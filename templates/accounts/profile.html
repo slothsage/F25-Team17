@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block content %}
+<h1>My Profile</h1>
+<p><b>Username:</b> {{ request.user.username }}</p>
+<p><b>Email:</b> {{ request.user.email }}</p>
+{% if request.user.driver_profile %}
+  <p><b>Phone:</b> {{ request.user.driver_profile.phone }}</p>
+  <p><b>Address:</b> {{ request.user.driver_profile.address }}</p>
+{% endif %}
+{% endblock %}

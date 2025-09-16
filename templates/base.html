@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sprint Demo</title>
+  <style>
+    body{font-family:system-ui;margin:2rem}
+    nav a, nav form{margin-right:1rem;display:inline-block}
+    .btn{padding:.4rem .8rem;border:1px solid #888;border-radius:.5rem;background:#f8f8f8}
+  </style>
+</head>
+<body>
+  <nav>
+    {% if user.is_authenticated %}
+      <a class="btn" href="{% url 'profile' %}">Profile</a>
+      <a class="btn" href="{% url 'profile_edit' %}">Edit Profile</a>
+      <a class="btn" href="{% url 'password_change' %}">Change Password</a>
+      <a class="btn" href="{% url 'password_reset' %}">Forgot Password</a>
+      <a class="btn" href="{% url 'delete_account' %}">Delete Account</a>
+      <form method="post" action="{% url 'logout' %}" style="display:inline">{% csrf_token %}
+        <button class="btn" type="submit">Log Out</button>
+      </form>
+    {% else %}
+      <a class="btn" href="{% url 'login' %}">Login</a>
+      <a class="btn" href="{% url 'password_reset' %}">Forgot Password</a>
+    {% endif %}
+  </nav>
+
+  {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+  {% block content %}{% endblock %}
+</body>
+</html>
