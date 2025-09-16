@@ -7,3 +7,5 @@ Team 17 Repo
 - Wilson Collins
 - Jacob Roberts
 
+# TO Run Server:
+- python3 manage.py runserver
