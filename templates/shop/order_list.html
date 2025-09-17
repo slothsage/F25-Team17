@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block content %}
+<h1>My Orders</h1>
+
+<form method="get" style="margin-bottom:1rem">
+  <label>Status:
+    <select name="status" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for s in "pending,confirmed,shipped,delivered,cancelled".split(',') %}
+        <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|title }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
+{% if orders %}
+  <ul>
+  {% for o in orders %}
+    <li>
+      <a href="{% url 'order_detail' o.id %}">Order #{{ o.id }}</a>
+      — {{ o.status|title }} — {{ o.points_spent }} pts — {{ o.placed_at|date:"Y-m-d H:i" }}
+    </li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <p>No orders yet.</p>
+{% endif %}
+{% endblock %}

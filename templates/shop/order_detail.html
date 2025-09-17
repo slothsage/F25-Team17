@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block content %}
+<h1>Order #{{ order.id }}</h1>
+<p>Status: <strong>{{ order.status|title }}</strong></p>
+<p>Points spent: {{ order.points_spent }}</p>
+
+<h3>Items</h3>
+<ul>
+{% for it in order.items.all %}
+  <li>{{ it.name_snapshot }} — {{ it.quantity }} × {{ it.points_each }} pts = {{ it.line_points }} pts</li>
+{% endfor %}
+</ul>
+
+{% if order.can_mark_received %}
+  <form method="post" action="{% url 'mark_order_received' order.id %}">
+    {% csrf_token %}
+    <button class="btn">Mark as received</button>
+  </form>
+{% endif %}
+
+<p><a class="btn" href="{% url 'order_list' %}">Back to Orders</a></p>
+{% endblock %}

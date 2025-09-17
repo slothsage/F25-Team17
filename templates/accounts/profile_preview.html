@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block content %}
+<h1>Profile Preview (Sponsor View)</h1>
+<p><em>This is how sponsors see your profile.</em></p>
+<ul>
+  <li><b>Username:</b> {{ data.username }}</li>
+  <li><b>Email:</b> {{ data.email }}</li>
+  <li><b>Phone:</b> {{ data.phone }}</li>
+  <li><b>Address:</b> {{ data.address }}</li>
+  <li><b>Join Status:</b> {{ data.join_status }}</li>
+</ul>
+<a class="btn" href="{% url 'profile' %}">Back to My Profile</a>
+{% endblock %}

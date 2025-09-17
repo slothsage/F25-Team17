@@ -24,6 +24,19 @@ def profile_edit(request):
     return render(request, "accounts/profile_edit.html", {"form": form})
 
 @login_required
+def profile_preview(request):
+    # Sponsor-visible projection 
+    profile = getattr(request.user, "driver_profile", None)
+    data = {
+        "username": request.user.username,
+        "email": request.user.email,
+        "phone": profile.phone if profile else "",
+        "address": profile.address if profile else "",
+        "join_status": "approved",  
+    }
+    return render(request, "accounts/profile_preview.html", {"data": data})
+
+@login_required
 def delete_account(request):
     if request.method == "POST":
         form = DeleteAccountForm(request.POST)

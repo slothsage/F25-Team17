@@ -1,4 +1,5 @@
-{% extends "base.html" %}{% block content %}
+{% extends "base.html" %}
+{% block content %}
 <h1>My Profile</h1>
 <p><b>Username:</b> {{ request.user.username }}</p>
 <p><b>Email:</b> {{ request.user.email }}</p>
@@ -6,4 +7,9 @@
   <p><b>Phone:</b> {{ request.user.driver_profile.phone }}</p>
   <p><b>Address:</b> {{ request.user.driver_profile.address }}</p>
 {% endif %}
+
+<hr>
+
+<a class="btn btn-primary" href="{% url 'profile_edit' %}">Edit Profile</a>
+<a class="btn btn-secondary" href="{% url 'profile_preview' %}">Preview as Sponsor</a>
 {% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block content %}
+<h1>My Cart</h1>
+
+{% if items %}
+  <ul>
+  {% for it in items %}
+    <li>{{ it.name_snapshot }} — {{ it.quantity }} × {{ it.points_each }} pts</li>
+  {% endfor %}
+  </ul>
+  <p><strong>Total:</strong> {{ total_points }} pts</p>
+
+  <form method="post" action="{% url 'clear_cart' %}">
+    {% csrf_token %}
+    <button class="btn" onclick="return confirm('Clear all items?')">Clear Cart</button>
+  </form>
+{% else %}
+  <p>Your cart is empty.</p>
+{% endif %}
+
+{% endblock %}
