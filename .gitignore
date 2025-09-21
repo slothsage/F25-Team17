@@ -1,0 +1,27 @@
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Django stuff
+db.sqlite3
+*.log
+*.pot
+*.py,cover
+local_settings.py
+
+# Environments & secrets
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS junk
+.DS_Store
+Thumbs.db
