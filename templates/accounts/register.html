@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<h1>Create your account</h1>
+<form method="post" action="{% url 'accounts:register' %}">{% csrf_token %}
+  {{ form.non_field_errors }}
+
+  {{ form.username.errors }}
+  <p>{{ form.username.label_tag }} {{ form.username }}</p>
+
+  {{ form.email.errors }}
+  <p>{{ form.email.label_tag }} {{ form.email }}</p>
+
+  {{ form.password1.errors }}
+  <p>{{ form.password1.label_tag }} {{ form.password1 }}</p>
+  <div class="help">{{ form.password1.help_text|safe }}</div>
+
+  <div style="margin:.5rem 0;">
+    <div>Password strength: <strong id="meter-text">—</strong></div>
+    <progress id="meter" max="4" value="0"></progress>
+  </div>
+
+  {{ form.password2.errors }}
+  <p>{{ form.password2.label_tag }} {{ form.password2 }}</p>
+
+  <button class="btn">Create account</button>
+</form>
+<script src="{% static 'accounts/password_strength.js' %}"></script>
+{% endblock %}

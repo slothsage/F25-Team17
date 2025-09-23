@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Password Policy{% endblock %}
+{% block content %}
+<h1>Password Policy</h1>
+<form method="post" action="{% url 'accounts:edit_policy' %}">{% csrf_token %}
+  <p>Min length <input type="number" name="min_length" value="{{ policy.min_length }}" min="4" max="128"></p>
+  <p><label><input type="checkbox" name="require_upper" {% if policy.require_upper %}checked{% endif %}> Require uppercase</label></p>
+  <p><label><input type="checkbox" name="require_lower" {% if policy.require_lower %}checked{% endif %}> Require lowercase</label></p>
+  <p><label><input type="checkbox" name="require_digit" {% if policy.require_digit %}checked{% endif %}> Require number</label></p>
+  <p><label><input type="checkbox" name="require_symbol" {% if policy.require_symbol %}checked{% endif %}> Require symbol</label></p>
+  <p>Expiry (days) <input type="number" name="expiry_days" value="{{ policy.expiry_days }}" min="0" max="3650"></p>
+  <button class="btn">Save policy</button>
+</form>
+{% endblock %}

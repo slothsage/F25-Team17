@@ -47,14 +47,6 @@ TEMPLATES = [{
 
 WSGI_APPLICATION = "truckincentive.wsgi.application"
 
-# SQLite for Sprint demo
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.sqlite3",
-#         "NAME": BASE_DIR / "db.sqlite3",
-#     }
-# }
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
@@ -71,10 +63,22 @@ DATABASES = {
     }
 }
 
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-     "OPTIONS": {"min_length": 8}},
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 12}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},   
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "accounts.validators.PolicyComplexityValidator"},
+]
+
+# 24 hours
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -82,13 +86,13 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
-
+# STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Auth flow
-LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "profile"
-LOGOUT_REDIRECT_URL = "login"
+LOGIN_URL = "accounts:login"
+LOGIN_REDIRECT_URL = "accounts:profile"      # after successful login
+LOGOUT_REDIRECT_URL = "accounts:login"       # after logout
 
 # Email prints to console for password reset demo
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

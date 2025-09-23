@@ -1,5 +1,10 @@
 from django import forms
 from .models import DriverProfile
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
+from django.contrib.auth.password_validation import password_validators_help_text_html
+
+User = get_user_model()
 
 class ProfileForm(forms.ModelForm):
     email = forms.EmailField(required=True, label="Email")
@@ -35,3 +40,22 @@ class DeleteAccountForm(forms.Form):
         if v != "DELETE":
             raise forms.ValidationError('Please type DELETE to confirm.')
         return v
+    
+
+class RegistrationForm(UserCreationForm):
+    email = forms.EmailField(required=True)
+
+    class Meta:
+        model = User
+        fields = ("username", "email")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Surface rules coming from AUTH_PASSWORD_VALIDATORS (incl. your custom one)
+        self.fields["password1"].help_text = password_validators_help_text_html()
+
+
+class PolicyPasswordChangeForm(PasswordChangeForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["new_password1"].help_text = password_validators_help_text_html()

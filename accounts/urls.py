@@ -1,15 +1,22 @@
-from django.urls import path
+from django.urls import path, reverse_lazy
 from django.contrib.auth import views as auth_views
 from . import views
+from .forms import PolicyPasswordChangeForm
+
+app_name = "accounts"
 
 urlpatterns = [
     # Auth
     path("login/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("register/", views.register, name="register"),
 
     # Password change (while logged in)
     path("password/change/", auth_views.PasswordChangeView.as_view(
-        template_name="registration/password_change_form.html"), name="password_change"),
+        form_class=PolicyPasswordChangeForm,
+        template_name="registration/password_change_form.html",
+        success_url=reverse_lazy("accounts:password_change_done"),
+    ), name="password_change"),
     path("password/change/done/", auth_views.PasswordChangeDoneView.as_view(
         template_name="registration/password_change_done.html"), name="password_change_done"),
 
@@ -22,6 +29,13 @@ urlpatterns = [
         template_name="registration/password_reset_confirm.html"), name="password_reset_confirm"),
     path("reset/done/", auth_views.PasswordResetCompleteView.as_view(
         template_name="registration/password_reset_complete.html"), name="password_reset_complete"),
+
+    # Admin-only password policy page 
+    path("policy/", views.edit_policy, name="edit_policy"),
+
+    # Admin-triggered password actions 
+    path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
+    path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
 
     # Driver profile
     path("", views.profile, name="profile"),
