@@ -1,22 +1,32 @@
+{# templates/registration/login.html #}
 {% extends "base.html" %}
+
 {% block title %}Login{% endblock %}
+
 {% block content %}
-<h1>Driver Login</h1>
-<form method="post" action="{% url 'accounts:login' %}">{% csrf_token %}
-{% extends "base.html" %}{% block content %}
-<h1>Sign In</h1>
-<p>Select your login type:</p>
-<form method="post">{% csrf_token %}
-  <div>
-    <label><input type="radio" name="user_type" value="driver" checked> Driver</label>
-    <label><input type="radio" name="user_type" value="sponsor"> Sponsor</label>
-    <label><input type="radio" name="user_type" value="admin"> Admin</label>
-  </div>
+  <h1>Sign In</h1>
 
-  <hr>
+  <form method="post" action="{% url 'accounts:login' %}">
+    {% csrf_token %}
+    <div>
+      <label>Username
+        <input type="text" name="username" required>
+      </label>
+    </div>
 
-  {{ form.as_p }}
-  <button class="btn">Login</button>
-</form>
-<p><a href="{% url 'accounts:password_reset' %}">Forgot your password?</a></p>
+    <div>
+      <label>Password
+        <input type="password" name="password" required>
+      </label>
+    </div>
+
+    <div>
+      <p>Select your login type:</p>
+      <label><input type="radio" name="user_type" value="driver" checked> Driver</label>
+      <label><input type="radio" name="user_type" value="sponsor"> Sponsor</label>
+      <label><input type="radio" name="user_type" value="admin"> Admin</label>
+    </div>
+
+    <button class="btn" type="submit">Log In</button>
+  </form>
 {% endblock %}
