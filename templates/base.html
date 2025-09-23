@@ -13,6 +13,11 @@
 <body>
   <nav>
     {% if user.is_authenticated %}
+      {% if user.is_staff or user.is_superuser %}
+        <a class="btn" href="/admin/">Admin Search</a>
+  <a class="btn" href="/admin/create-driver/">Create Driver</a>
+  <a class="btn" href="/admin/create-sponsor/">Create Sponsor</a>
+      {% endif %}
       <a class="btn" href="{% url 'profile' %}">Profile</a>
       <a class="btn" href="{% url 'profile_edit' %}">Edit Profile</a>
       <a class="btn" href="{% url 'password_change' %}">Change Password</a>

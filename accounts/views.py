@@ -4,6 +4,13 @@ from django.contrib.auth import logout as auth_logout
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import DriverProfile
 from .forms import ProfileForm, DeleteAccountForm
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.models import User
+from django.db.models import Q
+from django import db as django_db
+from django.db import models
+from shop.models import Order
+from django.core.paginator import Paginator
 
 @login_required
 def profile(request):
@@ -50,3 +57,259 @@ def delete_account(request):
     else:
         form = DeleteAccountForm()
     return render(request, "accounts/delete_account.html", {"form": form})
+
+
+@login_required
+def admin_user_search(request):
+    """Admin landing page: search for drivers (users with driver_profile) and sponsors (by sponsor_name on orders).
+
+    Search params:
+      - q: text that matches username, email, phone, or address for drivers
+      - sponsor: text to match sponsor_name (in orders)
+
+    Renders `accounts/admin_user_search.html` with `drivers`, `sponsors`, and `q` in context.
+    """
+    # support nav search param `type` -> 'driver'|'sponsor'
+    q = request.GET.get("q", "").strip()
+    sponsor_q = request.GET.get("sponsor", "").strip()
+    nav_type = request.GET.get("type")
+    if nav_type == "driver" and q == "":
+        q = request.GET.get("q", "").strip()
+    if nav_type == "sponsor" and sponsor_q == "":
+        sponsor_q = request.GET.get("q", "").strip()
+
+    # Restrict driver searches to Users that have a DriverProfile and are not staff or sponsors
+    drivers_qs = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor")
+    drivers_matching_count = 0
+    if q:
+        drivers_qs = drivers_qs.filter(
+            Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
+        ).distinct()
+
+    # counts: total drivers in system, and matching drivers for this query
+    total_drivers_count = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor").count()
+    drivers_matching_count = drivers_qs.count()
+
+    sponsors = []
+    sponsors_matching_count = 0
+    # total distinct sponsor names
+    total_sponsors_count = Order.objects.exclude(sponsor_name__isnull=True).exclude(sponsor_name__exact="").values("sponsor_name").distinct().count()
+    if sponsor_q:
+        # find sponsor_name and aggregate counts + sample drivers
+        sponsor_rows = (
+            Order.objects.filter(sponsor_name__icontains=sponsor_q)
+            .values("sponsor_name")
+            .annotate(count=models.Count("id"))
+            .order_by("sponsor_name")
+        )
+        # build a list with sponsor, count, and sample drivers
+        sponsors = []
+        for row in sponsor_rows:
+            name = row["sponsor_name"]
+            count = row["count"]
+            drivers = (
+                User.objects.filter(orders__sponsor_name=name).distinct().values_list("username", flat=True)[:5]
+            )
+            sponsors.append({"name": name, "count": count, "drivers": list(drivers)})
+        sponsors_matching_count = sponsor_rows.count()
+
+    # simple pagination for drivers
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(drivers_qs, 25)
+    drivers_page = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "accounts/admin_user_search.html",
+        {
+            "drivers": drivers_page,
+            "sponsors": sponsors,
+            "q": q,
+            "sponsor_q": sponsor_q,
+            "total_drivers_count": total_drivers_count,
+            "drivers_matching_count": drivers_matching_count,
+            "total_sponsors_count": total_sponsors_count,
+            "sponsors_matching_count": sponsors_matching_count,
+        },
+    )
+
+
+from django.contrib.auth.views import LoginView
+from django.shortcuts import resolve_url
+from django.contrib.auth import logout as auth_logout
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
+from django import forms
+from django.contrib.admin.views.decorators import staff_member_required
+
+
+class FrontLoginView(LoginView):
+    template_name = "registration/login.html"
+
+    def form_valid(self, form):
+        # user_type is chosen on the login form (driver/sponsor/admin)
+        user = form.get_user()
+        user_type = self.request.POST.get("user_type")
+
+        # log the user in using parent behavior
+        response = super().form_valid(form)
+
+        # Enforce user_type role restrictions
+        if user_type == "driver":
+            # disallow staff/superuser choosing driver (admins must pick admin)
+            if user.is_staff or user.is_superuser:
+                auth_logout(self.request)
+                messages.error(self.request, "Admin accounts must sign in as Admin. Please choose Admin on the login form.")
+                return redirect("login")
+            # must have a DriverProfile
+            if not hasattr(user, "driver_profile"):
+                auth_logout(self.request)
+                messages.error(self.request, "This account is not a driver. Please select the correct user type.")
+                return redirect("login")
+
+        if user_type == "sponsor":
+            # disallow staff/superuser choosing sponsor
+            if user.is_staff or user.is_superuser:
+                auth_logout(self.request)
+                messages.error(self.request, "Admin accounts must sign in as Admin. Please choose Admin on the login form.")
+                return redirect("login")
+            # must be in sponsor group
+            if not user.groups.filter(name="sponsor").exists():
+                auth_logout(self.request)
+                messages.error(self.request, "This account is not a sponsor. Please select the correct user type.")
+                return redirect("login")
+
+        if user_type == "admin":
+            if not (user.is_staff or user.is_superuser):
+                auth_logout(self.request)
+                messages.error(self.request, "This account is not an admin. Please select the correct user type.")
+                return redirect("login")
+
+        # if admin and has privileges, go to admin landing
+        if user_type == "admin" and (user.is_staff or user.is_superuser):
+            return redirect(resolve_url("admin_user_search"))
+
+        return response
+
+
+@staff_member_required
+def create_driver(request):
+    """Admin-only page to create a new driver user with DriverProfile."""
+    User = get_user_model()
+
+    class DriverCreateForm(forms.Form):
+        username = forms.CharField(max_length=150)
+        email = forms.EmailField(required=False)
+        password1 = forms.CharField(widget=forms.PasswordInput, label="Password")
+        password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm Password")
+        phone = forms.CharField(max_length=20, required=False)
+        address = forms.CharField(max_length=255, required=False)
+
+        def clean_username(self):
+            u = self.cleaned_data["username"]
+            if User.objects.filter(username=u).exists():
+                raise forms.ValidationError("Username already exists")
+            return u
+
+        def clean(self):
+            cleaned = super().clean()
+            p1 = cleaned.get("password1")
+            p2 = cleaned.get("password2")
+            if p1 and p2 and p1 != p2:
+                raise forms.ValidationError("Passwords do not match")
+            return cleaned
+
+    if request.method == "POST":
+        form = DriverCreateForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data["username"]
+            email = form.cleaned_data.get("email", "")
+            password = form.cleaned_data["password1"]
+            phone = form.cleaned_data.get("phone", "")
+            address = form.cleaned_data.get("address", "")
+
+            user = User.objects.create_user(username=username, email=email, password=password)
+            # ensure not staff
+            user.is_staff = False
+            user.is_superuser = False
+            user.save()
+            # create driver profile
+            from .models import DriverProfile
+            DriverProfile.objects.create(user=user, phone=phone, address=address)
+
+            messages.success(request, f"Driver '{username}' created.")
+            return redirect("admin_user_search")
+    else:
+        form = DriverCreateForm()
+
+    return render(request, "accounts/create_driver.html", {"form": form})
+
+
+@staff_member_required
+def create_sponsor(request):
+    """Admin-only page to create a new sponsor user (added to 'sponsor' group)."""
+    User = get_user_model()
+
+    class SponsorCreateForm(forms.Form):
+        username = forms.CharField(max_length=150)
+        email = forms.EmailField(required=False)
+        password1 = forms.CharField(widget=forms.PasswordInput, label="Password")
+        password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm Password")
+
+        def clean_username(self):
+            u = self.cleaned_data["username"]
+            if User.objects.filter(username=u).exists():
+                raise forms.ValidationError("Username already exists")
+            return u
+
+        def clean(self):
+            cleaned = super().clean()
+            p1 = cleaned.get("password1")
+            p2 = cleaned.get("password2")
+            if p1 and p2 and p1 != p2:
+                raise forms.ValidationError("Passwords do not match")
+            return cleaned
+
+    if request.method == "POST":
+        form = SponsorCreateForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data["username"]
+            email = form.cleaned_data.get("email", "")
+            password = form.cleaned_data["password1"]
+
+            user = User.objects.create_user(username=username, email=email, password=password)
+            # ensure not staff
+            user.is_staff = False
+            user.is_superuser = False
+            user.save()
+            # add to sponsor group (create group if missing)
+            from django.contrib.auth.models import Group
+            sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
+            user.groups.add(sponsor_group)
+
+            messages.success(request, f"Sponsor '{username}' created.")
+            return redirect("admin_user_search")
+    else:
+        form = SponsorCreateForm()
+
+    return render(request, "accounts/create_sponsor.html", {"form": form})
+
+
+@staff_member_required
+def toggle_user_active(request, user_id):
+    """Toggle the is_active flag for a user (deactivate/reactivate). Staff-only POST endpoint."""
+    if request.method != "POST":
+        messages.error(request, "Invalid request method.")
+        return redirect("admin_user_search")
+
+    user = get_object_or_404(User, id=user_id)
+    # prevent staff from accidentally deactivating themselves
+    if user == request.user:
+        messages.error(request, "You cannot change your own active status.")
+        return redirect("admin_user_search")
+
+    user.is_active = not user.is_active
+    user.save()
+    action = "reactivated" if user.is_active else "deactivated"
+    messages.success(request, f"User '{user.username}' has been {action}.")
+    return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))

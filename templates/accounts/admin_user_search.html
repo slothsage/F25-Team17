@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin: User & Sponsor Search</h1>
+
+
+<form method="get" class="form-inline mb-3">
+  <div>
+    <label>Driver search:</label>
+    <input type="text" name="q" value="{{ q }}" placeholder="username, email, phone, address" />
+    <button class="btn">Search Drivers</button>
+  </div>
+</form>
+
+<form method="get" class="form-inline mb-3">
+  <div>
+    <label>Sponsor search:</label>
+    <input type="text" name="sponsor" value="{{ sponsor_q }}" placeholder="sponsor name" />
+    <button class="btn">Search Sponsors</button>
+  </div>
+</form>
+
+{% if drivers %}
+  <h2>Drivers</h2>
+  <p>Showing {{ drivers_matching_count }} matching drivers out of {{ total_drivers_count }} total drivers.</p>
+  <table class="table">
+    <thead><tr><th>Username</th><th>Email</th><th>Phone</th><th>Address</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for u in drivers %}
+      <tr>
+        <td>{{ u.username }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.driver_profile.phone }}</td>
+        <td>{{ u.driver_profile.address }}</td>
+        <td>
+          <form method="post" action="{% url 'toggle_user_active' u.id %}" style="display:inline">
+            {% csrf_token %}
+            {% if u == request.user %}
+              <!-- cannot change your own active status -->
+              <button class="btn" disabled>Cannot change yourself</button>
+            {% else %}
+              {% if u.is_active %}
+                <button class="btn btn-warning" type="submit">Deactivate</button>
+              {% else %}
+                <button class="btn btn-success" type="submit">Reactivate</button>
+              {% endif %}
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div>
+    {% if drivers.has_previous %}
+      <a href="?q={{ q }}&page={{ drivers.previous_page_number }}">Previous</a>
+    {% endif %}
+    Page {{ drivers.number }} of {{ drivers.paginator.num_pages }}
+    {% if drivers.has_next %}
+      <a href="?q={{ q }}&page={{ drivers.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if sponsors %}
+  <h2>Sponsors</h2>
+  <p>Showing {{ sponsors_matching_count }} matching sponsors out of {{ total_sponsors_count }} total sponsors.</p>
+  <table class="table">
+    <thead><tr><th>Name</th><th>Order Count</th><th>Sample Drivers</th></tr></thead>
+    <tbody>
+      {% for s in sponsors %}
+      <tr>
+        <td>{{ s.name }}</td>
+        <td>{{ s.count }}</td>
+        <td>
+          {% for d in s.drivers %}
+            {{ d }}{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
+{% endblock %}
