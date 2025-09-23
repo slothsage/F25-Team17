@@ -19,6 +19,17 @@
       <a class="btn" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
       <a class="btn" href="{% url 'accounts:delete_account' %}">Delete Account</a>
       <form method="post" action="{% url 'accounts:logout' %}" style="display:inline">{% csrf_token %}
+      {% if user.is_staff or user.is_superuser %}
+        <a class="btn" href="/admin/">Admin Search</a>
+  <a class="btn" href="/admin/create-driver/">Create Driver</a>
+  <a class="btn" href="/admin/create-sponsor/">Create Sponsor</a>
+      {% endif %}
+      <a class="btn" href="{% url 'profile' %}">Profile</a>
+      <a class="btn" href="{% url 'profile_edit' %}">Edit Profile</a>
+      <a class="btn" href="{% url 'password_change' %}">Change Password</a>
+      <a class="btn" href="{% url 'password_reset' %}">Forgot Password</a>
+      <a class="btn" href="{% url 'delete_account' %}">Delete Account</a>
+      <form method="post" action="{% url 'logout' %}" style="display:inline">{% csrf_token %}
         <button class="btn" type="submit">Log Out</button>
       </form>
     {% else %}

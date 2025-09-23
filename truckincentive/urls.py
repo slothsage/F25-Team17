@@ -1,8 +1,15 @@
 from django.contrib import admin
 from django.urls import path, include
+from accounts import views as accounts_views
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # our custom admin landing/search
+    path("admin/", accounts_views.admin_user_search, name="admin_user_search"),
+    path("admin/create-driver/", accounts_views.create_driver, name="create_driver"),
+    path("admin/create-sponsor/", accounts_views.create_sponsor, name="create_sponsor"),
+    path("admin/user/<int:user_id>/toggle-active/", accounts_views.toggle_user_active, name="toggle_user_active"),
+    # real admin site moved to /admin/site/
+    path("admin/site/", admin.site.urls),
     path("", include("accounts.urls")),
     path("", include("shop.urls")),
 ]

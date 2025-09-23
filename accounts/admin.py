@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.urls import reverse
 from django.utils.html import format_html
+from .models import DriverProfile
 
 from .models import PasswordPolicy
 
@@ -45,3 +46,9 @@ class UserAdmin(DjangoUserAdmin):
             reverse("accounts:admin_send_reset_link", args=[obj.pk]),
             reverse("accounts:admin_set_temp_password", args=[obj.pk]),
         )
+
+
+@admin.register(DriverProfile)
+class DriverProfileAdmin(admin.ModelAdmin):
+	list_display = ("user", "phone", "address")
+	search_fields = ("user__username", "user__email", "phone", "address")
