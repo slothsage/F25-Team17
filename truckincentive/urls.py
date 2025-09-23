@@ -12,4 +12,5 @@ urlpatterns = [
     path("admin/site/", admin.site.urls),
     path("", include("accounts.urls")),
     path("", include("shop.urls")),
+    path("about/", accounts_views.about, name="about"),
 ]

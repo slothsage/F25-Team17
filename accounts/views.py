@@ -9,6 +9,8 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.core.mail import send_mail
+from django.db import connections
+from django.utils import timezone
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -388,3 +390,33 @@ def toggle_user_active(request, user_id):
     action = "reactivated" if user.is_active else "deactivated"
     messages.success(request, f"User '{user.username}' has been {action}.")
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
+
+
+def about(request):
+    connected = False
+    db_name = db_user = db_version = None
+    error = None
+
+    try:
+        with connections["default"].cursor() as cur:
+            # simple ping + some info
+            cur.execute("SELECT DATABASE(), USER(), VERSION()")
+            db_name, db_user, db_version = cur.fetchone()
+        connected = True
+    except Exception as e:
+        error = str(e)
+
+    # mask DB user for public display (e.g., CP****)
+    masked_user = None
+    if db_user:
+        user_part = db_user.split("@", 1)[0]
+        masked_user = (user_part[:2] + "****") if user_part else "****"
+
+    return render(request, "about.html", {
+        "connected": connected,
+        "db_name": db_name,
+        "db_user_masked": masked_user,
+        "db_version": db_version,
+        "error": error,
+        "now": timezone.now(),
+    })

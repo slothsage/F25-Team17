@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>About / Connectivity Check</h1>
+
+{% if connected %}
+  <p><strong>Status:</strong> ✅ Connected</p>
+  <ul>
+    <li><strong>DATABASE():</strong> {{ db_name }}</li>
+    <li><strong>USER():</strong> {{ db_user_masked }}</li>
+    <li><strong>VERSION():</strong> {{ db_version }}</li>
+  </ul>
+{% else %}
+  <p><strong>Status:</strong> ❌ Not connected</p>
+  {% if error %}<pre>{{ error }}</pre>{% endif %}
+{% endif %}
+
+<p>Rendered at: {{ now|date:"c" }}</p>
+{% endblock %}
