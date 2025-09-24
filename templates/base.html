@@ -1,6 +1,17 @@
 <!doctype html>
 <html>
 <head>
+  <script>
+    (function () {
+      try {
+        const stored = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored ? stored : (prefersDark ? "dark" : "light");
+        if (theme === "dark") document.documentElement.classList.add("dark");
+      } catch (_) {}
+    })();
+  </script>
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Sprint Demo</title>
@@ -8,6 +19,15 @@
     body{font-family:system-ui;margin:2rem}
     nav a, nav form{margin-right:1rem;display:inline-block}
     .btn{padding:.4rem .8rem;border:1px solid #888;border-radius:.5rem;background:#f8f8f8}
+
+    /* ADD: dark-mode overrides */
+      .dark body { background:#0b1020; color:#e5e7eb; }
+    .dark a { color:#a78bfa; }
+    .dark .btn {
+      background:#1f2937;
+      color:#e5e7eb;
+      border-color:#374151;
+    }
   </style>
 </head>
 <body>
@@ -34,9 +54,36 @@
     <a class="btn" href="{% url 'accounts:register' %}">Register</a>
     <a class="btn" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
   {% endif %}
-</nav>
 
+  <!-- ADD: theme toggle button -->
+  <button class="btn" id="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false">
+    Dark Mode: Off
+  </button>
+</nav>
   {% for m in messages %}<p>{{ m }}</p>{% endfor %}
   {% block content %}{% endblock %}
+    <!-- ADD: toggle logic (persist in localStorage) -->
+    <script>
+      (function () {
+        const btn = document.getElementById("theme-toggle");
+        if (!btn) return;
+  
+        const setLabel = () => {
+          const on = document.documentElement.classList.contains("dark");
+          btn.textContent = "Dark Mode: " + (on ? "On" : "Off");
+          btn.setAttribute("aria-pressed", String(on));
+        };
+  
+        setLabel();
+  
+        btn.addEventListener("click", () => {
+          const root = document.documentElement;
+          root.classList.toggle("dark");
+          const on = root.classList.contains("dark");
+          try { localStorage.setItem("theme", on ? "dark" : "light"); } catch (_) {}
+          setLabel();
+        });
+      })();
+    </script>
 </body>
 </html>
