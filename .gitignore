@@ -3,20 +3,44 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.so
 
 # Django stuff
-db.sqlite3
 *.log
 *.pot
 *.py,cover
 local_settings.py
+media/
+staticfiles/
+tmp/
 
 # Environments & secrets
 .env
+.env.*
 .venv/
 venv/
 ENV/
 env/
+secrets.json
+config.json
+credentials/
+aws_credentials/
+.gnupg/
+
+*.pem
+*.key
+
+# AWS
+.aws/
+*.tfstate
+*.tfstate.*
+.terraform/
+cloudformation-template.json
+
+# MySql
+*.sql
+*.dump
+*.bak
 
 # VS Code
 .vscode/
