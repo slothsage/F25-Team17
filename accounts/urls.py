@@ -43,4 +43,7 @@ urlpatterns = [
     path("account/delete/", views.delete_account, name="delete_account"),
     path("profile/preview/", views.profile_preview, name="profile_preview"),
 
+    # Notification preferences
+    path("notifications/settings/", views.notification_settings, name="notification_settings"),
+    path("notifications/", views.notifications_feed, name="notifications_feed"),
 ]

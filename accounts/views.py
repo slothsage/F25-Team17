@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django import forms
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout as auth_logout
 from django.shortcuts import render, redirect, get_object_or_404
@@ -15,7 +16,9 @@ from django.utils import timezone
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
 from .models import DriverProfile
+from .models import Notification
 from .forms import ProfileForm, DeleteAccountForm
+from .models import DriverNotificationPreference
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -391,6 +394,34 @@ def toggle_user_active(request, user_id):
     messages.success(request, f"User '{user.username}' has been {action}.")
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
+class NotificationPrefsForm(forms.ModelForm):
+    class Meta:
+        model = DriverNotificationPreference
+        fields = ["orders", "points", "promotions"]
+        widgets = {
+            "orders": forms.CheckboxInput(),
+            "points": forms.CheckboxInput(),
+            "promotions": forms.CheckboxInput(),
+        }
+
+@login_required
+def notification_settings(request):
+    prefs = DriverNotificationPreference.for_user(request.user)
+    if request.method == "POST":
+        form = NotificationPrefsForm(request.POST, instance=prefs)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Notification preferences saved.")
+            return redirect("notification_settings")
+    else:
+        form = NotificationPrefsForm(instance=prefs)
+    return render(request, "accounts/notification_settings.html", {"form": form})
+
+
+@login_required
+def notifications_feed(request):
+    rows = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
+    return render(request, "accounts/notifications_feed.html", {"rows": rows})
 
 def about(request):
     connected = False

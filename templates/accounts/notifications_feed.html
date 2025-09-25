@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Notifications</h1>
+  <ul>
+    {% for n in rows %}
+      <li>
+        <strong>[{{ n.kind }}]</strong> {{ n.title }} — {{ n.body }} ({{ n.created_at }})
+        {% if n.url %}<a href="{{ n.url }}">Open</a>{% endif %}
+      </li>
+    {% empty %}
+      <li>No notifications.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}
