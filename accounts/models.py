@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.db.models import Sum
 from django.contrib.auth.models import User
 
 class DriverProfile(models.Model):
@@ -71,3 +72,17 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"[{self.kind}] {self.title} → {self.user}"
+    
+class PointsLedger(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="points_ledger")
+    delta = models.IntegerField()  # positive or negative
+    reason = models.CharField(max_length=255, blank=True)
+    balance_after = models.IntegerField()  
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        sign = "+" if self.delta >= 0 else ""
+        return f"{self.user} {sign}{self.delta} ({self.reason}) → {self.balance_after}"

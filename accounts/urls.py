@@ -46,4 +46,8 @@ urlpatterns = [
     # Notification preferences
     path("notifications/settings/", views.notification_settings, name="notification_settings"),
     path("notifications/", views.notifications_feed, name="notifications_feed"),
+    path("notifications/clear/", views.notifications_clear, name="notifications_clear"),
+
+    
+    path("points/", views.points_history, name="points_history"),
 ]

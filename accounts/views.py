@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django import forms
+from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout as auth_logout
 from django.shortcuts import render, redirect, get_object_or_404
@@ -12,11 +13,13 @@ from django.utils.http import urlsafe_base64_encode
 from django.core.mail import send_mail
 from django.db import connections
 from django.utils import timezone
+from django.db.models import Sum
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
 from .models import DriverProfile
 from .models import Notification
+from .models import PointsLedger
 from .forms import ProfileForm, DeleteAccountForm
 from .models import DriverNotificationPreference
 from django.contrib.admin.views.decorators import staff_member_required
@@ -422,6 +425,27 @@ def notification_settings(request):
 def notifications_feed(request):
     rows = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
     return render(request, "accounts/notifications_feed.html", {"rows": rows})
+
+
+@login_required
+@require_POST
+def notifications_clear(request):
+    Notification.objects.filter(user=request.user).delete()
+    messages.success(request, "All notifications cleared.")
+    return redirect("accounts:notifications_feed")
+
+
+
+@login_required
+def points_history(request):
+    rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
+    balance = rows.aggregate(s=Sum("delta"))["s"] or 0
+    return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
+
+
+
+
+
 
 def about(request):
     connected = False

@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>Notifications</h1>
+
+<form method="post" action="{% url 'accounts:notifications_clear' %}" style="margin-bottom:1rem">
+  {% csrf_token %}
+  <button class="btn" type="submit">Clear All</button>
+</form>
+
   <ul>
     {% for n in rows %}
       <li>

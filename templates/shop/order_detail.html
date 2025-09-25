@@ -10,6 +10,13 @@
 {% endfor %}
 </ul>
 
+{% if order.status == "pending" or order.status == "processing" %}
+  <form method="post" action="{% url 'cancel_order' order.id %}" style="display:inline">
+    {% csrf_token %}
+    <button class="btn" type="submit">Cancel Order</button>
+  </form>
+{% endif %}
+
 {% if order.can_mark_received %}
   <form method="post" action="{% url 'mark_order_received' order.id %}">
     {% csrf_token %}

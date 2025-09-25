@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Points history</h1>
+
+  {% if rows %}
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Change</th>
+          <th>Reason</th>
+          <th>Balance after</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{ r.created_at }}</td>
+            <td>{% if r.delta >= 0 %}+{% endif %}{{ r.delta }}</td>
+            <td>{{ r.reason }}</td>
+            <td>{{ r.balance_after }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No points activity yet.</p>
+  {% endif %}
+
+  <p style="margin-top:1rem">
+    <a class="btn" href="{% url 'accounts:notifications_feed' %}">Back to Notifications</a>
+  </p>
+{% endblock %}
