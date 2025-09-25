@@ -27,8 +27,15 @@ credentials/
 aws_credentials/
 .gnupg/
 
+# Common keys and certs
 *.pem
 *.key
+*.crt
+*.cer
+*.der
+*.pfx
+*.p12
+*.csr
 
 # AWS
 .aws/
