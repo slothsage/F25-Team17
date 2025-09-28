@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Profile Preview{% endblock %}
+
+{% block title %}Profile Preview{% endblock title %}
 {% block content %}
 <h1>Profile Preview (Sponsor View)</h1>
 <p><em>This is how sponsors see your profile.</em></p>
@@ -11,4 +12,4 @@
   <li><b>Join Status:</b> {{ data.join_status }}</li>
 </ul>
 <a class="btn" href="{% url 'accounts:profile' %}">Back to My Profile</a>
-{% endblock %}
+{% endblock content %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Password Policy{% endblock %}
+{% block title %}Password Policy{% endblock title %}
 {% block content %}
 <h1>Password Policy</h1>
 <form method="post" action="{% url 'accounts:edit_policy' %}">{% csrf_token %}
@@ -11,4 +11,4 @@
   <p>Expiry (days) <input type="number" name="expiry_days" value="{{ policy.expiry_days }}" min="0" max="3650"></p>
   <button class="btn">Save policy</button>
 </form>
-{% endblock %}
+{% endblock content %}

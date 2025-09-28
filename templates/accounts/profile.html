@@ -1,14 +1,26 @@
 {% extends "base.html" %}
-{% block title %}My Profile{% endblock %}
+{% block title %}My Profile{% endblock title %}
+
 {% block content %}
 <h1>My Profile</h1>
 <p><b>Username:</b> {{ request.user.username }}</p>
 <p><b>Email:</b> {{ request.user.email }}</p>
+
 {% if request.user.driver_profile %}
+  <p><b>Name:</b>
+    {{ request.user.driver_profile.first_name }}
+    {{ request.user.driver_profile.last_name }}</p>
   <p><b>Phone:</b> {{ request.user.driver_profile.phone }}</p>
   <p><b>Address:</b> {{ request.user.driver_profile.address }}</p>
+  <p><b>City/State/Zip:</b>
+    {{ request.user.driver_profile.city }},
+    {{ request.user.driver_profile.state }}
+    {{ request.user.driver_profile.zip_code }}</p>
+
+{% else %}
+  <p>No driver profile found yet.</p>
 {% endif %}
 <hr>
 <a class="btn" href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
 <a class="btn" href="{% url 'accounts:profile_preview' %}">Preview as Sponsor</a>
-{% endblock %}
+{% endblock content %}

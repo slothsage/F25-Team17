@@ -11,7 +11,16 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = DriverProfile
-        fields = ["phone", "address"]
+        fields = [
+            "first_name",
+            "last_name",
+            "phone",
+            "address",
+            "city",
+            "state",
+            "zip_code",
+            # "profile_image"
+        ]
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user")

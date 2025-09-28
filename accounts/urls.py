@@ -39,6 +39,7 @@ urlpatterns = [
 
     # Driver profile
     path("", views.profile, name="profile"),
+    path("profile/", views.profile, name="profile_detail"),  # For convenience
     path("profile/edit/", views.profile_edit, name="profile_edit"),
     path("account/delete/", views.delete_account, name="delete_account"),
     path("profile/preview/", views.profile_preview, name="profile_preview"),
