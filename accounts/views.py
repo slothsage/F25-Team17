@@ -53,7 +53,7 @@ def profile_edit(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Profile updated.")
-            return redirect("profile")
+            return redirect("accounts:profile")
     else:
         form = ProfileForm(instance=profile, user=request.user)
     return render(request, "accounts/profile_edit.html", {"form": form})
@@ -81,7 +81,7 @@ def delete_account(request):
             auth_logout(request)
             user.delete()
             messages.success(request, "Your account has been deleted.")
-            return redirect("login")
+            return redirect("accounts:login")
     else:
         form = DeleteAccountForm()
     return render(request, "accounts/delete_account.html", {"form": form})
@@ -93,7 +93,7 @@ def register(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Account created. You can now log in.")
-            return redirect("login")
+            return redirect("accounts:login")
     else:
         form = RegistrationForm()
     return render(request, "accounts/register.html", {"form": form})
@@ -123,7 +123,7 @@ def send_reset_link(request, user_id):
     user = get_object_or_404(User, pk=user_id)
     uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    url = request.build_absolute_uri(reverse("password_reset_confirm", args=[uidb64, token]))
+    url = request.build_absolute_uri(reverse("accounts:password_reset_confirm", args=[uidb64, token]))
     send_mail(
         subject="Password reset",
         message=f"Use this link to reset your password: {url}",
@@ -415,7 +415,7 @@ def notification_settings(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Notification preferences saved.")
-            return redirect("notification_settings")
+            return redirect("accounts:notification_settings")
     else:
         form = NotificationPrefsForm(instance=prefs)
     return render(request, "accounts/notification_settings.html", {"form": form})
