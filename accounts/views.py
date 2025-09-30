@@ -13,6 +13,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.core.mail import send_mail
 from django.db import connections
 from django.utils import timezone
+from datetime import timedelta
 from django.db.models import Sum
 
 from .forms import RegistrationForm  
@@ -164,6 +165,8 @@ def admin_user_search(request):
     # support nav search param `type` -> 'driver'|'sponsor'
     q = request.GET.get("q", "").strip()
     sponsor_q = request.GET.get("sponsor", "").strip()
+    sort = request.GET.get("sort", "")
+    inactive = request.GET.get("inactive", "")
     nav_type = request.GET.get("type")
     if nav_type == "driver" and q == "":
         q = request.GET.get("q", "").strip()
@@ -177,6 +180,17 @@ def admin_user_search(request):
         drivers_qs = drivers_qs.filter(
             Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
         ).distinct()
+
+    if inactive == "never":
+        drivers_qs = drivers_qs.filter(last_login__isnull=True)
+    elif inactive == "30days":
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        drivers_qs = drivers_qs.filter(last_login__lt=thirty_days_ago)
+
+    if sort == "last_login_desc":
+        drivers_qs = drivers_qs.order_by("-last_login")
+    elif sort == "last_login_asc":
+        drivers_qs = drivers_qs.order_by("last_login")
 
     # counts: total drivers in system, and matching drivers for this query
     total_drivers_count = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor").count()

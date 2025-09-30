@@ -20,6 +20,23 @@
 </form>
 
 {% if drivers %}
+  <form method="get" class="form-inline mb-3">
+    <input type="hidden" name="q" value="{{ q }}">
+    <label for="sort">Sort by last login:</label>
+    <select name="sort" id="sort" onchange="this.form.submit()">
+      <option value="">--</option>
+      <option value="last_login_desc" {% if request.GET.sort == "last_login_desc" %}selected{% endif %}>Most recent</option>
+      <option value="last_login_asc" {% if request.GET.sort == "last_login_asc" %}selected{% endif %}>Oldest first</option>
+    </select>
+
+    <label for="inactive">Filter:</label>
+    <select name="inactive" id="inactive" onchange="this.form.submit()">
+      <option value="">All users</option>
+      <option value="never" {% if request.GET.inactive == "never" %}selected{% endif %}>Never logged in</option>
+      <option value="30days" {% if request.GET.inactive == "30days" %}selected{% endif %}>Inactive >30 days</option>
+    </select>
+  </form>
+
   <h2>Drivers</h2>
   <p>Showing {{ drivers_matching_count }} matching drivers out of {{ total_drivers_count }} total drivers.</p>
   <table class="table">
@@ -35,7 +52,7 @@
     </thead>
     <tbody>
       {% for u in drivers %}
-      <tr>
+      <tr {% if not u.is_active %}style="background-color: rgba(255, 100, 100, 0.08);" {% endif %}>
         <td>{{ u.username }}</td>
         <td>{{ u.email }}</td>
         <td>{{ u.driver_profile.phone }}</td>
