@@ -499,6 +499,14 @@ class NotificationPrefsForm(forms.ModelForm):
             "points": forms.CheckboxInput(),
             "promotions": forms.CheckboxInput(),
         }
+########################################################
+@login_required
+def notifications(request):
+    rows = (MessageRecipient.objects
+        .select_related("message", "message__author")
+        .filter(user=request.user)
+        .order_by("-delivered_at"))
+    return render(request, "accounts/notifications.html", {"rows": rows})
 
 @login_required
 def notification_settings(request):

@@ -16,7 +16,8 @@ urlpatterns = [
     path("messages/sent/", views.messages_sent, name="messages_sent"),
     path("messages/", views.messages_inbox, name="messages_inbox"),
     path("messages/item/<int:pk>/", views.message_detail, name="message_detail"),
-
+    path("notifications/", views.notifications, name="notifications"),
+    
     # Password change (while logged in)
     path("password/change/", auth_views.PasswordChangeView.as_view(
         form_class=PolicyPasswordChangeForm,
