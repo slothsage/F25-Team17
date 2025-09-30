@@ -14,7 +14,7 @@
 <form method="get" class="form-inline mb-3">
   <div>
     <label>Sponsor search:</label>
-    <input type="text" name="sponsor" value="{{ sponsor_q }}" placeholder="sponsor name" />
+    <input type="text" name="sponsor" value="{{ sponsor_q }}" placeholder="sponsor name, email" />
     <button class="btn">Search Sponsors</button>
   </div>
 </form>
@@ -110,6 +110,50 @@
           {% for d in s.drivers %}
             {{ d }}{% if not forloop.last %}, {% endif %}
           {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
+{% if sponsor_users %}
+  <h2>Sponsor Users</h2>
+  <p>Showing {{ sponsor_users|length }} matching sponsor users.</p>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sponsor_users %}
+      <tr {% if not s.is_active %}style="background-color: rgba(255, 100, 100, 0.08);" {% endif %}>
+        <td>{{ s.username }}</td>
+        <td>{{ s.email }}</td>
+        <td>
+          {% if s.is_active %}
+            <span style="color: lightgreen;">Active</span>
+          {% else %}
+            <span style="color: red;">Inactive</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{% url 'toggle_user_active' s.id %}" style="display:inline">
+            {% csrf_token %}
+            {% if s == request.user %}
+              <button class="btn" disabled>Cannot change yourself</button>
+            {% else %}
+              {% if s.is_active %}
+                <button class="btn btn-warning" type="submit">Deactivate</button>
+              {% else %}
+                <button class="btn btn-success" type="submit">Reactivate</button>
+              {% endif %}
+            {% endif %}
+          </form>
         </td>
       </tr>
       {% endfor %}

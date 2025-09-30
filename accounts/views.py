@@ -219,6 +219,14 @@ def admin_user_search(request):
             sponsors.append({"name": name, "count": count, "drivers": list(drivers)})
         sponsors_matching_count = sponsor_rows.count()
 
+    sponsor_users_qs = User.objects.filter(groups__name="sponsor")
+    if sponsor_q:
+        sponsor_users_qs = sponsor_users_qs.filter(
+            Q(username__icontains=sponsor_q) |
+            Q(email__icontains=sponsor_q)
+        )
+    sponsor_users_qs = sponsor_users_qs.order_by("username")
+    
     # simple pagination for drivers
     page_number = request.GET.get("page", 1)
     paginator = Paginator(drivers_qs, 25)
@@ -230,6 +238,7 @@ def admin_user_search(request):
         {
             "drivers": drivers_page,
             "sponsors": sponsors,
+            "sponsor_users": sponsor_users_qs,
             "q": q,
             "sponsor_q": sponsor_q,
             "total_drivers_count": total_drivers_count,
