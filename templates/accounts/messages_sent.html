@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Sent Messages{% endblock title %}
+{% block content %}
+<h1>Sent Messages</h1>
+<ul>
+    {% for m in rows %}
+        <li><strong>{{ m.subject }}</strong> — {{ m.created_at|date:"Y-m-d H:i" }}</li>
+    {% empty %}
+        <p>No sent messages.</p>
+    {% endfor %}
+</ul>
+{% endblock content %}

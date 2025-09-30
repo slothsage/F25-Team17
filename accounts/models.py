@@ -91,3 +91,37 @@ class PointsLedger(models.Model):
     def __str__(self):
         sign = "+" if self.delta >= 0 else ""
         return f"{self.user} {sign}{self.delta} ({self.reason}) → {self.balance_after}"
+    
+# --- Announcement/Targeted Messaging ---
+class Message(models.Model):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="messages_authored")
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+
+    select_all = models.BooleanField(default=False)
+    include_admins = models.BooleanField(default=False)
+    include_sponsors = models.BooleanField(default=False)
+    include_drivers = models.BooleanField(default=False)
+
+    direct_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="messages_direct", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.subject} ({self.created_at:%Y-%m-%d %H:%M})"
+    
+class MessageRecipient(models.Model):
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="recipients")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="inbox_items")
+    is_read = models.BooleanField(default=False)
+    delivered_at = models.DateTimeField(auto_now_add=True) #for ordering
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = (("message", "user"),)
+        ordering = ["-delivered_at"]
+
+    def __str__(self):
+        return f"{self.user} - {self.message.subject}"

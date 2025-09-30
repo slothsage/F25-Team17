@@ -1,5 +1,6 @@
 from django import forms
 from .models import DriverProfile
+from .models import Message
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import password_validators_help_text_html
@@ -36,6 +37,41 @@ class ProfileForm(forms.ModelForm):
             profile.save()
         return profile
 
+class MessageComposeForm(forms.ModelForm):
+    select_all = forms.BooleanField(required=False, label="All Users")
+    include_admins = forms.BooleanField(required=False, label="Admins")
+    include_sponsors = forms.BooleanField(required=False, label="Sponsors")
+    include_drivers = forms.BooleanField(required=False, label="Drivers")
+
+    users = forms.ModelMultipleChoiceField(
+        queryset = User.objects.filter(is_active=True).order_by("username"),
+        required = False,
+        help_text = "Select specific users to send to (overrides other selections).",
+    )
+    
+    class Meta:
+        model = Message
+        fields = [
+            "subject",
+            "body",
+            "select_all",
+            "include_admins",
+            "include_sponsors",
+            "include_drivers",
+            "users",
+        ]
+
+    def clean(self):
+        cleaned = super().clean()
+        if not (
+            cleaned.get("select_all") or
+            cleaned.get("include_admins") or
+            cleaned.get("include_sponsors") or
+            cleaned.get("include_drivers") or
+            cleaned.get("users")
+        ):
+            raise forms.ValidationError("Please select at least one recipient.")
+        return cleaned
 
 class DeleteAccountForm(forms.Form):
     confirm = forms.CharField(

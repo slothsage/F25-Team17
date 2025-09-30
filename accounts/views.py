@@ -21,6 +21,9 @@ from .models import PasswordPolicy
 from .models import DriverProfile
 from .models import Notification
 from .models import PointsLedger
+from .models import Message, MessageRecipient
+from .forms import MessageComposeForm
+
 from .forms import ProfileForm, DeleteAccountForm
 from .models import DriverNotificationPreference
 from django.contrib.admin.views.decorators import staff_member_required
@@ -152,13 +155,14 @@ def set_temporary_password(request, user_id):
     )
     messages.success(request, f"Temporary password emailed to {user.email}.")
     return redirect(request.META.get("HTTP_REFERER", "admin:index"))
+
 @login_required
 def admin_user_search(request):
     """Admin landing page: search for drivers (users with driver_profile) and sponsors (by sponsor_name on orders).
 
     Search params:
-      - q: text that matches username, email, phone, or address for drivers
-      - sponsor: text to match sponsor_name (in orders)
+    - q: text that matches username, email, phone, or address for drivers
+    - sponsor: text to match sponsor_name (in orders)
 
     Renders `accounts/admin_user_search.html` with `drivers`, `sponsors`, and `q` in context.
     """
@@ -297,6 +301,72 @@ class FrontLoginView(LoginView):
 
         return response
 
+
+@staff_member_required
+def messages_compose(request):
+    if request.method == "POST":
+        form = MessageComposeForm(request.POST)
+        if form.is_valid():
+            msg = form.save(commit = False)
+            msg.author = request.user
+            msg.save()
+            form.save_m2m()  # for direct_users
+
+            # Determine recipients
+            recipients = User.objects.none()
+            active = User.objects.filter(is_active=True)
+
+            data = form.cleaned_data
+            if data["select_all"]:
+                recipients = active
+            else:
+                if data["include_admins"]:
+                    recipients = recipients | active.filter(Q(is_staff=True) | Q(is_superuser=True))
+                if data["include_sponsors"]:
+                    recipients = recipients | active.filter(groups__name="sponsor")
+                if data["include_drivers"]:
+                    recipients = (
+                        recipients | active.filter(driver_profile__isnull=False)
+                        .exclude(groups__name="sponsor")
+                        .exclude(Q(is_staff=True) | Q(is_superuser=True))
+                    )
+                if data["users"]:
+                    recipients = recipients | data["users"] 
+            recipients = recipients.distinct()
+
+            MessageRecipient.objects.bulk_create(
+                [MessageRecipient(message=msg, user=u) for u in recipients],
+                ignore_conflicts = True,
+            )
+
+            messages.success(request, f"Message sent to {recipients.count()} recipients.")
+            return redirect("accounts:messages_sent")
+    else:
+        form = MessageComposeForm()
+    return render(request, "accounts/messages_compose.html", {"form": form})
+
+@login_required
+def messages_inbox(request):
+    rows = (MessageRecipient.objects
+            .select_related("message", "message__author")
+            .filter(user=request.user)
+            .order_by("delivered_at")
+    )
+    return render(request, "accounts/messages_inbox.html", {"rows": rows})
+
+@staff_member_required
+def messages_sent(request):
+    rows = Message.objects.filter(author = request.user).order_by("-created_at")
+    return render(request, "accounts/messages_sent.html", {"rows": rows})
+
+@login_required
+def message_detail(request, pk: int):
+    item = get_object_or_404(MessageRecipient.objects.select_related("message", "message__author"), 
+                            pk=pk, user=request.user)
+    if not item.is_read:
+        item.is_read = True
+        item.save(update_fields = ["is_read"])
+    return render(request, "accounts/message_detail.html", {"item":item})
 
 @staff_member_required
 def create_driver(request):

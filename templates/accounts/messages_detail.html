@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ item.message.subject }}{% endblock title %}
+{% block content %}
+<h1>{{ item.message.subject }}</h1>
+<p><em>From:</em> {{ item.message.author.username }} | {{ item.message.created_at|date:"Y-m-d H:i" }}</p>
+<hr>
+<p style="white-space: pre-wrap;">{{ item.message.body }}</p>
+<a class="btn" href="{% url 'accounts:messages_inbox' %}">Back</a>
+{% endblock content %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock title %}
+{% block content %}
+<h1>Messages</h1>
+<ul>
+    {% for r in rows %}
+    <li>
+        {% if not r.is_read %}<strong>[new]</strong>{% endif %}
+        <a href="{% url 'accounts:message_detail' r.pk %}">{{ r.message.subject }}</a>
+        — from {{ r.message.author.username }} — {{ r.message.created_at|date:"Y-m-d H:i" }}
+    </li>
+    {% empty %}
+    <p>No messages.</p>
+    {% endfor %}
+</ul>
+{% endblock content %}

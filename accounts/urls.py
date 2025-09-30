@@ -11,6 +11,12 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("register/", views.register, name="register"),
 
+    # Messaging
+    path("messages/compose/", views.messages_compose, name="message_compose"),
+    path("messages/sent/", views.messages_sent, name="messages_sent"),
+    path("messages/", views.messages_inbox, name="messages_inbox"),
+    path("messages/item/<int:pk>/", views.message_detail, name="message_detail"),
+
     # Password change (while logged in)
     path("password/change/", auth_views.PasswordChangeView.as_view(
         form_class=PolicyPasswordChangeForm,
