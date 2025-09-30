@@ -23,7 +23,16 @@
   <h2>Drivers</h2>
   <p>Showing {{ drivers_matching_count }} matching drivers out of {{ total_drivers_count }} total drivers.</p>
   <table class="table">
-    <thead><tr><th>Username</th><th>Email</th><th>Phone</th><th>Address</th><th>Action</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Address</th>
+        <th>Last Login</th>
+        <th>Action</th>
+      </tr>
+    </thead>
     <tbody>
       {% for u in drivers %}
       <tr>
@@ -31,6 +40,14 @@
         <td>{{ u.email }}</td>
         <td>{{ u.driver_profile.phone }}</td>
         <td>{{ u.driver_profile.address }}</td>
+        <td>
+          {% if u.last_login %}
+            {{ u.last_login|date:"Y-m-d H:i" }}<br>
+            <small>{{ u.last_login|timesince }} ago</small>
+          {% else %}
+            <span style="color: red;">Never</span>
+          {% endif %}
+        </td>
         <td>
           <form method="post" action="{% url 'toggle_user_active' u.id %}" style="display:inline">
             {% csrf_token %}

@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils.html import format_html
 from .models import DriverProfile
@@ -35,8 +36,11 @@ except admin.sites.NotRegistered:
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
-    # tuple-unpack to appease the type checker
-    list_display = (*DjangoUserAdmin.list_display, "password_actions")
+    # tuple-unpack for type checker
+    list_display = (*DjangoUserAdmin.list_display, "last_login", "password_actions")
+    list_filter = (*DjangoUserAdmin.list_filter, "last_login")
+    ordering = ("-last_login",)
+
 
     @admin.display(description="Password actions")
     def password_actions(self, obj):
