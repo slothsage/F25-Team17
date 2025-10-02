@@ -20,8 +20,14 @@ class ProfileForm(forms.ModelForm):
             "city",
             "state",
             "zip_code",
+            "description",
             # "profile_image"
         ]
+        widgets = {
+            "description": forms.Textarea(
+                attrs={"rows": 4, "placeholder": "Tell sponsors a bit about yourself…"}
+            ),
+        }
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user")

@@ -9,6 +9,9 @@
   <p>{{ form.email.label_tag }} {{ form.email }}</p>
   {{ form.as_p }}
   <button class="btn btn-sm btn-muted">Save</button>
+    {{ form.description.label_tag }}<br>
+  {{ form.description }}
+  {% if form.description.errors %}<div class="error">{{ form.description.errors }}</div>{% endif %}
 </form>
 
 {% endblock content %}
