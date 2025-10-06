@@ -522,21 +522,18 @@ def notification_settings(request):
         form = NotificationPrefsForm(instance=prefs)
     return render(request, "accounts/notification_settings.html", {"form": form})
 
+@login_required
+@require_POST
+def notifications_clear(request):
+    Notification.objects.filter(user=request.user).delete()
+    MessageRecipient.objects.filter(user=request.user).delete()
+    messages.success(request, "All notifications & messages cleared.")
+    return redirect("accounts:notifications_feed")
 
 @login_required
 def notifications_feed(request):
     rows = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
     return render(request, "accounts/notifications_feed.html", {"rows": rows})
-
-
-@login_required
-@require_POST
-def notifications_clear(request):
-    Notification.objects.filter(user=request.user).delete()
-    messages.success(request, "All notifications cleared.")
-    return redirect("accounts:notifications_feed")
-
-
 
 @login_required
 def points_history(request):
