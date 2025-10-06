@@ -37,41 +37,48 @@
 <body>
 
   <nav class="navbar site-nav">
-    <div class="container d-flex align-items-center justify-content-between">
-      <a class="navbar-brand m" href="/">Class Demo</a>
-
-      <div class="d-flex flex-wrap justify-content-center gap-2">
-        {% if user.is_authenticated %}
-          <a class="nav-link d-inline-block" href="{% url 'accounts:notifications_feed' %}">Notifications</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:profile' %}">Profile</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:password_change' %}">Change Password</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
-          {% if user.is_staff or user.is_superuser %}
-            <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
-            <a class="nav-link d-inline-block" href="/admin/create-driver/">Create Driver</a>
-            <a class="nav-link d-inline-block" href="/admin/create-sponsor/">Create Sponsor</a>
-          {% endif %}
-        {% endif %}
+    <div class="container nav-inner">
+      <div class="nav-left">
+        <a class="navbar-brand" href="/">Class Demo</a>
       </div>
 
-      <div>
+      <button id="nav-toggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false"> 
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div id="nav-links" class="nav-center">
+        <ul class="nav-list">
+        {% if user.is_authenticated %}
+          <li><a class="nav-link" href="{% url 'accounts:notifications_feed' %}">Notifications</a></li>
+          <li><a class="nav-link" href="{% url 'accounts:profile' %}">Profile</a></li>
+          <li><a class="nav-link" href="{% url 'accounts:profile_edit' %}">Edit Profile</a></li>
+          <li><a class="nav-link" href="{% url 'accounts:password_change' %}">Change Password</a></li>
+          <li><a class="nav-link" href="{% url 'accounts:password_reset' %}">Forgot Password</a></li>
+          <li><a class="nav-link" href="{% url 'accounts:delete_account' %}">Delete Account</a></li>
+          {% if user.is_staff or user.is_superuser %}
+            <li><a class="nav-link" href="/admin/">Admin Search</a></li>
+            <li><a class="nav-link" href="/admin/create-driver/">Create Driver</a></li>
+            <li><a class="nav-link" href="/admin/create-sponsor/">Create Sponsor</a></li>
+          {% endif %}
+        {% endif %}
+        </ul>
+      </div>
+
+      <div class="nav-right">
+        <div class="nav-actions">
         {% if user.is_authenticated %}
           <form method="post" action="{% url 'accounts:logout' %}" style="display:inline">
             {% csrf_token %}
-            <button class="btn btn-sm btn-muted" type="submit">Log Out</button>
+            <button class="btn btn-muted" type="submit">Log Out</button>
           </form>
         {% else %}
-          <a class="btn btn-sm btn-muted" href="{% url 'accounts:login' %}">Login</a>
-          <a class="btn btn-sm btn-muted" href="{% url 'accounts:register' %}">Register</a>
-          <a class="btn btn-sm btn-muted" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
+          <a class="btn btn-muted" href="{% url 'accounts:login' %}">Login</a>
+          <a class="btn btn-muted" href="{% url 'accounts:register' %}">Register</a>
         {% endif %}
-
-        
-        <button class="btn btn-sm btn-muted" id="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false">
+        <button class="btn btn-muted" id="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false">
           Dark Mode: Off
         </button>
+        </div>
       </div>
     </div>
   </nav>
@@ -102,6 +109,19 @@
         const on = root.classList.contains("dark");
         try { localStorage.setItem("theme", on ? "dark" : "light"); } catch (_) {}
         setLabel();
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      const navToggle = document.getElementById('nav-toggle');
+      const siteNav = document.querySelector('.site-nav');
+      if (!navToggle || !siteNav) return;
+
+      navToggle.addEventListener('click', function () {
+        const expanded = navToggle.getAttribute('aria-expanded') === 'true';
+        navToggle.setAttribute('aria-expanded', String(!expanded));
+        siteNav.classList.toggle('open');
       });
     })();
   </script>

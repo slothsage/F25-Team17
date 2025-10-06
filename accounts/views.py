@@ -33,6 +33,8 @@ from django import db as django_db
 from django.db import models
 from shop.models import Order
 from django.core.paginator import Paginator
+from django.http import HttpResponse
+import csv
 
 from django.contrib.auth.views import LoginView
 from django.shortcuts import resolve_url
@@ -235,6 +237,59 @@ def admin_user_search(request):
     page_number = request.GET.get("page", 1)
     paginator = Paginator(drivers_qs, 25)
     drivers_page = paginator.get_page(page_number)
+
+    # CSV export
+    export = request.GET.get("export")
+    export_type = request.GET.get("export_type", "drivers")
+    if export == "csv":
+        response = HttpResponse(content_type="text/csv")
+        filename = "export"
+        if export_type == "drivers":
+            filename = "drivers_export"
+        elif export_type == "sponsors":
+            filename = "sponsors_export"
+        else:
+            filename = "drivers_and_sponsors_export"
+        response["Content-Disposition"] = f"attachment; filename=\"{filename}.csv\""
+        writer = csv.writer(response)
+
+        # write driver rows
+        if export_type in ("drivers", "both"):
+            writer.writerow(["record_type", "username", "email", "phone", "address", "last_login", "is_active"])
+            for u in drivers_qs.order_by("username").distinct():
+                phone = getattr(getattr(u, "driver_profile", None), "phone", "")
+                address = getattr(getattr(u, "driver_profile", None), "address", "")
+                last_login = u.last_login.isoformat() if u.last_login else ""
+                writer.writerow(["driver", u.username, u.email, phone, address, last_login, str(u.is_active)])
+
+        # write sponsor rows
+        if export_type in ("sponsors", "both"):
+            if export_type == "both":
+                writer.writerow([])
+            writer.writerow(["record_type", "sponsor_name", "sample_drivers"])
+            if sponsor_q:
+                sponsor_rows = (
+                    Order.objects.filter(sponsor_name__icontains=sponsor_q)
+                    .values("sponsor_name")
+                    .annotate(count=models.Count("id"))
+                    .order_by("sponsor_name")
+                )
+            else:
+                sponsor_rows = (
+                    Order.objects.exclude(sponsor_name__isnull=True)
+                    .exclude(sponsor_name__exact="")
+                    .values("sponsor_name")
+                    .annotate(count=models.Count("id"))
+                    .order_by("sponsor_name")
+                )
+
+            for row in sponsor_rows:
+                name = row["sponsor_name"]
+                count = row["count"]
+                drivers = User.objects.filter(orders__sponsor_name=name).distinct().values_list("username", flat=True)[:5]
+                writer.writerow(["sponsor", name, count, ", ".join(drivers)])
+
+        return response
 
     return render(
         request,

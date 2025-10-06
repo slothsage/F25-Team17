@@ -2,6 +2,18 @@
 {% block content %}
 <h1>Admin: User & Sponsor Search</h1>
 
+<form method="get" class="form-inline mb-3">
+  <input type="hidden" name="q" value="{{ q }}">
+  <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
+  <label>Export:</label>
+  <select name="export_type">
+    <option value="drivers">Drivers</option>
+    <option value="sponsors">Sponsors</option>
+    <option value="both">Both</option>
+  </select>
+  <input type="hidden" name="export" value="csv">
+  <button class="btn">Export CSV</button>
+</form>
 
 <form method="get" class="form-inline mb-3">
   <div>
@@ -75,6 +87,18 @@
               {% if u.is_active %}
                 <button class="btn btn-warning" type="submit">Deactivate</button>
               {% else %}
+         <form method="get" class="form-inline mb-3">
+           <input type="hidden" name="q" value="{{ q }}">
+           <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
+           <label>Export:</label>
+           <select name="export_type">
+             <option value="drivers">Drivers</option>
+             <option value="sponsors">Sponsors</option>
+             <option value="both">Both</option>
+           </select>
+           <input type="hidden" name="export" value="csv">
+           <button class="btn">Export CSV</button>
+         </form>
                 <button class="btn btn-success" type="submit">Reactivate</button>
               {% endif %}
             {% endif %}
