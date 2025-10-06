@@ -1,30 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>Notifications</h1>
+  <h1>Notifications</h1> 
   <p>Viewing as: <strong>{{ request.user.username }}</strong></p>
 
-<!--
-  {% if notifications %}
-    <ul>
-      {% for n in notifications %}
-        <li>
-          <small>{{ n.created_at }}</small><br/>
-          <strong>[{{ n.kind }}]</strong> {{ n.title }} — {{ n.body }}
-          {% if n.url %} <a href="{{ n.url }}">View</a>{% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>No notifications yet for this user.</p>
-  {% endif %}
-  -->
+<form method="post" action="{% url 'accounts:notifications_clear' %}" style="margin-bottom:1rem">
+    {% csrf_token %}
+    <button class="btn" type="submit">Clear All</button>
+</form>
 
   {% if rows %}
   <ul>
     {% for r in rows %}
       <li>
         {% if not r.is_read %}<strong>[new]</strong>{% endif %}
-        <a href="{% url 'accounts:message_detail' r.pk %}">{{ r.message.subject }}</a>
+        <a href="{% url 'accounts:message_detail' r.message.pk %}">{{ r.message.subject }}</a>
         — from {{ r.message.author.username }} — {{ r.message.created_at|date:"Y-m-d H:i" }}
       </li>
     {% endfor %}

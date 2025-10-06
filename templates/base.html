@@ -49,12 +49,13 @@
       <div id="nav-links" class="nav-center">
         <ul class="nav-list">
         {% if user.is_authenticated %}
-          <li><a class="nav-link" href="{% url 'accounts:notifications_feed' %}">Notifications</a></li>
-          <li><a class="nav-link" href="{% url 'accounts:profile' %}">Profile</a></li>
-          <li><a class="nav-link" href="{% url 'accounts:profile_edit' %}">Edit Profile</a></li>
-          <li><a class="nav-link" href="{% url 'accounts:password_change' %}">Change Password</a></li>
-          <li><a class="nav-link" href="{% url 'accounts:password_reset' %}">Forgot Password</a></li>
-          <li><a class="nav-link" href="{% url 'accounts:delete_account' %}">Delete Account</a></li>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:notifications_feed' %}">Notifications</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:profile' %}">Profile</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:password_change' %}">Change Password</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a>
           {% if user.is_staff or user.is_superuser %}
             <li><a class="nav-link" href="/admin/">Admin Search</a></li>
             <li><a class="nav-link" href="/admin/create-driver/">Create Driver</a></li>

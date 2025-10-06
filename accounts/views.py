@@ -15,6 +15,7 @@ from django.db import connections
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum
+from urllib.parse import quote
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -576,21 +577,18 @@ def notification_settings(request):
         form = NotificationPrefsForm(instance=prefs)
     return render(request, "accounts/notification_settings.html", {"form": form})
 
+@login_required
+@require_POST
+def notifications_clear(request):
+    Notification.objects.filter(user=request.user).delete()
+    MessageRecipient.objects.filter(user=request.user).delete()
+    messages.success(request, "All notifications & messages cleared.")
+    return redirect("accounts:notifications_feed")
 
 @login_required
 def notifications_feed(request):
     rows = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
     return render(request, "accounts/notifications_feed.html", {"rows": rows})
-
-
-@login_required
-@require_POST
-def notifications_clear(request):
-    Notification.objects.filter(user=request.user).delete()
-    messages.success(request, "All notifications cleared.")
-    return redirect("accounts:notifications_feed")
-
-
 
 @login_required
 def points_history(request):
@@ -599,7 +597,24 @@ def points_history(request):
     return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
 
 
+@login_required
+def contact_sponsor(request):
+    profile = getattr(request.user, "driver_profile", None)
 
+    # If driver has no sponsor info, show a friendly error
+    if not profile or not profile.sponsor_email:
+        return render(request, "accounts/contact_sponsor.html", {
+            "error": "No sponsor contact information available.",
+        })
+
+    sponsor = profile.sponsor_name or "Your Sponsor"
+    email = profile.sponsor_email
+
+    # Pass data to the template for display (not redirect)
+    return render(request, "accounts/contact_sponsor.html", {
+        "email": email,
+        "sponsor": sponsor,
+    })
 
 
 

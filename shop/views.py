@@ -77,6 +77,31 @@ def cart_view(request):
     total_points = sum(i.points_each * i.quantity for i in items)
     return render(request, "shop/cart.html", {"items": items, "total_points": total_points})
 
+    # Get/create profile + form
+    profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+    from accounts.forms import AddressForm
+
+    if request.method == "POST" and request.POST.get("action") == "update_address":
+        form = AddressForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Delivery address updated.")
+            return redirect("cart")
+    else:
+        form = AddressForm(instance=profile)
+
+    return render(
+        request,
+        "shop/cart.html",
+        {
+            "items": items,
+            "total_points": total_points,
+            "address_form": form,
+            "profile": profile,
+        },
+    )
+
+
 @login_required
 @transaction.atomic
 def clear_cart(request):

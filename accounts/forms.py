@@ -110,3 +110,14 @@ class PolicyPasswordChangeForm(PasswordChangeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["new_password1"].help_text = password_validators_help_text_html()
+
+class AddressForm(forms.ModelForm):
+    class Meta:
+        model = DriverProfile
+        fields = ["address"]
+        widgets = {
+            "address": forms.TextInput(attrs={
+                "placeholder": "Delivery address",
+                "style": "min-width: 320px;"
+            })
+        }
