@@ -16,7 +16,9 @@
     {{ request.user.driver_profile.city }},
     {{ request.user.driver_profile.state }}
     {{ request.user.driver_profile.zip_code }}</p>
-
+{% if request.user.driver_profile.description %}
+  <p><strong>Description:</strong> {{ request.user.driver_profile.description }}</p>
+{% endif %}
 {% else %}
   <p>No driver profile found yet.</p>
 {% endif %}
