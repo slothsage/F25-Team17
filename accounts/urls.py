@@ -58,4 +58,5 @@ urlpatterns = [
 
     
     path("points/", views.points_history, name="points_history"),
+    path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
 ]

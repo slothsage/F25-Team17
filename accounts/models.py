@@ -3,6 +3,8 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models import Sum
 from django.contrib.auth.models import User
+from django.core.validators import validate_email
+
 
 class DriverProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="driver_profile")
@@ -14,6 +16,9 @@ class DriverProfile(models.Model):
     state = models.CharField(max_length=2, blank=True)
     zip_code = models.CharField(max_length=11, blank=True)
     description = models.TextField(blank=True)
+        # quick-contact fields (set by admin or seed data)
+    sponsor_name  = models.CharField(max_length=120, blank=True)
+    sponsor_email = models.EmailField(blank=True)
 
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"

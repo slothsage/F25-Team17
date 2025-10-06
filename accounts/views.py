@@ -15,6 +15,7 @@ from django.db import connections
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum
+from urllib.parse import quote
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -544,7 +545,24 @@ def points_history(request):
     return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
 
 
+@login_required
+def contact_sponsor(request):
+    profile = getattr(request.user, "driver_profile", None)
 
+    # If driver has no sponsor info, show a friendly error
+    if not profile or not profile.sponsor_email:
+        return render(request, "accounts/contact_sponsor.html", {
+            "error": "No sponsor contact information available.",
+        })
+
+    sponsor = profile.sponsor_name or "Your Sponsor"
+    email = profile.sponsor_email
+
+    # Pass data to the template for display (not redirect)
+    return render(request, "accounts/contact_sponsor.html", {
+        "email": email,
+        "sponsor": sponsor,
+    })
 
 
 

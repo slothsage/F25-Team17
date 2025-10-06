@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Contact Sponsor</h1>
+
+  {% if messages %}
+    {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+  {% endif %}
+
+  {% if email %}
+    <p>Sponsor: <strong>{{ sponsor_name|default:"Your Sponsor" }}</strong></p>
+    <p>
+      <a class="btn" href="mailto:{{ email }}?subject={{ 'Question from Driver'|urlencode }}">
+        Email {{ sponsor_name|default:"Sponsor" }}
+      </a>
+    </p>
+  {% else %}
+    <p>We don’t have a sponsor email on file for your account yet.</p>
+  {% endif %}
+
+  <p><a class="btn" href="{% url 'accounts:profile' %}">Back to Profile</a></p>
+{% endblock %}

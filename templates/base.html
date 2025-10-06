@@ -48,6 +48,7 @@
           <a class="nav-link d-inline-block" href="{% url 'accounts:password_change' %}">Change Password</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a>
           {% if user.is_staff or user.is_superuser %}
             <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
             <a class="nav-link d-inline-block" href="/admin/create-driver/">Create Driver</a>

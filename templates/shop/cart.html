@@ -1,6 +1,17 @@
 {% extends "base.html" %}{% block content %}
 <h1>My Cart</h1>
 
+<h2>Delivery Address</h2>
+<p>Current: {{ profile.address|default:"(not set)" }}</p>
+
+<form method="post" action="{% url 'cart' %}" style="margin:.5rem 0 1rem;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="update_address">
+  {{ address_form.as_p }}   {# TEMP: render entire form to prove it's there #}
+  <button class="btn" type="submit">Save Address</button>
+</form>
+<hr/>
+
 {% if items %}
   <ul>
   {% for it in items %}
