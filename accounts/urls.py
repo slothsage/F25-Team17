@@ -43,7 +43,11 @@ urlpatterns = [
 
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
-path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
+    path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
+
+    # Force logout
+    path("admin/users/<int:user_id>/force-logout/", views.force_logout_user, name="admin_force_logout_user"),
+
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience

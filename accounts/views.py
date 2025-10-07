@@ -6,6 +6,7 @@ from django.contrib.auth import logout as auth_logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 from django.contrib.auth.tokens import default_token_generator
 from django.urls import reverse
 from django.utils.encoding import force_bytes
@@ -544,6 +545,32 @@ def toggle_user_active(request, user_id):
     user.save()
     action = "reactivated" if user.is_active else "deactivated"
     messages.success(request, f"User '{user.username}' has been {action}.")
+    return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
+
+
+@staff_member_required
+def force_logout_user(request, user_id):
+    if request.method != "POST":
+        messages.error(request, "Invalid request method.")
+        return redirect("admin_user_search")
+
+    if user_id == request.user.id:
+        messages.error(request, "You cannot log yourself out.")
+        return redirect("admin_user_search")
+
+    # Loop through all sessions and delete those belonging to the user
+    user_model = get_user_model()
+    user = get_object_or_404(user_model, pk=user_id)
+
+    sessions = Session.objects.all()
+    count = 0
+    for session in sessions:
+        data = session.get_decoded()
+        if str(user.pk) == str(data.get('_auth_user_id')):
+            session.delete()
+            count += 1
+
+    messages.success(request, f"User '{user.username}' was logged out from {count} active session(s).")
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
 class NotificationPrefsForm(forms.ModelForm):
