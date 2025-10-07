@@ -191,6 +191,17 @@
               {% endif %}
             {% endif %}
           </form>
+          <!-- Temp Password Button -->
+          <form method="post" action="{% url 'accounts:admin_set_temp_password' s.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-secondary" type="submit">Temp Password</button>
+          </form>
+
+          <!-- Reset Link Button -->
+          <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-info" type="submit">Send Reset Link</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
