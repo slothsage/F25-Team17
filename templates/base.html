@@ -56,6 +56,7 @@
           <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a>
+          <a class="nav-link d-inline-block" href="{% url 'faqs' %}">FAQs</a>
         {% if user.is_staff or user.is_superuser %}
           <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
           <a class="nav-link d-inline-block" href="/admin/create-driver/">Create Driver</a>
@@ -73,6 +74,7 @@
             {% csrf_token %}
             <button class="btn btn-muted" type="submit">Log Out</button>
           </form>
+          <div id="idle-countdown" style="margin-left:.5rem;font-weight:600;color:var(--muted);"></div>
         {% else %}
           <a class="btn btn-muted" href="{% url 'accounts:login' %}">Login</a>
           <a class="btn btn-muted" href="{% url 'accounts:register' %}">Register</a>
@@ -87,6 +89,7 @@
 
   
   <div class="container-main">
+    {% block page_banner %}{% endblock page_banner %}
     {% for m in messages %}<p>{{ m }}</p>{% endfor %}
     {% block content %}{% endblock %}
   </div>
@@ -112,6 +115,65 @@
         try { localStorage.setItem("theme", on ? "dark" : "light"); } catch (_) {}
         setLabel();
       });
+    })();
+  </script>
+  <script>
+    // Inactivity logout:logout after 5 minutes
+    (function () {
+      // only run for users who are logged in
+      try {
+        const idleSeconds = 60 * 5; // 5 minutes
+        let lastActivity = Date.now();
+        let timeoutId = null;
+
+        function getCookie(name) {
+          const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+          return v ? v.pop() : '';
+        }
+
+        function scheduleLogout() {
+          clearTimeout(timeoutId);
+          const ms = idleSeconds * 1000 - (Date.now() - lastActivity);
+          if (ms <= 0) {
+            doLogout();
+          } else {
+            timeoutId = setTimeout(doLogout, ms);
+          }
+        }
+
+        function doLogout() {
+          const csrftoken = getCookie('csrftoken');
+          fetch("{% url 'accounts:logout' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: ''
+          }).catch(()=>{ /* ignore errors */ });
+          // Also redirect to login page
+          setTimeout(function(){ window.location = "{% url 'accounts:login' %}"; }, 200);
+        }
+
+        // reset activity on these events
+        ['mousemove','mousedown','keydown','touchstart','scroll'].forEach(evt => {
+          window.addEventListener(evt, function () { lastActivity = Date.now(); scheduleLogout(); }, { passive: true });
+        });
+
+        // UI countdown
+        const countdownEl = document.getElementById('idle-countdown');
+        function updateCountdown() {
+          if (!countdownEl) return;
+          const remaining = Math.max(0, idleSeconds - Math.round((Date.now() - lastActivity)/1000));
+          const mm = String(Math.floor(remaining/60)).padStart(2,'0');
+          const ss = String(remaining%60).padStart(2,'0');
+          countdownEl.textContent = mm + ':' + ss;
+        }
+
+        // tick every second for the UI
+        setInterval(updateCountdown, 1000);
+
+        // start the timer
+        scheduleLogout();
+        updateCountdown();
+      } catch (e) { /* ignore in older browsers */ }
     })();
   </script>
   <script>
