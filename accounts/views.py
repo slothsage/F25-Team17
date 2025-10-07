@@ -646,3 +646,8 @@ def about(request):
         "error": error,
         "now": timezone.now(),
     })
+
+
+def faqs(request):
+    """Simple FAQs page."""
+    return render(request, "faqs.html")
