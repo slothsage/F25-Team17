@@ -3,6 +3,9 @@
 
 {% block content %}
 <h1>My Profile</h1>
+{% if profile.image %}
+  <img src="{{ profile.image.url }}" alt="Profile photo" style="max-width:180px; border-radius:50%; margin-bottom:1rem;">
+{% endif %}
 <p><b>Username:</b> {{ request.user.username }}</p>
 <p><b>Email:</b> {{ request.user.email }}</p>
 

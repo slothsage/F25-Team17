@@ -4,14 +4,18 @@
 {% block content %}
 <h1>Edit Profile</h1>
 
-<form method="post">{% csrf_token %}
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
   {{ form.non_field_errors }}
+
   <p>{{ form.email.label_tag }} {{ form.email }}</p>
+
+  {% if profile.image %}
+    <p>Profile Image:</p>
+    <img src="{{ profile.image.url }}" alt="Current profile photo" style="max-width:140px; border-radius:50%; margin-bottom:1rem;">
+  {% endif %}
+
   {{ form.as_p }}
   <button class="btn btn-sm btn-muted">Save</button>
-    {{ form.description.label_tag }}<br>
-  {{ form.description }}
-  {% if form.description.errors %}<div class="error">{{ form.description.errors }}</div>{% endif %}
 </form>
 
 {% endblock content %}

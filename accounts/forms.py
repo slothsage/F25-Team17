@@ -21,12 +21,13 @@ class ProfileForm(forms.ModelForm):
             "state",
             "zip_code",
             "description",
-            # "profile_image"
+            "image"
         ]
         widgets = {
             "description": forms.Textarea(
                 attrs={"rows": 4, "placeholder": "Tell sponsors a bit about yourself…"}
             ),
+            "image": forms.ClearableFileInput(attrs={"accept": "image/*"}), 
         }
 
     def __init__(self, *args, **kwargs):
@@ -42,6 +43,17 @@ class ProfileForm(forms.ModelForm):
             profile.user = self.user
             profile.save()
         return profile
+    
+    def clean_image(self):
+        img = self.cleaned_data.get("image")
+        if not img:
+            return img
+        if getattr(img, "size", 0) > 5 * 1024 * 1024:
+            raise forms.ValidatationError("Please upload an image under 5 MB.")
+        ct = getattr(img, "content_type", "")
+        if ct and not ct.startswith("image/"):
+            raise forms.ValidationError("File must be an image,")
+        return img
 
 class MessageComposeForm(forms.ModelForm):
     select_all = forms.BooleanField(required=False, label="All Users")

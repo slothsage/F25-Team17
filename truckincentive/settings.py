@@ -92,6 +92,10 @@ STATICFILES_DIRS = [
 # STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Media (user uploads)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # Auth flow
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:profile"      # after successful login
