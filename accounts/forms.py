@@ -21,13 +21,12 @@ class ProfileForm(forms.ModelForm):
             "state",
             "zip_code",
             "description",
-            "image"
+            #"image"
         ]
         widgets = {
             "description": forms.Textarea(
                 attrs={"rows": 4, "placeholder": "Tell sponsors a bit about yourself…"}
             ),
-            "image": forms.ClearableFileInput(attrs={"accept": "image/*"}), 
         }
 
     def __init__(self, *args, **kwargs):
@@ -79,6 +78,7 @@ class MessageComposeForm(forms.ModelForm):
             "users",
         ]
 
+"""
     def clean(self):
         cleaned = super().clean()
         if not (
@@ -90,6 +90,7 @@ class MessageComposeForm(forms.ModelForm):
         ):
             raise forms.ValidationError("Please select at least one recipient.")
         return cleaned
+"""
 
 class DeleteAccountForm(forms.Form):
     confirm = forms.CharField(
