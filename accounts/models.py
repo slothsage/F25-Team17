@@ -4,7 +4,10 @@ from django.utils import timezone
 from django.db.models import Sum
 from django.contrib.auth.models import User
 from django.core.validators import validate_email
+from django.core.validators import FileExtensionValidator # for validating uploaded file types
 
+def avatar_upload_path_to(instance, filename):
+        return f"avatars/{instance.user.id}/{filename}"
 
 class DriverProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="driver_profile")
@@ -16,13 +19,18 @@ class DriverProfile(models.Model):
     state = models.CharField(max_length=2, blank=True)
     zip_code = models.CharField(max_length=11, blank=True)
     description = models.TextField(blank=True)
+    image = models.ImageField(
+        upload_to=avatar_upload_path_to,
+        blank=True,
+        default="defaults/avatar.png", # default avatar image
+        validators=[FileExtensionValidator(allowed_extensions=["jpg", "jpeg", "png", "gif", "webp"])],
+    )
         # quick-contact fields (set by admin or seed data)
     sponsor_name  = models.CharField(max_length=120, blank=True)
     sponsor_email = models.EmailField(blank=True)
 
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
-    
 
 class PasswordPolicy(models.Model):
     min_length = models.PositiveIntegerField(default=12)
