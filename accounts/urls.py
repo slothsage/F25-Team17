@@ -29,7 +29,8 @@ urlpatterns = [
 
     # Password reset (forgot password)
     path("password/reset/", auth_views.PasswordResetView.as_view(
-        template_name="registration/password_reset_form.html"), name="password_reset"),
+        template_name="registration/password_reset_form.html",
+        success_url=reverse_lazy("accounts:password_reset_done")), name="password_reset"),
     path("password/reset/done/", auth_views.PasswordResetDoneView.as_view(
         template_name="registration/password_reset_done.html"), name="password_reset_done"),
     path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
@@ -42,8 +43,7 @@ urlpatterns = [
 
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
-    path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
-
+path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience
