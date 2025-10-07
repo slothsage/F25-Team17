@@ -118,6 +118,12 @@
             {% csrf_token %}
             <button class="btn btn-info" type="submit">Send Reset Link</button>
           </form>
+
+          <!-- Force logout Button  -->
+          <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
@@ -203,6 +209,11 @@
           <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" style="display:inline; margin-left: 5px;">
             {% csrf_token %}
             <button class="btn btn-info" type="submit">Send Reset Link</button>
+          </form>
+          <!-- Force logout Button  -->
+          <form method="post" action="{% url 'accounts:admin_force_logout_user' s.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
           </form>
         </td>
       </tr>
