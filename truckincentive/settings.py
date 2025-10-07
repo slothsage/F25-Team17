@@ -97,6 +97,10 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "accounts:profile"      # after successful login
 LOGOUT_REDIRECT_URL = "accounts:login"       # after logout
 
+# Sessions: 5 minute inactivity timeout
+SESSION_COOKIE_AGE = 5 * 60   # 5 minutes in seconds
+SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
+
 # Email prints to console for password reset demo
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
