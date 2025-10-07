@@ -17,8 +17,8 @@
 
 <form method="get" class="form-inline mb-3">
   <div>
-    <label>Driver search:</label>
-    <input type="text" name="q" value="{{ q }}" placeholder="username, email, phone, address" />
+  <label>Driver search:</label>
+  <input type="text" name="q" value="{{ q }}" placeholder="username, email, phone, address or id:123" />
     <button class="btn">Search Drivers</button>
   </div>
 </form>
@@ -67,6 +67,7 @@
   <table class="table">
     <thead>
       <tr>
+        <th>ID</th>
         <th>Username</th>
         <th>Email</th>
         <th>Phone</th>
@@ -78,7 +79,8 @@
     <tbody>
       {% for u in drivers %}
       <tr {% if not u.is_active %}style="background-color: rgba(255, 100, 100, 0.08);" {% endif %}>
-        <td>{{ u.username }}</td>
+  <td>{{ u.id }}</td>
+  <td>{{ u.username }}</td>
         <td>{{ u.email }}</td>
         <td>{{ u.driver_profile.phone }}</td>
         <td>{{ u.driver_profile.address }}</td>

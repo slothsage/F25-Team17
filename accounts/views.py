@@ -184,9 +184,21 @@ def admin_user_search(request):
     drivers_qs = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor")
     drivers_matching_count = 0
     if q:
-        drivers_qs = drivers_qs.filter(
-            Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
-        ).distinct()
+        # Support searching by numeric id using either 'id:123' or just '123'
+        id_query = None
+        if q.lower().startswith("id:"):
+            maybe = q.split(":", 1)[1].strip()
+            if maybe.isdigit():
+                id_query = int(maybe)
+        elif q.isdigit():
+            id_query = int(q)
+
+        if id_query is not None:
+            drivers_qs = drivers_qs.filter(Q(pk=id_query) | Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)).distinct()
+        else:
+            drivers_qs = drivers_qs.filter(
+                Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
+            ).distinct()
 
     if inactive == "never":
         drivers_qs = drivers_qs.filter(last_login__isnull=True)
@@ -256,12 +268,12 @@ def admin_user_search(request):
 
         # write driver rows
         if export_type in ("drivers", "both"):
-            writer.writerow(["record_type", "username", "email", "phone", "address", "last_login", "is_active"])
+            writer.writerow(["record_type", "id", "username", "email", "phone", "address", "last_login", "is_active"])
             for u in drivers_qs.order_by("username").distinct():
                 phone = getattr(getattr(u, "driver_profile", None), "phone", "")
                 address = getattr(getattr(u, "driver_profile", None), "address", "")
                 last_login = u.last_login.isoformat() if u.last_login else ""
-                writer.writerow(["driver", u.username, u.email, phone, address, last_login, str(u.is_active)])
+                writer.writerow(["driver", u.id, u.username, u.email, phone, address, last_login, str(u.is_active)])
 
         # write sponsor rows
         if export_type in ("sponsors", "both"):
