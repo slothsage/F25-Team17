@@ -49,6 +49,19 @@
     </select>
   </form>
 
+<form method="get" class="form-inline mb-3">
+  <input type="hidden" name="q" value="{{ q }}">
+  <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
+  <label>Export:</label>
+  <select name="export_type">
+    <option value="drivers">Drivers</option>
+    <option value="sponsors">Sponsors</option>
+    <option value="both">Both</option>
+  </select>
+  <input type="hidden" name="export" value="csv">
+  <button class="btn">Export CSV</button>
+</form>
+
   <h2>Drivers</h2>
   <p>Showing {{ drivers_matching_count }} matching drivers out of {{ total_drivers_count }} total drivers.</p>
   <table class="table">
@@ -87,21 +100,21 @@
               {% if u.is_active %}
                 <button class="btn btn-warning" type="submit">Deactivate</button>
               {% else %}
-         <form method="get" class="form-inline mb-3">
-           <input type="hidden" name="q" value="{{ q }}">
-           <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
-           <label>Export:</label>
-           <select name="export_type">
-             <option value="drivers">Drivers</option>
-             <option value="sponsors">Sponsors</option>
-             <option value="both">Both</option>
-           </select>
-           <input type="hidden" name="export" value="csv">
-           <button class="btn">Export CSV</button>
-         </form>
                 <button class="btn btn-success" type="submit">Reactivate</button>
               {% endif %}
             {% endif %}
+          </form>
+
+          <!-- Temp Password Button -->
+          <form method="post" action="{% url 'accounts:admin_set_temp_password' u.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-secondary" type="submit">Temp Password</button>
+          </form>
+
+          <!-- Reset Link Button  -->
+          <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-info" type="submit">Send Reset Link</button>
           </form>
         </td>
       </tr>
@@ -177,6 +190,17 @@
                 <button class="btn btn-success" type="submit">Reactivate</button>
               {% endif %}
             {% endif %}
+          </form>
+          <!-- Temp Password Button -->
+          <form method="post" action="{% url 'accounts:admin_set_temp_password' s.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-secondary" type="submit">Temp Password</button>
+          </form>
+
+          <!-- Reset Link Button -->
+          <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-info" type="submit">Send Reset Link</button>
           </form>
         </td>
       </tr>
