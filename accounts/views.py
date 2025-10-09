@@ -350,7 +350,7 @@ class FrontLoginView(LoginView):
             if not hasattr(user, "driver_profile"):
                 auth_logout(self.request)
                 messages.error(self.request, "This account is not a driver. Please select the correct user type.")
-                return redirect("login")
+                return redirect("accounts:login")
 
         if user_type == "sponsor":
             # disallow staff/superuser choosing sponsor
