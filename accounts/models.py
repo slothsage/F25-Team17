@@ -25,7 +25,8 @@ class DriverProfile(models.Model):
     image = models.ImageField(
         upload_to=avatar_upload_path_to,
         blank=True,
-        default="media/defaults/avatar.png",
+        null=True,
+        default=None,   #"media/defaults/avatar.png",
         validators=[FileExtensionValidator(allowed_extensions=["jpg","jpeg","png","gif","webp"])],
     )
     

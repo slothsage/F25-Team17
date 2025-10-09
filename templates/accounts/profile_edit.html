@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Edit Profile{% endblock title %}
 
 {% block content %}
@@ -8,9 +9,10 @@
   {% csrf_token %}
   {{ form.non_field_errors }}
 
+  {# Email comes from the form's __init__ #}
   <p>{{ form.email.label_tag }} {{ form.email }}</p>
 
-  {# Render all fields EXCEPT image and description #}
+  {# Render all fields EXCEPT image, description, and email #}
   {% for field in form.visible_fields %}
     {% if field.name != "image" and field.name != "description" and field.name != "email" %}
       <p>
@@ -20,20 +22,24 @@
     {% endif %}
   {% endfor %}
 
-  {# Single image uploader + current preview #}
+  {# Single image uploader + current/placeholder preview #}
   <p>
     <label for="{{ form.image.id_for_label }}">Profile photo</label><br>
     {{ form.image }}
+    <br><small>Current:</small><br>
     {% if request.user.driver_profile and request.user.driver_profile.image %}
-      <br><small>Current:</small><br>
       <img src="{{ request.user.driver_profile.image.url }}"
-          alt="Current photo"
-          style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
+           alt="Current photo"
+           style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
+    {% else %}
+      <img src="{% static 'defaults/avatar.png' %}"
+           alt="Default avatar"
+           style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
     {% endif %}
     {% if form.image.errors %}<div class="error">{{ form.image.errors }}</div>{% endif %}
   </p>
 
-  {# Description field once #}
+  {# Description once #}
   <p>
     {{ form.description.label_tag }}<br>
     {{ form.description }}
