@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -53,7 +54,18 @@ def order_list(request):
 @login_required
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, driver=request.user)
-    return render(request, "shop/order_detail.html", {"order": order})
+
+    # consider delayed if still not fulfilled and older than 5 days
+    is_delayed = (
+        order.status in ["pending", "processing"]
+        and order.placed_at < timezone.now() - timedelta(days=5)  # use created/placed field your model has
+    )
+
+    return render(
+        request,
+        "shop/order_detail.html",
+        {"order": order, "is_delayed": is_delayed},
+    )
 
 # STORY: Mark Order as Received
 @login_required

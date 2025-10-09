@@ -54,3 +54,27 @@ def on_points_updated(user, delta: int, reason: str, new_balance: int):
             )
         except Exception:
             pass
+
+def on_order_delayed(order):
+    """
+    Send an 'Order Delayed' in-app notification to the driver.
+    Respects the 'orders' preference.
+    De-duplicates by URL+title so we don't spam.
+    """
+    user = order.driver
+    try:
+        url = reverse("order_detail", args=[order.id])
+    except Exception:
+        url = ""
+
+    title = "Order Delayed"
+    body = f"Order #{order.id} is delayed. We’ll notify you when it ships."
+
+    #  if we've already sent one for this order+url, skip
+    if Notification.objects.filter(
+        user=user, kind="orders", url=url, title=title
+    ).exists():
+        return
+
+    # respect prefs via your existing helper
+    send_in_app_notification(user, "orders", title, body, url=url)

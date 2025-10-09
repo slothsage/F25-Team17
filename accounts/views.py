@@ -34,6 +34,7 @@ from django.db.models import Q
 from django import db as django_db
 from django.db import models
 from shop.models import Order
+from shop.utils import order_is_delayed
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 import csv
@@ -321,6 +322,11 @@ def admin_user_search(request):
         },
     )
 
+@login_required
+def order_detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id, driver=request.user)
+    is_delayed = order_is_delayed(order)
+    return render(request, "shop/order_detail.html", {"order": order, "is_delayed": is_delayed})
 
 class FrontLoginView(LoginView):
     template_name = "registration/login.html"

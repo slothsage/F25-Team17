@@ -1,6 +1,12 @@
 {% extends "base.html" %}{% block content %}
 <h1>Order #{{ order.id }}</h1>
-<p>Status: <strong>{{ order.status|title }}</strong></p>
+<p>Status: <strong>{{ order.status|title }}</strong>
+  {% if is_delayed %}
+    <span style="margin-left:.5rem;padding:.15rem .4rem;border:1px solid #f59e0b;border-radius:.35rem;background:#fff7ed;">
+      Delayed
+    </span>
+  {% endif %}
+</p>
 <p>Points spent: {{ order.points_spent }}</p>
 
 <h3>Items</h3>
