@@ -5,11 +5,13 @@ from django.db.models import Sum
 from django.contrib.auth.models import User
 from django.core.validators import validate_email
 from django.core.validators import FileExtensionValidator # for validating uploaded file types
+import os
 
-"""
 def avatar_upload_path_to(instance, filename):
-        return f"avatars/{instance.user.id}/{filename}"
-"""
+    base, ext = os.path.splitext(filename.lower())
+    ext = ext if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"] else ".jpg"
+    return f"avatars/user_{instance.user_id}{ext}"
+
 class DriverProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="driver_profile")
     first_name = models.CharField(max_length=30, blank=True)
@@ -20,11 +22,12 @@ class DriverProfile(models.Model):
     state = models.CharField(max_length=2, blank=True)
     zip_code = models.CharField(max_length=11, blank=True)
     description = models.TextField(blank=True)
-    """image = models.ImageField(
+    image = models.ImageField(
         upload_to=avatar_upload_path_to,
         blank=True,
-        default="defaults/avatar.png", # default avatar image
-        validators=[FileExtensionValidator(allowed_extensions=["jpg", "jpeg", "png", "gif", "webp"])],"""
+        default="media/defaults/avatar.png",
+        validators=[FileExtensionValidator(allowed_extensions=["jpg","jpeg","png","gif","webp"])],
+    )
     
         # quick-contact fields (set by admin or seed data)
     sponsor_name  = models.CharField(max_length=120, blank=True)

@@ -58,7 +58,7 @@ def profile(request):
 def profile_edit(request):
     profile, _ = DriverProfile.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        form = ProfileForm(request.POST, instance=profile, user=request.user)
+        form = ProfileForm(request.POST, request.FILES,instance=profile, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile updated.")

@@ -17,7 +17,6 @@ urlpatterns = [
     path("about/", accounts_views.about, name="about"),
     path("faqs/", accounts_views.faqs, name="faqs"),
 ]
-"""
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-"""

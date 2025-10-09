@@ -3,6 +3,11 @@
 
 {% block content %}
 <h1>My Profile</h1>
+{% if request.user.driver_profile and request.user.driver_profile.image %}
+  <p>
+    <img src="{{ request.user.driver_profile.image.url }}" alt="Profile photo" style="width:120px;height:120px;object-fit:cover;border-radius:60px;border:1px solid #ddd;">
+  </p>
+{% endif %}
 <p><b>Username:</b> {{ request.user.username }}</p>
 <p><b>Email:</b> {{ request.user.email }}</p>
 

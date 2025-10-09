@@ -21,7 +21,7 @@ class ProfileForm(forms.ModelForm):
             "state",
             "zip_code",
             "description",
-            #"image"
+            "image",
         ]
         widgets = {
             "description": forms.Textarea(
@@ -47,11 +47,8 @@ class ProfileForm(forms.ModelForm):
         img = self.cleaned_data.get("image")
         if not img:
             return img
-        if getattr(img, "size", 0) > 5 * 1024 * 1024:
-            raise forms.ValidatationError("Please upload an image under 5 MB.")
-        ct = getattr(img, "content_type", "")
-        if ct and not ct.startswith("image/"):
-            raise forms.ValidationError("File must be an image,")
+        if img.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("File size is too large ( > 5MB ).")
         return img
 
 class MessageComposeForm(forms.ModelForm):

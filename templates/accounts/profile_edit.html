@@ -4,14 +4,42 @@
 {% block content %}
 <h1>Edit Profile</h1>
 
-<form method="post">{% csrf_token %}
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
   {{ form.non_field_errors }}
-  <p>{{ form.email.label_tag }} {{ form.email }}</p>
-  {{ form.as_p }}
-  <button class="btn btn-sm btn-muted">Save</button>
-    {{ form.description.label_tag }}<br>
-  {{ form.description }}
-  {% if form.description.errors %}<div class="error">{{ form.description.errors }}</div>{% endif %}
-</form>
 
+  <p>{{ form.email.label_tag }} {{ form.email }}</p>
+
+  {# Render all fields EXCEPT image and description #}
+  {% for field in form.visible_fields %}
+    {% if field.name != "image" and field.name != "description" and field.name != "email" %}
+      <p>
+        {{ field.label_tag }} {{ field }}
+        {% if field.errors %}<div class="error">{{ field.errors }}</div>{% endif %}
+      </p>
+    {% endif %}
+  {% endfor %}
+
+  {# Single image uploader + current preview #}
+  <p>
+    <label for="{{ form.image.id_for_label }}">Profile photo</label><br>
+    {{ form.image }}
+    {% if request.user.driver_profile and request.user.driver_profile.image %}
+      <br><small>Current:</small><br>
+      <img src="{{ request.user.driver_profile.image.url }}"
+          alt="Current photo"
+          style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
+    {% endif %}
+    {% if form.image.errors %}<div class="error">{{ form.image.errors }}</div>{% endif %}
+  </p>
+
+  {# Description field once #}
+  <p>
+    {{ form.description.label_tag }}<br>
+    {{ form.description }}
+    {% if form.description.errors %}<div class="error">{{ form.description.errors }}</div>{% endif %}
+  </p>
+
+  <button class="btn btn-sm btn-muted">Save</button>
+</form>
 {% endblock content %}
