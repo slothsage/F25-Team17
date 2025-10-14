@@ -14,6 +14,15 @@
     <label>{{ form.promotions }} Promotions</label>
   </fieldset>
 
+    <fieldset style="margin-bottom:1rem">
+    <legend>Channels</legend>
+    <label>{{ form.email_enabled }} Email alerts</label><br>
+    <label>{{ form.sms_enabled }} SMS alerts (preferred)</label>
+    <p style="color:#666;margin:.35rem 0 0">
+      If SMS is enabled, duplicate email alerts will be suppressed.
+    </p>
+  </fieldset>
+  
   <fieldset style="margin-bottom:1rem">
     <legend>Sound</legend>
 

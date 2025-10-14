@@ -1,8 +1,80 @@
 from django.urls import reverse
 from django.core.mail import send_mail
-
+from django.conf import settings
 from .models import DriverNotificationPreference, Notification
 
+
+def _kind_allowed(user, kind: str) -> bool:
+    """
+    Gate by per-kind preferences; 'dropped' bypasses mutes.
+    """
+    if kind == "dropped":
+        return True
+    prefs = DriverNotificationPreference.for_user(user)
+    return {
+        "orders": prefs.orders,
+        "points": prefs.points,
+        "promotions": prefs.promotions,
+    }.get(kind, True)
+
+
+def _send_sms_safe(user, title: str, body: str, url: str = "") -> bool:
+    """
+    Optional SMS hook. Returns True if an SMS was (or would be) sent, False otherwise.
+    Implement with Twilio/etc. later. For now we no-op if no phone or no provider.
+    """
+    # Try to find a phone number
+    phone = ""
+    try:
+        # DriverProfile has `phone`
+        if hasattr(user, "driver_profile") and user.driver_profile and user.driver_profile.phone:
+            phone = user.driver_profile.phone
+    except Exception:
+        pass
+
+    if not phone:
+        return False
+
+    # TODO: integrate real SMS provider here.
+    # Example (pseudo):
+    # twilio_client.messages.create(
+    #     to=phone,
+    #     from_=settings.TWILIO_FROM_NUMBER,
+    #     body=f"{title}: {body} {(' ' + url) if url else ''}".strip(),
+    # )
+    return False  # change to True once wired up
+
+
+def _notify_channels(user, kind: str, title: str, body: str, url: str = ""):
+    """
+    Channel fan-out with duplicate protection:
+      - Always create in-app Notification if kind allowed.
+      - If SMS enabled -> try SMS (and SKIP email to avoid duplicates).
+      - Else if Email enabled -> send email (if user.email).
+    """
+    if _kind_allowed(user, kind):
+        Notification.objects.create(user=user, kind=kind, title=title, body=body, url=url)
+
+    # Channel prefs
+    prefs = DriverNotificationPreference.for_user(user)
+
+    if prefs.sms_enabled:
+        sent_sms = _send_sms_safe(user, title, body, url)
+        if sent_sms:
+            return  # do not double-send email
+
+
+    if prefs.email_enabled and getattr(user, "email", ""):
+        try:
+            send_mail(
+                subject=title,
+                message=f"{body}\n\n{('View: ' + url) if url else ''}".strip(),
+                from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
 
 def send_in_app_notification(user, kind: str, title: str, body: str, url: str = ""):
     """

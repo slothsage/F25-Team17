@@ -61,6 +61,9 @@ class DriverNotificationPreference(models.Model):
     orders = models.BooleanField(default=True)
     points = models.BooleanField(default=True)
     promotions = models.BooleanField(default=False) 
+    # delivery channels
+    email_enabled = models.BooleanField(default=True)
+    sms_enabled = models.BooleanField(default=False)
 
     SOUND_CHOICES = [
         ("default", "Default chime"),
