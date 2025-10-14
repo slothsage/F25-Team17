@@ -34,6 +34,9 @@ class DriverProfile(models.Model):
     sponsor_name  = models.CharField(max_length=120, blank=True)
     sponsor_email = models.EmailField(blank=True)
 
+    # Optional per-user session timeout (seconds). If null, use system default in settings.SESSION_COOKIE_AGE
+    session_timeout_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Per-user inactivity timeout in seconds (blank = use system default)")
+
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
 
@@ -159,3 +162,27 @@ class MessageRecipient(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.message.subject}"
+
+
+# --- Login Activity / Audit ---
+class LoginActivity(models.Model):
+    """Record user login attempts (success and failure) for admin audit.
+
+    Stores a reference to the user when known (failed attempts may not have a user),
+    timestamp, remote IP, user agent string, and a boolean `successful`.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="login_activities")
+    username = models.CharField(max_length=150, blank=True, help_text="Username attempted (when user not resolved)")
+    successful = models.BooleanField(default=False)
+    ip_address = models.CharField(max_length=64, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Login activity"
+        verbose_name_plural = "Login activities"
+
+    def __str__(self):
+        who = self.user.username if self.user else (self.username or "<unknown>")
+        return f"LoginActivity<{who}> {'OK' if self.successful else 'FAIL'} @ {self.created_at:%Y-%m-%d %H:%M}"

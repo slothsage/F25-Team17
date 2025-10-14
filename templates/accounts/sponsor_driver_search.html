@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Driver Search</h1>
+<form method="get" class="form-inline mb-3">
+  <label>Search drivers:</label>
+  <input type="text" name="q" value="{{ q }}" placeholder="username, email, phone, address or id:123" />
+  <button class="btn">Search</button>
+</form>
+
+{% if drivers %}
+  <p>Showing {{ drivers.paginator.count }} drivers.</p>
+  <table class="table">
+    <thead>
+      <tr><th>ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Address</th><th>Last Login</th></tr>
+    </thead>
+    <tbody>
+      {% for u in drivers %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.username }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.driver_profile.phone }}</td>
+        <td>{{ u.driver_profile.address }}</td>
+        <td>{% if u.last_login %}{{ u.last_login|date:"Y-m-d H:i" }}{% else %}<span style="color:red;">Never</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div>
+    {% if drivers.has_previous %}
+      <a href="?q={{ q }}&page={{ drivers.previous_page_number }}">Previous</a>
+    {% endif %}
+    Page {{ drivers.number }} of {{ drivers.paginator.num_pages }}
+    {% if drivers.has_next %}
+      <a href="?q={{ q }}&page={{ drivers.next_page_number }}">Next</a>
+    {% endif %}
+  </div>
+{% else %}
+  <p>No drivers found.</p>
+{% endif %}
+
+{% endblock content %}

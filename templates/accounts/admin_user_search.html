@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Admin: User & Sponsor Search</h1>
+<p><a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a></p>
 
 <form method="get" class="form-inline mb-3">
   <input type="hidden" name="q" value="{{ q }}">
@@ -113,6 +114,9 @@
             <button class="btn btn-secondary" type="submit">Temp Password</button>
           </form>
 
+          <!-- Change Password Link -->
+          <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' u.id %}" style="margin-left:5px;">Change Password</a>
+
           <!-- Reset Link Button  -->
           <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" style="display:inline; margin-left: 5px;">
             {% csrf_token %}
@@ -124,6 +128,8 @@
             {% csrf_token %}
             <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
           </form>
+          <!-- Set Timeout Link -->
+          <a class="btn btn-secondary" href="{% url 'accounts:admin_set_timeout' u.id %}" style="margin-left:5px;">Set Timeout</a>
         </td>
       </tr>
       {% endfor %}
@@ -204,6 +210,9 @@
             {% csrf_token %}
             <button class="btn btn-secondary" type="submit">Temp Password</button>
           </form>
+
+          <!-- Change Password Link -->
+          <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' s.id %}" style="margin-left:5px;">Change Password</a>
 
           <!-- Reset Link Button -->
           <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" style="display:inline; margin-left: 5px;">

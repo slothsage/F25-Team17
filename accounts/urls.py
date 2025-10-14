@@ -43,9 +43,17 @@ urlpatterns = [
     # Admin-only password policy page 
     path("policy/", views.edit_policy, name="edit_policy"),
 
+    # Admin: login activity audit
+    path("admin/login-activity/", views.login_activity, name="login_activity"),
+
+    # Sponsor-facing driver search
+    path("sponsor/drivers/", views.sponsor_driver_search, name="sponsor_driver_search"),
+
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
     path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
+    path("admin/users/<int:user_id>/set-password/", views.admin_set_password, name="admin_set_password"),
+    path("admin/users/<int:user_id>/set-timeout/", views.admin_set_timeout, name="admin_set_timeout"),
 
     # Force logout
     path("admin/users/<int:user_id>/force-logout/", views.force_logout_user, name="admin_force_logout_user"),

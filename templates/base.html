@@ -56,6 +56,10 @@
           <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a>
+                {% load group_filters %}
+                {% if user.is_authenticated and user|has_group:"sponsor" %}
+            <a class="nav-link d-inline-block" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
+          {% endif %}
           <a class="nav-link d-inline-block" href="{% url 'faqs' %}">FAQs</a>
         {% if user.is_staff or user.is_superuser %}
           <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
@@ -122,7 +126,8 @@
     (function () {
       // only run for users who are logged in
       try {
-        const idleSeconds = 60 * 5; // 5 minutes
+  // idle timeout in seconds; injected via context processor (user_session_timeout)
+  const idleSeconds = (typeof window.USER_SESSION_TIMEOUT !== 'undefined') ? parseInt(window.USER_SESSION_TIMEOUT, 10) : {{ user_session_timeout|default:300 }};
         let lastActivity = Date.now();
         let timeoutId = null;
 
@@ -170,8 +175,9 @@
         // tick every second for the UI
         setInterval(updateCountdown, 1000);
 
-        // start the timer
-        scheduleLogout();
+  // expose the timeout to other scripts and start the timer
+  try { window.USER_SESSION_TIMEOUT = {{ user_session_timeout|default:300 }}; } catch(e) {}
+  scheduleLogout();
         updateCountdown();
       } catch (e) { /* ignore in older browsers */ }
     })();

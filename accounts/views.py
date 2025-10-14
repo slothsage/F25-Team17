@@ -35,6 +35,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django import db as django_db
 from django.db import models
+from .models import LoginActivity
 from shop.models import Order
 from shop.utils import order_is_delayed
 from django.core.paginator import Paginator
@@ -162,6 +163,65 @@ def set_temporary_password(request, user_id):
     )
     messages.success(request, f"Temporary password emailed to {user.email}.")
     return redirect(request.META.get("HTTP_REFERER", "admin:index"))
+
+
+class AdminSetPasswordForm(forms.Form):
+    password = forms.CharField(widget=forms.PasswordInput, label="New password")
+    confirm = forms.CharField(widget=forms.PasswordInput, label="Confirm password")
+
+    def clean(self):
+        cleaned = super().clean()
+        p = cleaned.get("password")
+        c = cleaned.get("confirm")
+        if p != c:
+            raise forms.ValidationError("Passwords do not match")
+        return cleaned
+
+
+@staff_member_required
+def admin_set_password(request, user_id):
+    User = get_user_model()
+    user = get_object_or_404(User, pk=user_id)
+    if request.method == "POST":
+        form = AdminSetPasswordForm(request.POST)
+        if form.is_valid():
+            user.set_password(form.cleaned_data["password"])
+            user.save()
+            # show a simple success page with link back to admin search
+            messages.success(request, f"Password updated for {user.username}.")
+            return render(request, "accounts/admin_set_password_success.html", {"target_user": user})
+    else:
+        form = AdminSetPasswordForm()
+    return render(request, "accounts/admin_set_password.html", {"form": form, "target_user": user})
+
+
+class AdminSetTimeoutForm(forms.Form):
+    # allow blank to unset and use default
+    session_timeout_seconds = forms.IntegerField(label="Session timeout (seconds)", required=False, min_value=30, help_text="Blank = use system default")
+
+
+@staff_member_required
+def admin_set_timeout(request, user_id):
+    User = get_user_model()
+    user = get_object_or_404(User, pk=user_id)
+    profile = getattr(user, "driver_profile", None)
+    if request.method == "POST":
+        form = AdminSetTimeoutForm(request.POST)
+        if form.is_valid():
+            val = form.cleaned_data.get("session_timeout_seconds")
+            if profile:
+                profile.session_timeout_seconds = val if val else None
+                profile.save()
+            else:
+                # if the user has no DriverProfile, create one to store the setting
+                from .models import DriverProfile
+                profile = DriverProfile.objects.create(user=user, session_timeout_seconds=(val if val else None))
+            messages.success(request, f"Session timeout updated for {user.username}.")
+            return render(request, "accounts/admin_set_timeout_success.html", {"target_user": user})
+    else:
+        initial = {"session_timeout_seconds": profile.session_timeout_seconds if profile else None}
+        form = AdminSetTimeoutForm(initial=initial)
+    return render(request, "accounts/admin_set_timeout.html", {"form": form, "target_user": user})
 
 @login_required
 def admin_user_search(request):
@@ -324,6 +384,41 @@ def admin_user_search(request):
         },
     )
 
+
+@login_required
+def sponsor_driver_search(request):
+    """Sponsor-facing search: allow sponsor users to search drivers (no admin actions)."""
+    # only sponsor group members may access
+    if not request.user.groups.filter(name="sponsor").exists():
+        messages.error(request, "Access denied")
+        return redirect("accounts:profile")
+
+    q = request.GET.get("q", "").strip()
+    drivers_qs = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor")
+
+    if q:
+        id_query = None
+        if q.lower().startswith("id:"):
+            maybe = q.split(":", 1)[1].strip()
+            if maybe.isdigit():
+                id_query = int(maybe)
+        elif q.isdigit():
+            id_query = int(q)
+
+        if id_query is not None:
+            drivers_qs = drivers_qs.filter(Q(pk=id_query) | Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)).distinct()
+        else:
+            drivers_qs = drivers_qs.filter(
+                Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
+            ).distinct()
+
+    drivers_qs = drivers_qs.order_by("username")
+    paginator = Paginator(drivers_qs, 25)
+    page_number = request.GET.get("page", 1)
+    drivers_page = paginator.get_page(page_number)
+
+    return render(request, "accounts/sponsor_driver_search.html", {"drivers": drivers_page, "q": q})
+
 @login_required
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, driver=request.user)
@@ -435,6 +530,34 @@ def messages_inbox(request):
 def messages_sent(request):
     rows = Message.objects.filter(author = request.user).order_by("-created_at")
     return render(request, "accounts/messages_sent.html", {"rows": rows})
+
+
+@staff_member_required
+def login_activity(request):
+    """Admin page: list login activity records with optional user filter and success/failure filter."""
+    qs = LoginActivity.objects.select_related("user").all()
+    user_q = request.GET.get("user", "").strip()
+    status = request.GET.get("status", "")  # 'success' | 'fail' | ''
+
+    if user_q:
+        # allow searching by username or id
+        if user_q.isdigit():
+            qs = qs.filter(models.Q(user__id=int(user_q)) | models.Q(username__icontains=user_q))
+        else:
+            qs = qs.filter(models.Q(user__username__icontains=user_q) | models.Q(username__icontains=user_q))
+
+    if status == "success":
+        qs = qs.filter(successful=True)
+    elif status == "fail":
+        qs = qs.filter(successful=False)
+
+    qs = qs.order_by("-created_at")
+
+    paginator = Paginator(qs, 50)
+    page = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page)
+
+    return render(request, "accounts/login_activity.html", {"page": page_obj, "user_q": user_q, "status": status})
 
 @login_required
 def message_detail(request, pk: int):
