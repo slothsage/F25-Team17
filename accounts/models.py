@@ -62,6 +62,18 @@ class DriverNotificationPreference(models.Model):
     points = models.BooleanField(default=True)
     promotions = models.BooleanField(default=False) 
 
+    SOUND_CHOICES = [
+        ("default", "Default chime"),
+        ("silent", "Silent"),
+        ("custom", "Custom file"),
+    ]
+    sound_mode = models.CharField(max_length=20, choices=SOUND_CHOICES, default="default")
+    sound_file = models.FileField(
+        upload_to="notif_sounds/",
+        blank=True, null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
+    )
+    
     class Meta:
         verbose_name = "Driver Notification Preference"
         verbose_name_plural = "Driver Notification Preferences"

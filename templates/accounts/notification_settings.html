@@ -1,37 +1,80 @@
 {% extends "base.html" %}
+{% load static %}
 {% block content %}
-<h1>Notification Preferences</h1>
+<h1>Notification Settings</h1>
 
-<form method="post">
+<form method="post" enctype="multipart/form-data">
   {% csrf_token %}
+  {{ form.non_field_errors }}
 
-  <div style="margin:.5rem 0;">
-    <label>
-      {{ form.orders }}
-      Orders
-    </label>
-  </div>
+  <fieldset style="margin-bottom:1rem">
+    <legend>Kinds</legend>
+    <label>{{ form.orders }} Orders</label><br>
+    <label>{{ form.points }} Points</label><br>
+    <label>{{ form.promotions }} Promotions</label>
+  </fieldset>
 
-  <div style="margin:.5rem 0;">
-    <label>
-      {{ form.points }}
-      Points
-    </label>
-  </div>
+  <fieldset style="margin-bottom:1rem">
+    <legend>Sound</legend>
 
-  <div style="margin:.5rem 0;">
-    <label>
-      {{ form.promotions }}
-      Promotions
-    </label>
-    <div style="font-size:.9rem;color:#666;">(Optional marketing announcements)</div>
-  </div>
+    <div>
+      <label for="{{ form.sound_mode.id_for_label }}">Mode</label><br>
+      {{ form.sound_mode }}
+      {{ form.sound_mode.errors }}
+    </div>
 
-  <div style="margin:1rem 0;padding:.75rem;border:1px solid #ddd;background:#fafafa;">
-    <strong>Dropped Alerts</strong> – always ON and cannot be muted.
-    <div style="font-size:.9rem;color:#666;">You will always receive an alert if a sponsor drops you.</div>
-  </div>
+    <div id="custom-file" style="margin-top:.5rem; {% if form.instance.sound_mode != 'custom' %}display:none{% endif %}">
+      <label for="{{ form.sound_file.id_for_label }}">Custom audio (.mp3 / .wav / .ogg)</label><br>
+      {{ form.sound_file }}
+      {{ form.sound_file.errors }}
+      {% if form.instance.sound_file %}
+        <div style="margin-top:.25rem">
+          Current file:
+          <a href="{{ form.instance.sound_file.url }}" target="_blank" rel="noopener">Download</a>
+        </div>
+      {% endif %}
+      <small style="color:#666;display:block;margin-top:.25rem">Tip: keep files short (&lt; 10s) for a snappy alert.</small>
+    </div>
+
+    <div style="margin-top:.75rem">
+      <button type="button" class="btn" id="play-test" {% if not preview_url %}disabled{% endif %}>
+        Play test sound
+      </button>
+      <audio id="test-audio" src="{{ preview_url }}" preload="none"></audio>
+    </div>
+  </fieldset>
 
   <button class="btn" type="submit">Save</button>
+  <a class="btn" href="{% url 'accounts:notifications_feed' %}" style="margin-left:.5rem">Back to Notifications</a>
 </form>
-{% endblock content %}
+
+<script>
+  (function(){
+    const mode = document.getElementById("id_sound_mode");
+    const customWrap = document.getElementById("custom-file");
+    const playBtn = document.getElementById("play-test");
+    const audio = document.getElementById("test-audio");
+
+    function refresh() {
+      if (!mode) return;
+      const isCustom = mode.value === "custom";
+      if (customWrap) customWrap.style.display = isCustom ? "" : "none";
+      // Enable/disable play button if preview exists
+      if (playBtn) playBtn.disabled = !audio || !audio.src;
+    }
+
+    if (mode) {
+      mode.addEventListener("change", refresh);
+      refresh();
+    }
+
+    if (playBtn && audio) {
+      playBtn.addEventListener("click", () => {
+        if (!audio.src) return;
+        try { audio.currentTime = 0; } catch(_) {}
+        audio.play().catch(()=>{});
+      });
+    }
+  })();
+</script>
+{% endblock %}

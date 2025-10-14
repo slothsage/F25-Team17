@@ -1,5 +1,7 @@
 from django.urls import path, reverse_lazy
 from django.contrib.auth import views as auth_views
+from django.conf.urls import static
+from django.conf import settings
 from . import views
 from .forms import PolicyPasswordChangeForm
 

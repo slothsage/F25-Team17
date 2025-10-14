@@ -109,3 +109,8 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 # Email prints to console for password reset demo
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
+
+STATIC_URL = "static/"
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"

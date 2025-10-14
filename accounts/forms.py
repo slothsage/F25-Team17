@@ -1,6 +1,7 @@
 from django import forms
 from .models import DriverProfile
 from .models import Message
+from .models import DriverNotificationPreference
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import password_validators_help_text_html
@@ -131,3 +132,18 @@ class AddressForm(forms.ModelForm):
                 "style": "min-width: 320px;"
             })
         }
+
+class NotificationPreferenceForm(forms.ModelForm):
+    class Meta:
+        model = DriverNotificationPreference
+        fields = ["orders", "points", "promotions", "sound_mode", "sound_file"]
+
+    def clean(self):
+        cleaned = super().clean()
+        mode = cleaned.get("sound_mode")
+        file = cleaned.get("sound_file")
+        if mode == "custom" and not file:
+            self.add_error("sound_file", "Please upload an audio file for custom sound.")
+        if mode in ("default", "silent"):
+            cleaned["sound_file"] = None
+        return cleaned

@@ -17,6 +17,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum
 from urllib.parse import quote
+from django.templatetags.static import static
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -25,6 +26,7 @@ from .models import Notification
 from .models import PointsLedger
 from .models import Message, MessageRecipient
 from .forms import MessageComposeForm
+from .forms import NotificationPreferenceForm
 
 from .forms import ProfileForm, DeleteAccountForm
 from .models import DriverNotificationPreference
@@ -612,15 +614,28 @@ def notifications(request):
 @login_required
 def notification_settings(request):
     prefs = DriverNotificationPreference.for_user(request.user)
+
     if request.method == "POST":
-        form = NotificationPrefsForm(request.POST, instance=prefs)
+        form = NotificationPreferenceForm(request.POST, request.FILES, instance=prefs)
         if form.is_valid():
             form.save()
-            messages.success(request, "Notification preferences saved.")
+            messages.success(request, "Notification settings saved.")
             return redirect("accounts:notification_settings")
     else:
-        form = NotificationPrefsForm(instance=prefs)
-    return render(request, "accounts/notification_settings.html", {"form": form})
+        form = NotificationPreferenceForm(instance=prefs)
+
+    # Resolve a preview URL for the test button
+    preview_url = ""
+    if prefs.sound_mode == "default":
+        preview_url = static("sounds/default-chime.mp3") 
+    elif prefs.sound_mode == "custom" and prefs.sound_file:
+        preview_url = prefs.sound_file.url  
+
+    return render(
+        request,
+        "accounts/notification_settings.html",
+        {"form": form, "preview_url": preview_url, "prefs": prefs},
+    )
 
 @login_required
 @require_POST
