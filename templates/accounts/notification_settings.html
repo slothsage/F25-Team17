@@ -23,6 +23,26 @@
     </p>
   </fieldset>
   
+    <fieldset style="margin-bottom:1rem">
+    <legend>Theme</legend>
+    <label for="{{ form.theme.id_for_label }}">Color theme</label><br>
+    {{ form.theme }}
+    {{ form.theme.errors }}
+    <p style="color:#666;margin:.35rem 0 0">
+      Pick light, dark, or high-contrast. Applies instantly.
+    </p>
+  </fieldset>
+
+  <fieldset style="margin-bottom:1rem">
+  <legend>Language</legend>
+  <label for="{{ form.language.id_for_label }}">Preferred language</label><br>
+  {{ form.language }}
+  {{ form.language.errors }}
+  <p style="color:#666;margin:.35rem 0 0">
+    Choose your display language. Changes apply on next page load.
+  </p>
+</fieldset>
+
   <fieldset style="margin-bottom:1rem">
     <legend>Sound</legend>
 
@@ -84,6 +104,29 @@
         audio.play().catch(()=>{});
       });
     }
+  })();
+  (function () {
+    const sel = document.getElementById("id_theme");
+    if (!sel) return;
+
+    // live-preview + persist
+    sel.addEventListener("change", function () {
+      const val = sel.value || "system";
+      // Apply to <html>
+      if (val === "system") {
+        document.documentElement.removeAttribute("data-theme");
+        document.documentElement.classList.remove("dark");
+        // optional: auto-apply dark if OS prefers dark
+        if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+          document.documentElement.setAttribute("data-theme", "dark");
+          document.documentElement.classList.add("dark");
+        }
+      } else {
+        document.documentElement.setAttribute("data-theme", val);
+        document.documentElement.classList.toggle("dark", val === "dark");
+      }
+      try { localStorage.setItem("theme", val); } catch (_) {}
+    });
   })();
 </script>
 {% endblock %}

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+LOCAL_PATHS = [BASE_DIR / "local"]
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key")
@@ -24,6 +25,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -42,7 +44,7 @@ TEMPLATES = [{
         "django.template.context_processors.request",
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
-        "accounts.context_processors.user_session_timeout",
+        "accounts.context_processors.theme",
     ]},
 }]
 
@@ -74,6 +76,12 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 
+LANGUAGES = [
+    ('en', 'English'),
+    ('es', 'Español'),
+    ('fr', 'Français'),
+]
+
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
@@ -88,7 +96,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Auth flow
 LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "accounts:profile"      # after successful login
+LOGIN_REDIRECT_URL = "about"      # after successful login
 LOGOUT_REDIRECT_URL = "accounts:login"       # after logout
 
 # Sessions: 5 minute inactivity timeout
