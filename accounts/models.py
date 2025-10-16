@@ -65,6 +65,9 @@ class DriverNotificationPreference(models.Model):
     email_enabled = models.BooleanField(default=True)
     sms_enabled = models.BooleanField(default=False)
 
+    language = models.CharField(max_length=10, default="en")           # e.g., en, es, fr
+    theme = models.CharField(max_length=12, default="system")
+
     SOUND_CHOICES = [
         ("default", "Default chime"),
         ("silent", "Silent"),
