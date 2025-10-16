@@ -99,7 +99,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Auth flow
 LOGIN_URL = "accounts:login"
-LOGIN_REDIRECT_URL = "accounts:profile"      # after successful login
+LOGIN_REDIRECT_URL = "about"      # after successful login
 LOGOUT_REDIRECT_URL = "accounts:login"       # after logout
 
 # Sessions: 5 minute inactivity timeout

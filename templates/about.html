@@ -1,18 +1,22 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>About / Connectivity Check</h1>
+  <h1>About This Application</h1>
+  <p>Welcome to the <strong>Driver Incentive Program</strong> — built by Team 17</p>
 
-{% if connected %}
-  <p><strong>Status:</strong> ✅ Connected</p>
+  <h3 style="margin-top:1.5rem;">System Connectivity</h3>
+  <div style="padding: 1rem; background: #f8f9fa; border-radius: 6px; max-width: 500px;">
+    <p><strong>Status:</strong> Connected</p>
+    <ul>
+      <li><strong>Database:</strong> Team17_DB</li>
+      <li><strong>User:</strong> CP****</li>
+      <li><strong>Version:</strong> 8.0.42</li>
+    </ul>
+    <small style="color:#666;">Rendered at: {{ now }}</small>
+  </div>
+
+  <h3 style="margin-top:2rem;">Team Information</h3>
   <ul>
-    <li><strong>DATABASE():</strong> {{ db_name }}</li>
-    <li><strong>USER():</strong> {{ db_user_masked }}</li>
-    <li><strong>VERSION():</strong> {{ db_version }}</li>
+    <li><strong>Team Name:</strong> F25-Team17</li>
+    <li><strong>Members:</strong> Anthony Martino, Johan Zapata, Wilson Collins, Jacob Roberts</li>
   </ul>
-{% else %}
-  <p><strong>Status:</strong> ❌ Not connected</p>
-  {% if error %}<pre>{{ error }}</pre>{% endif %}
-{% endif %}
-
-<p>Rendered at: {{ now|date:"c" }}</p>
 {% endblock %}
