@@ -32,7 +32,17 @@
       Pick light, dark, or high-contrast. Applies instantly.
     </p>
   </fieldset>
-  
+
+  <fieldset style="margin-bottom:1rem">
+  <legend>Language</legend>
+  <label for="{{ form.language.id_for_label }}">Preferred language</label><br>
+  {{ form.language }}
+  {{ form.language.errors }}
+  <p style="color:#666;margin:.35rem 0 0">
+    Choose your display language. Changes apply on next page load.
+  </p>
+</fieldset>
+
   <fieldset style="margin-bottom:1rem">
     <legend>Sound</legend>
 

@@ -1,4 +1,4 @@
-{% load static %}
+{% load static i18n %}
 <!doctype html>
 <html>
 <head>
@@ -84,6 +84,16 @@
         <button class="btn btn-muted" id="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false">
           Dark Mode: Off
         </button>
+        <form action="{% url 'set_language' %}" method="post" class="lang-switcher" style="display:inline-block;margin-left:.5rem">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% get_current_language as LANGUAGE_CODE %}
+            <select name="language" onchange="this.form.submit()" class="btn btn-muted">
+            <option value="en" {% if LANGUAGE_CODE|slice:":2" == "en" %}selected{% endif %}>English</option>
+            <option value="es" {% if LANGUAGE_CODE|slice:":2" == "es" %}selected{% endif %}>Español</option>
+            <option value="fr" {% if LANGUAGE_CODE|slice:":2" == "fr" %}selected{% endif %}>Français</option>
+           </select>
+          </form>
         </div>
       </div>
     </div>

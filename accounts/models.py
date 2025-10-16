@@ -88,6 +88,12 @@ class DriverNotificationPreference(models.Model):
         default="system",
         help_text="Visual theme preference."
     )
+    LANGUAGE_CHOICES = [
+        ("en", "English"),
+        ("es", "Español"),
+        ("fr", "Français"),
+    ]
+    language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default="en")
     
     class Meta:
         verbose_name = "Driver Notification Preference"
