@@ -136,17 +136,19 @@ class AddressForm(forms.ModelForm):
 class NotificationPreferenceForm(forms.ModelForm):
     class Meta:
         model = DriverNotificationPreference
-        fields = ["orders", "points", "promotions", "email_enabled", "sms_enabled", "sound_mode", "sound_file"]
+        fields = ["orders", "points", "promotions", "email_enabled", "sms_enabled", "sound_mode", "sound_file", "theme"]
         widgets = {
             "orders": forms.CheckboxInput(),
             "points": forms.CheckboxInput(),
             "promotions": forms.CheckboxInput(),
             "email_enabled": forms.CheckboxInput(),
             "sms_enabled": forms.CheckboxInput(),
+            "theme": forms.Select(),
         }
         labels = {
             "email_enabled": "Email alerts",
             "sms_enabled": "SMS alerts (preferred; no duplicate emails)",
+            "theme": "Theme",
         }
 
     def clean(self):

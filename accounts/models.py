@@ -76,6 +76,18 @@ class DriverNotificationPreference(models.Model):
         blank=True, null=True,
         validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
     )
+    THEME_CHOICES = [
+        ("system", "System / Default"),
+        ("light", "Light"),
+        ("dark", "Dark"),
+        ("contrast", "High Contrast"),
+    ]
+    theme = models.CharField(
+        max_length=20,
+        choices=THEME_CHOICES,
+        default="system",
+        help_text="Visual theme preference."
+    )
     
     class Meta:
         verbose_name = "Driver Notification Preference"

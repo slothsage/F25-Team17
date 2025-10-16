@@ -102,3 +102,46 @@ body {
   /* small adjustments for action buttons */
   .nav-actions .btn { padding: .35rem .6rem; }
 }
+
+/* Dark theme */
+html[data-theme="dark"] :root,
+html.dark :root { /* fallback: supports old .dark class */
+  --brand: #a78bfa;
+  --muted: #9ca3af;
+  --surface: #111827;      /* cards / nav */
+  --background: #0b1020;   /* page bg */
+  --border: #1f2937;
+  --shadow: rgba(0, 0, 0, 0.35);
+}
+
+/* High-contrast theme */
+html[data-theme="contrast"] :root {
+  --brand: #0ea5e9;        /* bright cyan */
+  --muted: #111827;        /* very dark text for readability */
+  --surface: #ffffff;
+  --background: #fffffe;   /* slightly off-white for less glare */
+  --border: #111827;
+  --shadow: rgba(0, 0, 0, 0.25);
+}
+
+/* body/text color tweaks that follow variables */
+html[data-theme="dark"] body,
+html.dark body {
+  color: #e5e7eb; /* light gray text on dark bg */
+}
+
+html[data-theme="contrast"] body {
+  color: #0b1020; /* very dark text on light bg */
+}
+
+/* nav link hover colors adapt to theme */
+html[data-theme="dark"] .site-nav .nav-link:hover,
+html.dark .site-nav .nav-link:hover {
+  background-color: #1f2937;
+  color: var(--brand);
+}
+
+html[data-theme="contrast"] .site-nav .nav-link:hover {
+  background-color: #e2e8f0;
+  color: var(--brand);
+}
