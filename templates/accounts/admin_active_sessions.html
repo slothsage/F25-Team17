@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Active Sessions</h1>
+
+{% if sessions %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>User ID</th>
+        <th>IP Address</th>
+        <th>Last Activity</th>
+        <th>Session Key</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td>{{ s.user.username }}</td>
+        <td>{{ s.user.id }}</td>
+        <td>{{ s.ip }}</td>
+        <td>{{ s.last_activity }}</td>
+        <td><code>{{ s.session_key }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No active sessions found.</p>
+{% endif %}
+{% endblock %}

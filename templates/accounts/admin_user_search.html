@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Admin: User & Sponsor Search</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>Admin: User & Sponsor Search</h1>
+  <a href="{% url 'accounts:admin_active_sessions' %}" class="btn btn-sm btn-primary">
+    View Active Sessions
+  </a>
+</div>
 
 <form method="get" class="form-inline mb-3">
   <input type="hidden" name="q" value="{{ q }}">
