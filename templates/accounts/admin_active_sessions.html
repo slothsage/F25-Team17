@@ -20,7 +20,16 @@
         <td>{{ s.user.id }}</td>
         <td>{{ s.ip }}</td>
         <td>{{ s.last_activity }}</td>
-        <td><code>{{ s.session_key }}</code></td>
+        <td>
+          <code>{{ s.session_key }}</code>
+          <form method="post" action="{% url 'accounts:terminate_session' s.session_key %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Terminate this session?');">
+              Terminate
+            </button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

@@ -20,6 +20,7 @@ from urllib.parse import quote
 from django.templatetags.static import static
 from django.utils.timezone import now
 from django.utils.timezone import localtime
+from django.shortcuts import redirect
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -717,6 +718,17 @@ def admin_active_sessions(request):
     return render(request, "accounts/admin_active_sessions.html", {
         "sessions": sessions
     })
+
+@staff_member_required
+@require_POST
+def terminate_session(request, session_key):
+    try:
+        session = Session.objects.get(session_key=session_key)
+        session.delete()
+        messages.success(request, f"Session {session_key} terminated.")
+    except Session.DoesNotExist:
+        messages.error(request, f"Session {session_key} not found.")
+    return redirect("accounts:admin_active_sessions")
 
 def about(request):
     connected = False

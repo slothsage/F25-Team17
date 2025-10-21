@@ -51,6 +51,7 @@ urlpatterns = [
     path("admin/users/<int:user_id>/force-logout/", views.force_logout_user, name="admin_force_logout_user"),
     # Active sessions
     path("admin/sessions/", views.admin_active_sessions, name="admin_active_sessions"),
+    path("admin/sessions/terminate/<str:session_key>/", views.terminate_session, name="terminate_session"),
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience
