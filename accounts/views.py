@@ -708,7 +708,7 @@ def admin_active_sessions(request):
                 sessions.append({
                     "user": user,
                     "session_key": session.session_key,
-                    "ip": data.get("ip", "N/A"),  # only if you're saving IPs
+                    "ip": data.get("ip_address", "N/A"),  
                     "last_activity": localtime(session.expire_date),
                 })
             except User.DoesNotExist:
