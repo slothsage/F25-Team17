@@ -699,6 +699,7 @@ def contact_sponsor(request):
 
 @staff_member_required
 def admin_active_sessions(request):
+    sort = request.GET.get("sort", "recent")
     sessions = []
     for session in Session.objects.all():
         data = session.get_decoded()
@@ -715,8 +716,12 @@ def admin_active_sessions(request):
             except User.DoesNotExist:
                 pass
 
+    reverse = sort != "oldest"
+    sessions.sort(key=lambda s: s["last_activity"], reverse=reverse)
+
     return render(request, "accounts/admin_active_sessions.html", {
-        "sessions": sessions
+        "sessions": sessions,
+        "sort": sort,
     })
 
 @staff_member_required

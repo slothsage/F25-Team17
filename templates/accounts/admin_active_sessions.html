@@ -2,6 +2,15 @@
 {% block content %}
 <h1>Active Sessions</h1>
 
+<!-- Sort Form -->
+<form method="get" class="form-inline mb-3">
+  <label for="sort">Sort by last activity:</label>
+  <select name="sort" id="sort" onchange="this.form.submit()" class="form-select form-select-sm d-inline w-auto ms-2">
+    <option value="recent" {% if sort == "recent" %}selected{% endif %}>Most recent</option>
+    <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest first</option>
+  </select>
+</form>
+
 {% if sessions %}
   <table class="table">
     <thead>
@@ -9,7 +18,13 @@
         <th>Username</th>
         <th>User ID</th>
         <th>IP Address</th>
-        <th>Last Activity</th>
+        <th>Last Activity
+          {% if sort == "recent" %}
+            ↑
+          {% elif sort == "oldest" %}
+            ↓
+          {% endif %}
+        </th>
         <th>Session Key</th>
       </tr>
     </thead>
