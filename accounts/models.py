@@ -180,3 +180,12 @@ class MessageRecipient(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.message.subject}"
+    
+
+class FailedLoginAttempt(models.Model):
+    username = models.CharField(max_length=150)
+    ip_address = models.GenericIPAddressField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.username} from {self.ip_address} at {self.timestamp}"

@@ -222,4 +222,26 @@
   </table>
 {% endif %}
 
+{% if failed_logins %}
+  <h2>Recent Failed Login Attempts</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>IP Address</th>
+        <th>Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for attempt in failed_logins %}
+      <tr>
+        <td>{{ attempt.username }}</td>
+        <td>{{ attempt.ip_address }}</td>
+        <td>{{ attempt.timestamp|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+
 {% endblock content %}
