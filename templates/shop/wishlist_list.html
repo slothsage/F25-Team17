@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Your Wishlists</h1>
+
+<!-- Create form inline for quick add -->
+<form method="post" class="mb-3">
+    {% csrf_token %}
+    <input type="text" name="name" placeholder="New wishlist name" required>
+    <button type="submit">Create</button>
+</form>
+
+{% if Wishlists %}
+    <ul>
+    {% for wl in wishlists %}
+    <li>
+        <a href="{% url 'wishlist_detail' wl.id %}">{{ wl.name }}</a>
+        <!-- Delete as POST to prevent accidental clicks -->
+        <form method="post" action="{% url 'wishlist_delete' wl.id %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" onclick="return confirm('Delete {{ wl.name }}?');">Delete</button>
+        </form>
+    </li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No wishlists yet. Create one above.</p>
+{% endif %}
+{% endblock %}

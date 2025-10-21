@@ -1,3 +1,4 @@
+from pyclbr import Class
 from django.db import models
 from django.conf import settings
 # Create your models here.
@@ -39,3 +40,37 @@ class CartItem(models.Model):
     points_each = models.IntegerField(default=0)
     quantity = models.IntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
+
+class Wishlist(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="wishlists",
+    )
+    name = models.CharField(max_length=150)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("user", "name")] # one name per user
+
+    def __str__(self):
+        return f"{self.name} (by {self.user})"
+
+class WishListItem(models.Model):
+    wishlist = models.ForeignKey(
+        Wishlist, on_delete=models.CASCADE, related_name="items"
+    )
+
+    # API integration fields (still don't know what is available)
+    product_id = models.CharField(max_length=130, blank=True) #Ebay item ID
+    product_url = models.URLField(blank=True) #URL
+    thumb_url = models.URLField(blank=True) #Image URL
+    
+    name_snapshot = models.CharField(max_length=255)
+    points_each = models.IntegerField(default=0)
+    quantity = models.IntegerField(default=1) #multiples allowed
+    added_at = models.DateTimeField(auto_now=True)
+
+    def line_points(self):
+        return self.points_each * max(1, self.quantity)
