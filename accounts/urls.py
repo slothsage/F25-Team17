@@ -73,4 +73,17 @@ urlpatterns = [
     
     path("points/", views.points_history, name="points_history"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
+
+    path("api/suggest/drivers/", views.api_driver_suggest, name="api_driver_suggest"),
+    path("api/suggest/sponsors/", views.api_sponsor_suggest, name="api_sponsor_suggest"),
+    
+    # Support tickets
+    path("support/submit/", views.submit_ticket, name="submit_ticket"),
+    path("admin/tickets/", views.admin_tickets, name="admin_tickets"),
+    path("admin/tickets/<int:ticket_id>/resolve/", views.resolve_ticket, name="resolve_ticket"),
+    
+    # Complaints
+    path("complaints/submit/", views.submit_complaint, name="submit_complaint"),
+    path("admin/complaints/", views.admin_complaints, name="admin_complaints"),
+    path("admin/complaints/<int:complaint_id>/resolve/", views.resolve_complaint, name="resolve_complaint"),
 ]

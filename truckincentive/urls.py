@@ -16,7 +16,9 @@ urlpatterns = [
     path("", include("shop.urls")),
     path("about/", accounts_views.about, name="about"),
     path("faqs/", accounts_views.faqs, name="faqs"),
-    path("i18n/", include("django.conf.urls.i18n"))
+    path("i18n/", include("django.conf.urls.i18n")),
+    path("api/suggest/drivers/", accounts_views.api_driver_suggest, name="api_driver_suggest"),
+    path("api/suggest/sponsors/", accounts_views.api_sponsor_suggest, name="api_sponsor_suggest"),
 ]
 
 if settings.DEBUG:

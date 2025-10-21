@@ -207,3 +207,52 @@ class LoginActivity(models.Model):
     def __str__(self):
         who = self.user.username if self.user else (self.username or "<unknown>")
         return f"LoginActivity<{who}> {'OK' if self.successful else 'FAIL'} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+# --- Support Tickets ---
+class SupportTicket(models.Model):
+    """Driver support ticket for in-app help requests."""
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("resolved", "Resolved"),
+    ]
+    
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_tickets")
+    subject = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="tickets_resolved")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Support ticket"
+        verbose_name_plural = "Support tickets"
+
+    def __str__(self):
+        return f"Ticket #{self.id} - {self.driver.username} - {self.subject} [{self.status}]"
+
+
+class Complaint(models.Model):
+    """Driver complaint submission and admin resolution system."""
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("resolved", "Resolved"),
+    ]
+    
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="complaints")
+    subject = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="complaints_resolved")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Complaint"
+        verbose_name_plural = "Complaints"
+
+    def __str__(self):
+        return f"Complaint #{self.id} - {self.driver.username} - {self.subject} [{self.status}]"
