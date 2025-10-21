@@ -19,6 +19,7 @@ from django.db.models import Sum
 from urllib.parse import quote
 from django.templatetags.static import static
 from django.utils.timezone import now
+from django.utils.timezone import localtime
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -694,6 +695,28 @@ def contact_sponsor(request):
     })
 
 
+
+@staff_member_required
+def admin_active_sessions(request):
+    sessions = []
+    for session in Session.objects.all():
+        data = session.get_decoded()
+        user_id = data.get('_auth_user_id')
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+                sessions.append({
+                    "user": user,
+                    "session_key": session.session_key,
+                    "ip": data.get("ip", "N/A"),  # only if you're saving IPs
+                    "last_activity": localtime(session.expire_date),
+                })
+            except User.DoesNotExist:
+                pass
+
+    return render(request, "accounts/admin_active_sessions.html", {
+        "sessions": sessions
+    })
 
 def about(request):
     connected = False
