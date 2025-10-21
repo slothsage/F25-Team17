@@ -130,73 +130,73 @@ def clear_cart(request):
 
 @login_required
 def wishlist_list(request):
-    """ 
-    WISHLIST VIEW LANDING PAGE - shows all wishlists for the logged in user
     """
-    if request.method == "POST":
-        name = (request.POST.get("name") or "").strip()
-        if not name:
-            messages.error(request, "Please name your wishlist.")
-        else:
-            Wishlist.objects.get_or_create(user=request.user, name=name)
-            messages.success(request, f'Wishlist "{name}" created.')
+    /wishlists/ - lists all wishlists, create, delete, add/remove items from wishlists
+    """
+    action = request.POST.get("action")
+
+    if request.method == "POST" and action:
+        if action == "create_wishlist":
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                messages.error(request, "Please enter a wishlist name.")
+            else:
+                Wishlist.objects.get_or_create(user=request.user, name=name)
+                messages.success(request, f"Wishlist '{name}' created.")
             return redirect("wishlist_list")
-    
-    lists = Wishlist.objects.filter(user=request.user).order_by("-updated_at", "-created_at")
-    return render(request, "shop/wishlist_list.html", {"wishlists": lists})
 
-@login_required
-def wishlist_detail(request, wishlist_id):
-    """
-    Details Page - shows all items in a wishlist.
-    """
-    wl = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
+        elif action == "delete_wishlist":
+            wid = request.POST.get("wishlist_id")
+            wl = get_object_or_404(Wishlist, id=wid, user=request.user)
+            nm = wl.name
+            wl.delete()
+            messages.success(request, f"Deleted wishlist '{nm}'.")
+            return redirect("wishlist_list")
 
-    if request.method == "POST" and request.POST.get("action") == "add_item":
-        # NOTE: When eBay is wired up, fill product_id/product_url/thumb_url here.
-        name = (request.POST.get("name_snapshot") or "").strip()
-        points = int(request.POST.get("points_each") or 0)
-        qty = max(1, int(request.POST.get("quantity") or 1))
-    
-        if not name:
-            messages.error(request, "Item name is required.")
-        else:
-            WishListItem.objects.create(
-                wishlist=wl,
-                name_snapshot=name,
-                points_each=points,
-                quantity=qty,
-                # product_id=request.POST.get("product_id", ""),
-                # product_url=request.POST.get("product_url", ""),
-                # thumb_url=request.POST.get("thumb_url", ""),
-            )
+        elif action == "add_item":
+            wid = request.POST.get("wishlist_id")
+            wl = get_object_or_404(Wishlist, id=wid, user=request.user)
+
+            name = (request.POST.get("name_snapshot") or "").strip()
+            points = int(request.POST.get("points_each") or 0)
+            qty = max(1, int(request.POST.get("quantity") or 1))
+
+            if not name:
+                messages.error(request, "Item name is required.")
+            else:
+                WishListItem.objects.create(
+                    wishlist=wl,
+                    name_snapshot=name,
+                    points_each=points,
+                    quantity=qty,
+                    # product_id=request.POST.get("product_id",""),
+                    # product_url=request.POST.get("product_url",""),
+                    # thumb_url=request.POST.get("thumb_url",""),
+                )
+                wl.save(update_fields=["updated_at"])
+                messages.success(request, f"Added '{name}' to '{wl.name}'.")
+            return redirect("wishlist_list")
+
+        elif action == "remove_item":
+            wid = request.POST.get("wishlist_id")
+            iid = request.POST.get("item_id")
+            wl = get_object_or_404(Wishlist, id=wid, user=request.user)
+            it = get_object_or_404(WishListItem, id=iid, wishlist=wl)
+            it.delete()
             wl.save(update_fields=["updated_at"])
-            messages.success(request, f"Added '{name}' to {wl.name}.")
-            return redirect("wishlist_detail", wishlist_id=wl.id)
-    
-    return render(request, "shop/wishlist_detail.html", {"wishlist": wl, "items": wl.items.all()})
+            messages.success(request, "Item removed.")
+            return redirect("wishlist_list")
 
-@login_required
-@transaction.atomic
-def wishlist_delete(request, wishlist_id):
-    """Delete an entire wishlist (POST only)."""
-    wl = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
-    if request.method == "POST":
-        name = wl.name
-        wl.delete()
-        messages.success(request, f"Deleted wishlist '{name}'.")
-        return redirect("wishlist_list")
-    return redirect("wishlist_detail", wishlist_id=wishlist_id)
+    # GET: fetch ALL wishlists + their items
+    wishlists = (
+        Wishlist.objects
+        .filter(user=request.user)
+        .prefetch_related("items")
+        .order_by("-updated_at", "-created_at")
+    )
 
-@login_required
-@transaction.atomic
-def wishlist_item_remove(request, wishlist_id, item_id):
-    """Remove a single item from a wishlist (POST only)."""
-    wl = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
-    item = get_object_or_404(WishListItem, id=item_id, wishlist=wl)
-    if request.method == "POST":
-        item.delete()
-        wl.save(update_fields=["updated_at"])
-        messages.success(request, "Item removed.")
-        return redirect("wishlist_detail", wishlist_id=wishlist_id)
-    return redirect("wishlist_detail", wishlist_id=wishlist_id)
+    return render(
+        request,
+        "shop/wishlist_list.html",
+        {"wishlists": wishlists},
+    )
