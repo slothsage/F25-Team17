@@ -18,6 +18,7 @@ from datetime import timedelta
 from django.db.models import Sum
 from urllib.parse import quote
 from django.templatetags.static import static
+from django.utils.timezone import now
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -25,6 +26,7 @@ from .models import DriverProfile
 from .models import Notification
 from .models import PointsLedger
 from .models import Message, MessageRecipient
+from .models import FailedLoginAttempt
 from .forms import MessageComposeForm
 from .forms import NotificationPreferenceForm
 
@@ -308,6 +310,8 @@ def admin_user_search(request):
 
         return response
 
+    failed_logins = FailedLoginAttempt.objects.order_by('-timestamp')[:25]
+
     return render(
         request,
         "accounts/admin_user_search.html",
@@ -321,6 +325,7 @@ def admin_user_search(request):
             "drivers_matching_count": drivers_matching_count,
             "total_sponsors_count": total_sponsors_count,
             "sponsors_matching_count": sponsors_matching_count,
+            "failed_logins": failed_logins,  
         },
     )
 
@@ -332,6 +337,18 @@ def order_detail(request, order_id):
 
 class FrontLoginView(LoginView):
     template_name = "registration/login.html"
+
+    def form_invalid(self, form):
+        username = self.request.POST.get("username", "")
+        ip_address = self.get_client_ip()
+        FailedLoginAttempt.objects.create(username=username, ip_address=ip_address)
+        return super().form_invalid(form)
+
+    def get_client_ip(self):
+        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0]
+        return self.request.META.get('REMOTE_ADDR')
 
     def form_valid(self, form):
         # user_type is chosen on the login form (driver/sponsor/admin)

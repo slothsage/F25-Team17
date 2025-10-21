@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils.html import format_html
 from .models import DriverProfile
-
+from .models import FailedLoginAttempt
 from .models import PasswordPolicy
 
 
@@ -56,3 +56,10 @@ class UserAdmin(DjangoUserAdmin):
 class DriverProfileAdmin(admin.ModelAdmin):
 	list_display = ("user", "phone", "address")
 	search_fields = ("user__username", "user__email", "phone", "address")
+
+
+@admin.register(FailedLoginAttempt)
+class FailedLoginAttemptAdmin(admin.ModelAdmin):
+    list_display = ("username", "ip_address", "timestamp")
+    ordering = ("-timestamp",)
+    search_fields = ("username", "ip_address")

@@ -1,7 +1,8 @@
 asgiref==3.9.1
 cffi==2.0.0
-cryptography==46.0.2
+cryptography==46.0.1
 Django==5.2.6
+pillow==11.3.0
 pycparser==2.23
 PyMySQL==1.1.2
 python-dotenv==1.1.1
