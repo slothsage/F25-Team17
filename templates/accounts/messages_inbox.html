@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Messages</h1>
+
+    <div style="margin-bottom:1rem;">
+        <a href="{% url 'accounts:message_compose' %}" class="btn">Compose</a>
+        <a href="{% url 'accounts:messages_sent' %}" class="btn">Sent</a>
+    </div>
+
+    {% if rows %}
+    <ul>
+    {% for r in rows %}
+        <li>
+            {% if not r.is_read %}<strong>[new]</strong>{% endif %}
+            <a href="{% url 'accounts:messages_detail' r.pk %}">{{ r.message.subject }}</a>
+            — from {{ r.message.author.username }} — {{ r.message.created_at|date:"Y-m-d H:i" }}
+        </li>
+    {% endfor %}
+    </ul>
+    {% else %}
+        <p>No messages in your inbox.</p>
+    {% endif %}
+{% endblock content %}

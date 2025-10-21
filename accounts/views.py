@@ -442,8 +442,9 @@ def message_detail(request, pk: int):
                             pk=pk, user=request.user)
     if not item.is_read:
         item.is_read = True
-        item.save(update_fields = ["is_read"])
-    return render(request, "accounts/message_detail.html", {"item":item})
+        item.read_at = timezone.now()
+        item.save(update_fields = ["is_read", "read_at"])
+    return render(request, "accounts/messages_detail.html", {"item":item})
 
 @staff_member_required
 def create_driver(request):
@@ -605,10 +606,9 @@ class NotificationPrefsForm(forms.ModelForm):
 ########################################################
 @login_required
 def notifications(request):
-    rows = (MessageRecipient.objects
-        .select_related("message", "message__author")
+    rows = (Notification.objects
         .filter(user=request.user)
-        .order_by("-delivered_at"))
+        .order_by("-created_at"))
     return render(request, "accounts/notifications.html", {"rows": rows})
 
 @login_required

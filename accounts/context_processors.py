@@ -1,4 +1,6 @@
+from urllib import request
 from .models import DriverNotificationPreference
+from .models import Notification, MessageRecipient
 from django.utils import translation
 
 def theme(request):
@@ -26,3 +28,12 @@ def apply_user_language(get_response):
                 pass
         return get_response(request)
     return middleware
+
+#trying to include an unread and read counts for notifications and messages
+def unread_counts(requests):
+    if not requests.user.is_authenticated:
+        return {}
+    return {
+        "unread_notifications": Notification.objects.filter(user=request.user, read=False).count(),
+        "unread_messages": MessageRecipient.objects.filter(user=request.user, is_read=False).count(),
+    }

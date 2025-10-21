@@ -14,11 +14,11 @@ urlpatterns = [
     path("register/", views.register, name="register"),
 
     # Messaging
-    path("messages/compose/", views.messages_compose, name="message_compose"),
-    path("messages/sent/", views.messages_sent, name="messages_sent"),
     path("messages/", views.messages_inbox, name="messages_inbox"),
-    path("messages/item/<int:pk>/", views.message_detail, name="message_detail"),
-    path("notifications/", views.notifications, name="notifications"),
+    path("messages/sent/", views.messages_sent, name="messages_sent"),
+    path("messages/compose/", views.messages_compose, name="message_compose"),
+    path("messages/item/<int:pk>/", views.message_detail, name="messages_detail"),
+    
     
     # Password change (while logged in)
     path("password/change/", auth_views.PasswordChangeView.as_view(
@@ -58,10 +58,11 @@ urlpatterns = [
     path("profile/preview/", views.profile_preview, name="profile_preview"),
 
     # Notification preferences
-    path("notifications/settings/", views.notification_settings, name="notification_settings"),
-    path("notifications/", views.notifications_feed, name="notifications_feed"),
+    path("notifications/", views.notifications, name="notifications"),
+    path("notifications/feed/", views.notifications_feed, name="notifications_feed"),
     path("notifications/clear/", views.notifications_clear, name="notifications_clear"),
-
+    path("notifications/settings/", views.notification_settings, name="notification_settings"),
+    
     
     path("points/", views.points_history, name="points_history"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
