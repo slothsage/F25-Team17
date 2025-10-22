@@ -6,6 +6,9 @@ from django.db import transaction
 from .models import Order, OrderItem, CartItem
 from django.urls import reverse
 from .models import Wishlist, WishListItem
+from django.core.paginator import Paginator
+from django.utils.dateparse import parse_date
+
 
 try:
     from accounts.notifications import send_in_app_notification
@@ -46,11 +49,66 @@ def cancel_order(request, order_id):
 # STORY: Order Status (list)
 @login_required
 def order_list(request):
-    status = request.GET.get("status")
+    """
+    Full order history for the logged-in driver with filters + pagination.
+    GET params:
+      status=<pending|confirmed|shipped|delivered|cancelled>
+      sponsor=<substring>
+      date_from=YYYY-MM-DD
+      date_to=YYYY-MM-DD
+      per_page=<int>
+      page=<int>
+    """
     qs = Order.objects.filter(driver=request.user).order_by("-placed_at")
+
+    # filters 
+    status = request.GET.get("status", "").strip()
     if status:
         qs = qs.filter(status=status)
-    return render(request, "shop/order_list.html", {"orders": qs, "status": status})
+
+    sponsor = request.GET.get("sponsor", "").strip()
+    if sponsor:
+        qs = qs.filter(sponsor_name__icontains=sponsor)
+
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+
+    if date_from_str:
+        d = parse_date(date_from_str) 
+        if d:
+            start_dt = timezone.make_aware(timezone.datetime.combine(d, timezone.datetime.min.time()))
+            qs = qs.filter(placed_at__gte=start_dt)
+
+    if date_to_str:
+        d = parse_date(date_to_str)
+        if d:
+            end_dt = timezone.make_aware(timezone.datetime.combine(d, timezone.datetime.max.time()))
+            qs = qs.filter(placed_at__lte=end_dt)
+
+    # pagination 
+    try:
+        per_page = int(request.GET.get("per_page", "10"))
+    except ValueError:
+        per_page = 10
+    per_page = max(1, min(per_page, 200))
+
+    paginator = Paginator(qs, per_page)
+    page_number = request.GET.get("page") or 1
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+        "orders": page_obj.object_list,
+        "filters": {
+            "status": status,
+            "sponsor": sponsor,
+            "date_from": date_from_str,
+            "date_to": date_to_str,
+            "per_page": per_page,
+        },
+        "STATUS_CHOICES": [("", "All")] + list(Order.STATUS_CHOICES),
+    }
+    return render(request, "shop/order_list.html", context)
 
 # STORY: Order Status (detail) + base for "Mark as Received"
 @login_required
