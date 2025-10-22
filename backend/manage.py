@@ -2,10 +2,15 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
-
+from dotenv import load_dotenv
+from pathlib import Path
 
 def main():
     """Run administrative tasks."""
+
+    BASE_DIR = Path(__file__).resolve().parent
+    load_dotenv(BASE_DIR / ".env")
+
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'truckincentive.settings')
     try:
         from django.core.management import execute_from_command_line

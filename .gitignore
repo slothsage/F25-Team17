@@ -15,8 +15,8 @@ staticfiles/
 tmp/
 
 # Environments & secrets
-.env
-.env.*
+backend/.env
+backend/.env.*
 .venv/
 venv/
 ENV/
@@ -48,6 +48,19 @@ cloudformation-template.json
 *.sql
 *.dump
 *.bak
+
+# Frontend (Vite / React)
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
+frontend/.env.local
+frontend/.env.*.local
+
+# Mobile (React Native / Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/.env.local
+mobile/.env.*.local
 
 # VS Code
 .vscode/

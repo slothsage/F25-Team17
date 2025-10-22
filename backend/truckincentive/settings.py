@@ -50,6 +50,7 @@ TEMPLATES = [{
 }]
 
 WSGI_APPLICATION = "truckincentive.wsgi.application"
+ASGI_APPLICATION = "truckincentive.asgi.application"
 
 DATABASES = {
     "default": {
@@ -83,7 +84,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # 24 hours
 PASSWORD_RESET_TIMEOUT = 60 * 60 * 24
-
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
@@ -96,9 +96,8 @@ LANGUAGES = [
 ]
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-]
+STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # media
 MEDIA_URL = "/media/"
