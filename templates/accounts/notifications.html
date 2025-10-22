@@ -2,6 +2,7 @@
 {% block content %}
   <h1>Notifications</h1> 
 <div style="margin-bottom: 1rem;">
+  <a class="btn" href="{% url 'accounts:notifications_history' %}">View History</a>
   <a href="{% url 'accounts:notification_settings' %}" class="btn btn-primary">
     Notification Settings
   </a>

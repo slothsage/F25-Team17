@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.core.mail import send_mail
+from django.db.models.functions import TruncDate
 from django.db import connections
 from django.utils import timezone
 from datetime import timedelta
@@ -668,6 +669,48 @@ def notifications_clear(request):
 def notifications_feed(request):
     rows = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
     return render(request, "accounts/notifications_feed.html", {"rows": rows})
+
+
+@login_required
+def notifications_history(request):
+    """
+    Dashboard list of all notifications with search, filters, pagination.
+    Groups by day in the template via the annotated 'day' field.
+    """
+    qs = (
+        Notification.objects
+        .filter(user=request.user)
+        .order_by("-created_at")
+        .annotate(day=TruncDate("created_at"))
+    )
+
+    # filters
+    kind = request.GET.get("kind", "")
+    if kind:
+        qs = qs.filter(kind=kind)
+
+    read = request.GET.get("read", "")
+    if read == "unread":
+        qs = qs.filter(read=False)
+    elif read == "read":
+        qs = qs.filter(read=True)
+
+    q = request.GET.get("q", "").strip()
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(body__icontains=q))
+
+    paginator = Paginator(qs, 15)  
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    context = {
+        "page_obj": page_obj,
+        "q": q,
+        "read": read,
+        "kind": kind,
+        "kind_choices": Notification.KIND_CHOICES,
+    }
+    return render(request, "accounts/notification_history.html", context)
+
 
 @login_required
 def points_history(request):

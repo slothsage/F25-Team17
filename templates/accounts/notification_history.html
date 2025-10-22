@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<h1>Notification History</h1>
+
+<form method="get" class="filters" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search title or message…" class="btn" style="min-width:240px">
+  <label>
+    Kind:
+    <select name="kind" class="btn" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for value,label in kind_choices %}
+        <option value="{{ value }}" {% if kind == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Status:
+    <select name="read" class="btn" onchange="this.form.submit()">
+      <option value="">All</option>
+      <option value="unread" {% if read == "unread" %}selected{% endif %}>Unread</option>
+      <option value="read" {% if read == "read" %}selected{% endif %}>Read</option>
+    </select>
+  </label>
+  <button class="btn" type="submit">Apply</button>
+</form>
+
+{% if page_obj.object_list %}
+  {# Group by day (annotated in the view) #}
+  {% regroup page_obj.object_list by day as day_groups %}
+
+  <div class="history">
+    {% for group in day_groups %}
+      <h3 style="margin-top:1.25rem">{{ group.grouper|date:"Y-m-d" }}</h3>
+      <ul style="list-style:none;padding-left:0;margin:.5rem 0 0">
+        {% for n in group.list %}
+          <li style="padding:.5rem 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:.8rem;opacity:.8;border:1px solid var(--border);padding:.1rem .4rem;border-radius:.5rem;margin-right:.4rem">
+              {{ n.get_kind_display }}
+            </span>
+            {% if not n.read %}
+              <strong>[new]</strong>
+            {% endif %}
+            <a href="{{ n.url|default:'#' }}">{{ n.title }}</a>
+            <div style="color:var(--muted);font-size:.9rem">{{ n.body }}</div>
+            <div style="color:var(--muted);font-size:.8rem">{{ n.created_at|date:"H:i" }}</div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </div>
+
+  {# Pagination controls #}
+  <nav style="margin-top:1rem;display:flex;gap:.5rem;align-items:center">
+    {% if page_obj.has_previous %}
+      <a class="btn" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&kind={{ kind }}&read={{ read }}">« Prev</a>
+    {% else %}
+      <button class="btn" disabled>« Prev</button>
+    {% endif %}
+
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+      <a class="btn" href="?page={{ page_obj.next_page_number }}&q={{ q }}&kind={{ kind }}&read={{ read }}">Next »</a>
+    {% else %}
+      <button class="btn" disabled>Next »</button>
+    {% endif %}
+  </nav>
+{% else %}
+  <p>No notifications found.</p>
+{% endif %}
+{% endblock %}

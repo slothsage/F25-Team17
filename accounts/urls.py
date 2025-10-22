@@ -61,6 +61,7 @@ urlpatterns = [
 
     # Notification preferences
     path("notifications/", views.notifications, name="notifications"),
+    path("notifications/history/", views.notifications_history, name="notifications_history"),
     path("notifications/feed/", views.notifications_feed, name="notifications_feed"),
     path("notifications/clear/", views.notifications_clear, name="notifications_clear"),
     path("notifications/settings/", views.notification_settings, name="notification_settings"),
