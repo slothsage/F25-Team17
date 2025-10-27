@@ -33,6 +33,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     'accounts.middleware.ActiveUserSessionMiddleware',
+    "accounts.middleware.BlockLockedUserMiddleware",
 ]
 
 ROOT_URLCONF = "truckincentive.urls"

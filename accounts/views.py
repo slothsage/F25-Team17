@@ -588,6 +588,29 @@ def toggle_user_active(request, user_id):
     messages.success(request, f"User '{user.username}' has been {action}.")
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
+@staff_member_required
+def toggle_lock_user(request, user_id):
+    """
+    Admin-only action: toggles a driver's locked status.
+    Locked users cannot log in or access protected pages.
+    """
+    if request.method != "POST":
+        messages.error(request, "Invalid request method.")
+        return redirect("admin_user_search")
+
+    user = get_object_or_404(User, id=user_id)
+    profile = getattr(user, "driver_profile", None)
+
+    if not profile:
+        messages.error(request, "This user does not have a driver profile.")
+        return redirect("admin_user_search")
+
+    profile.is_locked = not profile.is_locked
+    profile.save()
+
+    action = "locked" if profile.is_locked else "unlocked"
+    messages.success(request, f"Driver '{user.username}' has been {action}.")
+    return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
 @staff_member_required
 def force_logout_user(request, user_id):

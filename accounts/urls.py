@@ -50,8 +50,11 @@ urlpatterns = [
     # Force logout
     path("admin/users/<int:user_id>/force-logout/", views.force_logout_user, name="admin_force_logout_user"),
     # Active sessions
+    path("admin/user/<int:user_id>/toggle-active/", views.toggle_user_active, name="toggle_user_active"),
     path("admin/sessions/", views.admin_active_sessions, name="admin_active_sessions"),
     path("admin/sessions/terminate/<str:session_key>/", views.terminate_session, name="terminate_session"),
+    # Lock user
+    path("admin/user/<int:user_id>/toggle-lock/", views.toggle_lock_user, name="toggle_lock_user"),
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import User
@@ -41,6 +42,7 @@ class UserAdmin(DjangoUserAdmin):
     list_filter = (*DjangoUserAdmin.list_filter, "last_login")
     ordering = ("-last_login",)
 
+    actions = ["lock_selected_users", "unlock_selected_users"]
 
     @admin.display(description="Password actions")
     def password_actions(self, obj):
@@ -54,8 +56,11 @@ class UserAdmin(DjangoUserAdmin):
 
 @admin.register(DriverProfile)
 class DriverProfileAdmin(admin.ModelAdmin):
-	list_display = ("user", "phone", "address")
-	search_fields = ("user__username", "user__email", "phone", "address")
+    list_display = ("user", "phone", "address")
+    search_fields = ("user__username", "user__email", "phone", "address")
+    readonly_fields = ("is_locked",)
+    list_filter = ("is_locked",)
+    ist_display = ("user", "phone", "address", "is_locked")
 
 
 @admin.register(FailedLoginAttempt)

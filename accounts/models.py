@@ -34,6 +34,12 @@ class DriverProfile(models.Model):
     sponsor_name  = models.CharField(max_length=120, blank=True)
     sponsor_email = models.EmailField(blank=True)
 
+    is_locked = models.BooleanField(
+        default=False,
+        help_text="If checked, this user is prevented from logging in (admin only)",
+        editable=False  
+    )
+
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
 
