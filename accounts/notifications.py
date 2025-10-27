@@ -1,7 +1,8 @@
 from django.urls import reverse
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import DriverNotificationPreference, Notification
+from .models import DriverNotificationPreference, Notification, PointsLedger
+from django.db.models import Sum, Max
 
 
 def _kind_allowed(user, kind: str) -> bool:
@@ -101,31 +102,89 @@ def send_in_app_notification(user, kind: str, title: str, body: str, url: str = 
     )
 
 
+def get_current_balance(user):
+    """
+    Return the user's latest known balance using PointsLedger.balance_after.
+    If no ledger rows yet, treat balance as 0.
+    """
+    latest = (
+        PointsLedger.objects
+        .filter(user=user)
+        .order_by("-created_at")
+        .first()
+    )
+    return latest.balance_after if latest else 0
+
+
+def check_low_balance(user):
+    """
+    If low-balance alerts are enabled and the driver's balance_after
+    is below their threshold, send exactly one 'Low Points' alert.
+    """
+    prefs = DriverNotificationPreference.for_user(user)
+
+    if not getattr(prefs, "low_balance_alert_enabled", False):
+        return
+
+    threshold = getattr(prefs, "low_balance_threshold", 0)
+
+    balance = get_current_balance(user)
+
+    if balance >= threshold:
+        return
+
+    title = "Low Points Alert"
+    body = (
+        f"Your point balance is low ({balance} pts remaining). "
+        "Consider saving your remaining points for future rewards."
+    )
+    try:
+        url = reverse("accounts:points_history")
+    except Exception:
+        url = ""
+
+    already_sent = Notification.objects.filter(
+        user=user,
+        kind="points",
+        title=title,
+    ).exists()
+    if already_sent:
+        return
+
+    _notify_channels(
+        user=user,
+        kind="points",
+        title=title,
+        body=body,
+        url=url,
+    )
+
+
 def on_points_updated(user, delta: int, reason: str, new_balance: int):
     """
-    Emits an in-app notification (respects prefs) and optionally an email.
+    Called whenever points change for a driver.
+
+    - Sends 'Points updated' notification (respects channel prefs).
+    - Then runs low-balance check, which may send a 'Low Points Alert'.
     """
     title = "Points updated"
     sign = "+" if delta >= 0 else ""
     body = f"{sign}{delta} — {reason}. New balance: {new_balance}"
-    # Use the namespaced URL
-    url = reverse("accounts:points_history")
 
-    # In-app 
-    send_in_app_notification(user, "points", title, body, url=url)
+    try:
+        url = reverse("accounts:points_history")
+    except Exception:
+        url = ""
 
-    # Optional email 
-    if getattr(user, "email", ""):
-        try:
-            send_mail(
-                subject=title,
-                message=f"{body}\n\nView history: {url}",
-                from_email=None,  # DEFAULT_FROM_EMAIL
-                recipient_list=[user.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
+    _notify_channels(
+        user=user,
+        kind="points",
+        title=title,
+        body=body,
+        url=url,
+    )
+    check_low_balance(user)
+
 
 def on_order_delayed(order):
     """

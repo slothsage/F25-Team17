@@ -111,6 +111,33 @@ class DriverNotificationPreference(models.Model):
         obj, _ = cls.objects.get_or_create(user=user, defaults={"orders": True, "points": True, "promotions": False})
         return obj
     
+    low_balance_alert_enabled = models.BooleanField(default=True)
+    low_balance_threshold = models.PositiveIntegerField(default=100)
+
+    class Meta:
+        verbose_name = "Driver Notification Preference"
+        verbose_name_plural = "Driver Notification Preferences"
+
+    def __str__(self):
+        return f"NotifPrefs<{self.user}>"
+
+    @classmethod
+    def for_user(cls, user):
+        obj, _ = cls.objects.get_or_create(
+            user=user,
+            defaults={
+                "orders": True,
+                "points": True,
+                "promotions": False,
+                "email_enabled": True,
+                "sms_enabled": False,
+                "sound_mode": "default",
+                "low_balance_alert_enabled": True,
+                "low_balance_threshold": 100,
+            },
+        )
+        return obj
+    
 class Notification(models.Model):
     KIND_CHOICES = [
         ("orders", "Orders"),
@@ -189,3 +216,11 @@ class FailedLoginAttempt(models.Model):
 
     def __str__(self):
         return f"{self.username} from {self.ip_address} at {self.timestamp}"
+    
+class DriverSettings(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="driver_settings")
+    low_balance_alert_enabled = models.BooleanField(default=True)
+    low_balance_threshold = models.PositiveIntegerField(default=100)
+
+    def __str__(self):
+        return f"{self.user.username} settings"
