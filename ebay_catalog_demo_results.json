@@ -1,0 +1,117 @@
+{
+  "timestamp": "2025-10-27T11:56:38.835015",
+  "query": "https://api.sandbox.ebay.com/buy/browse/v1/item_summary/search?q=laptop&limit=10&offset=0",
+  "total_results": 108,
+  "products": [
+    {
+      "ebay_item_id": "v1|110588318818|0",
+      "name": "ACEMAGIC RX16 16\" Gaming Laptop AMD Ryzen 7 6800H 16GB DDR5 512GB SSD Win 11 Pro",
+      "price_usd": 459.0,
+      "price_points": 45900,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": "http://i.ebayimg.sandbox.ebay.com/images/g/9NMAAOSwhONoVpde/s-l225.jpg",
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/ACEMAGIC-RX16-16-Gaming-Laptop-AMD-Ryzen-7-6800H-16GB-DDR5-512GB-SSD-Win-11-Pro/110588318818?src=urllib&_skw=laptop&hash=item19bf93d462:g:9NMAAOSwhONoVpde",
+      "category": "PC Laptops & Netbooks"
+    },
+    {
+      "ebay_item_id": "v1|110588364118|0",
+      "name": "some bilstein test3",
+      "price_usd": 200.0,
+      "price_points": 20000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/some-bilstein-test3/110588364118?src=urllib&_skw=laptop&hash=item19bf948556:i:110588364118",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588364042|0",
+      "name": "some bilstein test",
+      "price_usd": 200.0,
+      "price_points": 20000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/some-bilstein-test/110588364042?src=urllib&_skw=laptop&hash=item19bf94850a:i:110588364042",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588364035|0",
+      "name": "very 544hopeful test",
+      "price_usd": 200.0,
+      "price_points": 20000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/very-544hopeful-test/110588364035?src=urllib&_skw=laptop&hash=item19bf948503:i:110588364035",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588364045|0",
+      "name": "some bilstein test2",
+      "price_usd": 200.0,
+      "price_points": 20000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/some-bilstein-test2/110588364045?src=urllib&_skw=laptop&hash=item19bf94850d:i:110588364045",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588364743|0",
+      "name": "some ARP test1",
+      "price_usd": 200.0,
+      "price_points": 20000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/some-ARP-test1/110588364743?src=urllib&_skw=laptop&hash=item19bf9487c7:i:110588364743",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588408026|0",
+      "name": "HP - 14\" Laptop - Intel Celeron - 4GB Memory - 64GB eMMC - Snowflake White",
+      "price_usd": 299.99,
+      "price_points": 29999,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/HP-14-Laptop-Intel-Celeron-4GB-Memory-64GB-eMMC-Snowflake-White/110588408026?src=urllib&_skw=laptop&hash=item19bf9530da:i:110588408026",
+      "category": "PC Laptops & Netbooks"
+    },
+    {
+      "ebay_item_id": "v1|110588375623|0",
+      "name": "Apple MacBook Air M4 15-Inch - Lightweight, Powerful Laptop",
+      "price_usd": 12.0,
+      "price_points": 1200,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/Apple-MacBook-Air-M4-15-Inch-Lightweight-Powerful-Laptop/110588375623?src=urllib&_skw=laptop&hash=item19bf94b247:i:110588375623",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588320087|0",
+      "name": "Apple MacBook Pro MB990LL/A 13.3 in. Notebook NEW",
+      "price_usd": 100.0,
+      "price_points": 10000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/Apple-MacBook-Pro-MB990LL-A-13-3-in-Notebook-NEW/110588320087?src=urllib&_skw=laptop&hash=item19bf93d957:i:110588320087",
+      "category": "Apple Laptops"
+    },
+    {
+      "ebay_item_id": "v1|110588423488|0",
+      "name": "HP MacBook Pro MB990LL/A 13.3 in. Notebook NEW",
+      "price_usd": 500.0,
+      "price_points": 50000,
+      "currency": "USD",
+      "condition": "New",
+      "image_url": null,
+      "ebay_url": "https://cgi.sandbox.ebay.com/itm/HP-MacBook-Pro-MB990LL-A-13-3-in-Notebook-NEW/110588423488?src=urllib&_skw=laptop&hash=item19bf956d40:i:110588423488",
+      "category": "Apple Laptops"
+    }
+  ]
+}

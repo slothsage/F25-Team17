@@ -7,7 +7,10 @@ from .models import Order, OrderItem, CartItem
 from django.urls import reverse
 from .models import Wishlist, WishListItem
 from django.core.paginator import Paginator
+from .ebay_service import ebay_service
 from django.utils.dateparse import parse_date
+from django.http import JsonResponse
+import json
 
 
 try:
@@ -258,3 +261,176 @@ def wishlist_list(request):
         "shop/wishlist_list.html",
         {"wishlists": wishlists},
     )
+
+
+@login_required
+def catalog_search(request):
+    """
+    Main catalog search page - shows search form and results
+    Available to all logged-in users (drivers can browse, sponsors can add to catalog)
+    """
+    query = request.GET.get('q', '').strip()
+    page_num = request.GET.get('page', '1')
+    
+    try:
+        page_num = int(page_num)
+    except ValueError:
+        page_num = 1
+    
+    limit = 20
+    offset = (page_num - 1) * limit
+    
+    context = {
+        'query': query,
+        'page': page_num,
+        'results': None,
+        'error': None
+    }
+    
+    if query:
+        try:
+            results = ebay_service.search_products(query, limit=limit, offset=offset)
+            
+            products = [
+                ebay_service.format_product(item)
+                for item in results.get('itemSummaries', [])
+            ]
+            
+            context['results'] = {
+                'products': products,
+                'total': results.get('total', 0),
+                'has_next': results.get('next') is not None,
+                'has_prev': page_num > 1
+            }
+            
+        except Exception as e:
+            context['error'] = str(e)
+    
+    return render(request, 'shop/catalog_search.html', context)
+
+
+@login_required
+def catalog_search_ajax(request):
+    """
+    AJAX endpoint for searching products
+    Returns JSON response for dynamic searching
+    """
+    query = request.GET.get('q', '').strip()
+    limit = min(int(request.GET.get('limit', 20)), 50)
+    offset = int(request.GET.get('offset', 0))
+    
+    if not query:
+        return JsonResponse({'error': 'Search query required'}, status=400)
+    
+    try:
+        results = ebay_service.search_products(query, limit=limit, offset=offset)
+        
+        products = [
+            ebay_service.format_product(item)
+            for item in results.get('itemSummaries', [])
+        ]
+        
+        return JsonResponse({
+            'success': True,
+            'products': products,
+            'total': results.get('total', 0),
+            'limit': limit,
+            'offset': offset
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
+
+@login_required
+def add_to_cart_from_catalog(request):
+    """
+    Add an eBay product directly to cart
+    POST with: ebay_item_id, quantity (optional)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        ebay_item_id = data.get('ebay_item_id')
+        quantity = int(data.get('quantity', 1))
+        
+        if not ebay_item_id:
+            return JsonResponse({'error': 'Missing ebay_item_id'}, status=400)
+        
+        product = ebay_service.get_product_details(ebay_item_id)
+        formatted = ebay_service.format_product(product)
+        
+        if not formatted['is_available']:
+            return JsonResponse({
+                'error': 'This product is no longer available'
+            }, status=400)
+        
+        cart_item, created = CartItem.objects.get_or_create(
+            driver=request.user,
+            name_snapshot=formatted['name'],
+            defaults={
+                'points_each': formatted['price_points'],
+                'quantity': quantity
+            }
+        )
+        
+        if not created:
+            cart_item.quantity += quantity
+            cart_item.points_each = formatted['price_points']  
+            cart_item.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Added to cart!',
+            'cart_total': sum(
+                item.points_each * item.quantity 
+                for item in CartItem.objects.filter(driver=request.user)
+            )
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def add_to_wishlist_from_catalog(request):
+    """
+    Add an eBay product to a wishlist
+    POST with: wishlist_id, ebay_item_id
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        wishlist_id = data.get('wishlist_id')
+        ebay_item_id = data.get('ebay_item_id')
+        
+        if not wishlist_id or not ebay_item_id:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        
+        wishlist = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
+        
+        product = ebay_service.get_product_details(ebay_item_id)
+        formatted = ebay_service.format_product(product)
+        
+        WishListItem.objects.create(
+            wishlist=wishlist,
+            product_id=formatted['ebay_item_id'],
+            product_url=formatted['ebay_url'],
+            thumb_url=formatted['image_url'],
+            name_snapshot=formatted['name'],
+            points_each=formatted['price_points'],
+            quantity=1
+        )
+        
+        wishlist.save(update_fields=['updated_at'])
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"Added to wishlist '{wishlist.name}'"
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
