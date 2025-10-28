@@ -72,12 +72,12 @@ def order_list(request):
     """
     Full order history for the logged-in driver with filters + pagination.
     GET params:
-      status=<pending|confirmed|shipped|delivered|cancelled>
-      sponsor=<substring>
-      date_from=YYYY-MM-DD
-      date_to=YYYY-MM-DD
-      per_page=<int>
-      page=<int>
+        status=<pending|confirmed|shipped|delivered|cancelled>
+        sponsor=<substring>
+        date_from=YYYY-MM-DD
+        date_to=YYYY-MM-DD
+        per_page=<int>
+        page=<int>
     """
     qs = Order.objects.filter(driver=request.user).order_by("-placed_at")
 
