@@ -65,6 +65,8 @@ urlpatterns = [
     path("admin/user/<int:user_id>/toggle-lock/", views.toggle_lock_user, name="toggle_lock_user"),
     # Suspend
     path("admin/user/<int:user_id>/toggle-suspend/", views.toggle_suspend_user, name="toggle_suspend_user"),
+    # Error logs
+    path("admin/download-error-log/", views.download_error_log, name="download_error_log"),
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience

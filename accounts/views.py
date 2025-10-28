@@ -62,6 +62,10 @@ from django.contrib.auth import get_user_model
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 
+from django.http import FileResponse, HttpResponseNotFound
+from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
+
 User = get_user_model()
 
 try:
@@ -1179,3 +1183,16 @@ def custom_permission_denied_view(request, exception=None):
     return render(request, "errors/403_account_blocked.html", {
         "reason": "You do not have permission to access this page or your account has been restricted."
     }, status=403)
+
+
+@staff_member_required
+def download_error_log(request):
+    """Allows admin to download the latest error log file."""
+    log_path = settings.LOG_DIR / "error.log"
+
+    if not log_path.exists():
+        return HttpResponseNotFound("No error log file found.")
+
+    # Serve as downloadable file
+    response = FileResponse(open(log_path, "rb"), as_attachment=True, filename="error.log")
+    return response
