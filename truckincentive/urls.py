@@ -22,5 +22,7 @@ urlpatterns = [
     path("api/suggest/sponsors/", accounts_views.api_sponsor_suggest, name="api_sponsor_suggest"),
 ]
 
+handler403 = accounts_views.custom_permission_denied_view
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

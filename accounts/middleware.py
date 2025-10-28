@@ -1,8 +1,9 @@
 import datetime
 from django.utils.timezone import now
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.contrib.auth import logout
+from django.http import HttpResponseForbidden
 
 
 class ActiveUserSessionMiddleware:
@@ -10,6 +11,27 @@ class ActiveUserSessionMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if request.user.is_authenticated:
+            profile = getattr(request.user, "driver_profile", None)
+
+            # Deactivated accounts
+            if not request.user.is_active:
+                return render(request, "errors/403_account_blocked.html", {
+                    "reason": "Your account has been deactivated by an administrator."
+                }, status=403)
+
+            # Locked accounts
+            if profile and profile.is_locked:
+                return render(request, "errors/403_account_blocked.html", {
+                    "reason": "Your account has been locked for security reasons."
+                }, status=403)
+
+            # Suspended accounts
+            if profile and profile.is_suspended:
+                return render(request, "errors/403_account_blocked.html", {
+                    "reason": "Your account has been suspended by an administrator."
+                }, status=403)
+            
         response = self.get_response(request)
 
         if request.user.is_authenticated:
@@ -26,7 +48,7 @@ class ActiveUserSessionMiddleware:
         if x_forwarded_for:
             return x_forwarded_for.split(",")[0]
         return request.META.get("REMOTE_ADDR")
-    
+
 
 class BlockLockedUserMiddleware:
     """

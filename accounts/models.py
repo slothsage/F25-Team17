@@ -41,7 +41,12 @@ class DriverProfile(models.Model):
         help_text="If checked, this user is prevented from logging in (admin only)",
         editable=False  
     )
-
+    is_suspended = models.BooleanField(
+        default=False,
+        help_text="If checked, this user is temporarily suspended and cannot access any part of the system (admin only)",
+        editable=False
+    )
+    
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
 

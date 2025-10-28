@@ -728,6 +728,24 @@ def toggle_lock_user(request, user_id):
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
 @staff_member_required
+@require_POST
+def toggle_suspend_user(request, user_id):
+    """Suspend or unsuspend a user account."""
+    user = get_object_or_404(User, id=user_id)
+    profile = getattr(user, "driver_profile", None)
+
+    if not profile:
+        messages.error(request, "User does not have a driver profile.")
+        return redirect("admin_user_search")
+
+    profile.is_suspended = not profile.is_suspended
+    profile.save()
+
+    status = "unsuspended" if not profile.is_suspended else "suspended"
+    messages.success(request, f"User '{user.username}' has been {status}.")
+    return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
+
+@staff_member_required
 def force_logout_user(request, user_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
@@ -1156,3 +1174,8 @@ def resolve_complaint(request, complaint_id):
     messages.success(request, f"Complaint #{complaint.id} marked as resolved and driver notified.")
     return redirect(request.META.get("HTTP_REFERER", "accounts:admin_complaints"))
 
+def custom_permission_denied_view(request, exception=None):
+    """Global 403 Forbidden handler."""
+    return render(request, "errors/403_account_blocked.html", {
+        "reason": "You do not have permission to access this page or your account has been restricted."
+    }, status=403)
