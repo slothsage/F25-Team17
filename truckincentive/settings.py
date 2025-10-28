@@ -48,6 +48,8 @@ TEMPLATES = [{
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
         "accounts.context_processors.theme",
+        "accounts.context_processors.user_session_timeout",
+        "accounts.context_processors.unread_counts",
     ]},
 }]
 
@@ -85,16 +87,13 @@ LANGUAGES = [
     ('fr', 'Français'),
 ]
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-]
+# Static files
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
-# media
+# Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
-# STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Auth flow
@@ -110,10 +109,7 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
 
-STATIC_URL = "static/"
-
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# (Removed duplicate STATIC_URL and MEDIA_URL definitions below)
 
 
 EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'

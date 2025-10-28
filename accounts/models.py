@@ -34,6 +34,8 @@ class DriverProfile(models.Model):
     sponsor_name  = models.CharField(max_length=120, blank=True)
     sponsor_email = models.EmailField(blank=True)
 
+    # Optional per-user session timeout (seconds). If null, use system default in settings.SESSION_COOKIE_AGE
+    session_timeout_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Per-user inactivity timeout in seconds (blank = use system default)")
     is_locked = models.BooleanField(
         default=False,
         help_text="If checked, this user is prevented from logging in (admin only)",
@@ -62,61 +64,43 @@ class PasswordPolicy(models.Model):
 
 # --- Alert Preferences --- 
 class DriverNotificationPreference(models.Model):
+    """Per-driver notification and UX preferences."""
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notif_prefs")
- 
+
+    # Kinds
     orders = models.BooleanField(default=True)
     points = models.BooleanField(default=True)
-    promotions = models.BooleanField(default=False) 
-    # delivery channels
+    promotions = models.BooleanField(default=False)
+
+    # Delivery channels
     email_enabled = models.BooleanField(default=True)
     sms_enabled = models.BooleanField(default=False)
 
-    language = models.CharField(max_length=10, default="en")           # e.g., en, es, fr
-    theme = models.CharField(max_length=12, default="system")
-
-    SOUND_CHOICES = [
-        ("default", "Default chime"),
-        ("silent", "Silent"),
-        ("custom", "Custom file"),
-    ]
-    sound_mode = models.CharField(max_length=20, choices=SOUND_CHOICES, default="default")
-    sound_file = models.FileField(
-        upload_to="notif_sounds/",
-        blank=True, null=True,
-        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
-    )
+    # Visual theme
     THEME_CHOICES = [
         ("system", "System / Default"),
         ("light", "Light"),
         ("dark", "Dark"),
         ("contrast", "High Contrast"),
     ]
-    theme = models.CharField(
-        max_length=20,
-        choices=THEME_CHOICES,
-        default="system",
-        help_text="Visual theme preference."
-    )
-    LANGUAGE_CHOICES = [
-        ("en", "English"),
-        ("es", "Español"),
-        ("fr", "Français"),
-    ]
+    theme = models.CharField(max_length=20, choices=THEME_CHOICES, default="system", help_text="Visual theme preference.")
+
+    # Language
+    LANGUAGE_CHOICES = [("en", "English"), ("es", "Español"), ("fr", "Français")]
     language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default="en")
-    
-    class Meta:
-        verbose_name = "Driver Notification Preference"
-        verbose_name_plural = "Driver Notification Preferences"
 
-    def __str__(self):
-        return f"NotifPrefs<{self.user}>"
+    # Sounds
+    SOUND_CHOICES = [("default", "Default chime"), ("silent", "Silent"), ("custom", "Custom file")]
+    sound_mode = models.CharField(max_length=20, choices=SOUND_CHOICES, default="default")
+    sound_file = models.FileField(
+        upload_to="notif_sounds/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
+    )
 
-    @classmethod
-    def for_user(cls, user):
-        # create with defaults if missing
-        obj, _ = cls.objects.get_or_create(user=user, defaults={"orders": True, "points": True, "promotions": False})
-        return obj
-    
+    # Low balance alert
     low_balance_alert_enabled = models.BooleanField(default=True)
     low_balance_threshold = models.PositiveIntegerField(default=100)
 
@@ -129,6 +113,7 @@ class DriverNotificationPreference(models.Model):
 
     @classmethod
     def for_user(cls, user):
+        """Get or create preferences for a user with sensible defaults."""
         obj, _ = cls.objects.get_or_create(
             user=user,
             defaults={
@@ -213,6 +198,79 @@ class MessageRecipient(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.message.subject}"
+
+
+# --- Login Activity / Audit ---
+class LoginActivity(models.Model):
+    """Record user login attempts (success and failure) for admin audit.
+
+    Stores a reference to the user when known (failed attempts may not have a user),
+    timestamp, remote IP, user agent string, and a boolean `successful`.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="login_activities")
+    username = models.CharField(max_length=150, blank=True, help_text="Username attempted (when user not resolved)")
+    successful = models.BooleanField(default=False)
+    ip_address = models.CharField(max_length=64, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Login activity"
+        verbose_name_plural = "Login activities"
+
+    def __str__(self):
+        who = self.user.username if self.user else (self.username or "<unknown>")
+        return f"LoginActivity<{who}> {'OK' if self.successful else 'FAIL'} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+# --- Support Tickets ---
+class SupportTicket(models.Model):
+    """Driver support ticket for in-app help requests."""
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("resolved", "Resolved"),
+    ]
+    
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_tickets")
+    subject = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="tickets_resolved")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Support ticket"
+        verbose_name_plural = "Support tickets"
+
+    def __str__(self):
+        return f"Ticket #{self.id} - {self.driver.username} - {self.subject} [{self.status}]"
+
+
+class Complaint(models.Model):
+    """Driver complaint submission and admin resolution system."""
+    STATUS_CHOICES = [
+        ("open", "Open"),
+        ("resolved", "Resolved"),
+    ]
+    
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="complaints")
+    subject = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="open")
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="complaints_resolved")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Complaint"
+        verbose_name_plural = "Complaints"
+
+    def __str__(self):
+        return f"Complaint #{self.id} - {self.driver.username} - {self.subject} [{self.status}]"
     
 
 class FailedLoginAttempt(models.Model):

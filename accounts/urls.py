@@ -43,9 +43,17 @@ urlpatterns = [
     # Admin-only password policy page 
     path("policy/", views.edit_policy, name="edit_policy"),
 
+    # Admin: login activity audit
+    path("admin/login-activity/", views.login_activity, name="login_activity"),
+
+    # Sponsor-facing driver search
+    path("sponsor/drivers/", views.sponsor_driver_search, name="sponsor_driver_search"),
+
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
     path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
+    path("admin/users/<int:user_id>/set-password/", views.admin_set_password, name="admin_set_password"),
+    path("admin/users/<int:user_id>/set-timeout/", views.admin_set_timeout, name="admin_set_timeout"),
 
     # Force logout
     path("admin/users/<int:user_id>/force-logout/", views.force_logout_user, name="admin_force_logout_user"),
@@ -72,4 +80,17 @@ urlpatterns = [
     
     path("points/", views.points_history, name="points_history"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
+
+    path("api/suggest/drivers/", views.api_driver_suggest, name="api_driver_suggest"),
+    path("api/suggest/sponsors/", views.api_sponsor_suggest, name="api_sponsor_suggest"),
+    
+    # Support tickets
+    path("support/submit/", views.submit_ticket, name="submit_ticket"),
+    path("admin/tickets/", views.admin_tickets, name="admin_tickets"),
+    path("admin/tickets/<int:ticket_id>/resolve/", views.resolve_ticket, name="resolve_ticket"),
+    
+    # Complaints
+    path("complaints/submit/", views.submit_complaint, name="submit_complaint"),
+    path("admin/complaints/", views.admin_complaints, name="admin_complaints"),
+    path("admin/complaints/<int:complaint_id>/resolve/", views.resolve_complaint, name="resolve_complaint"),
 ]
