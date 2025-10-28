@@ -7,16 +7,45 @@
         <a href="{% url 'accounts:messages_sent' %}" class="btn">Sent</a>
     </div>
 
+    <form method="post" action="{% url 'accounts:messages_bulk_delete' %}">
+    {% csrf_token %}
+    <div style="margin:.5rem 0;">
+        <button class="btn" type="submit">Delete selected</button>
+        <label style="margin-left:1rem;">
+            <input type="checkbox" id="select-all"> Select all
+        </label>
+    </div>
+
     {% if rows %}
     <ul>
     {% for r in rows %}
         <li>
-            {% if not r.is_read %}<strong>[new]</strong>{% endif %}
-            <a href="{% url 'accounts:messages_detail' r.pk %}">{{ r.message.subject }}</a>
-            — from {{ r.message.author.username }} — {{ r.message.created_at|date:"Y-m-d H:i" }}
-        </li>
+        <label style="margin-right:.5rem;">
+        <input type="checkbox" name="ids" value="{{ r.pk }}">
+        </label>
+        {% if not r.is_read %}<strong>[new]</strong>{% endif %}
+        <a href="{% url 'accounts:messages_detail' r.pk %}">{{ r.message.subject }}</a>
+        — from {{ r.message.author.username }} — {{ r.message.created_at|date:"Y-m-d H:i" }}
+        <!-- single delete button -->
+        <form method="post" action="{% url 'accounts:messages_delete' r.pk %}" style="display:inline;">
+            {% csrf_token %}
+        <button class="btn" type="submit" onclick="return confirm('Delete this message?')">Delete</button>
+        </form>
+    </li>
     {% endfor %}
     </ul>
+    </form>
+
+    <script>
+    (function(){
+        var all = document.getElementById('select-all');
+        if (!all) return;
+        all.addEventListener('change', function(){
+        document.querySelectorAll('input[name="ids"]').forEach(function(cb){ cb.checked = all.checked; });
+        });
+    })();
+    </script>
+
     {% else %}
         <p>No messages in your inbox.</p>
     {% endif %}

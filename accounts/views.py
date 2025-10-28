@@ -24,6 +24,7 @@ from django.templatetags.static import static
 from django.utils.timezone import now
 from django.utils.timezone import localtime
 from django.shortcuts import redirect
+from urllib3 import request
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -549,6 +550,34 @@ def messages_sent(request):
     rows = Message.objects.filter(author = request.user).order_by("-created_at")
     return render(request, "accounts/messages_sent.html", {"rows": rows})
 
+@login_required
+@require_POST
+def message_delete(request, pk: int):
+    item = get_object_or_404(MessageRecipient, pk=pk, user=request.user)
+    item.delete()
+    messages.success(request, "Message deleted.")
+    return redirect(request.META.get("HTTP_REFERER", "accounts:messages_inbox"))
+
+@login_required
+@require_POST
+def messages_bulk_delete(request):
+    ids = request.POST.getlist("ids")
+    if ids:
+        (MessageRecipient.objects
+            .filter(user=request.user, pk__in=ids)
+            .delete())
+        messages.success(request, "Selected messages deleted.")
+    else:
+        messages.info(request, "No messages selected for deletion.")
+    return redirect("accounts:messages_inbox")
+
+@staff_member_required
+@require_POST
+def message_sent_delete(request, pk: int):
+    msg = get_object_or_404(Message, pk=pk, author=request.user)
+    msg.delete()
+    messages.success(request, "Sent message deleted.")
+    return redirect("accounts:messages_sent")
 
 @staff_member_required
 def login_activity(request):
@@ -826,6 +855,25 @@ def notifications_clear(request):
     MessageRecipient.objects.filter(user=request.user).delete()
     messages.success(request, "All notifications & messages cleared.")
     return redirect("accounts:notifications_feed")
+
+@login_required
+@require_POST
+def notification_delete(request, pk: int):
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    notif.delete()
+    messages.success(request, "Notification deleted.")
+    return redirect(request.META.get("HTTP_REFERER", "accounts:notifications"))
+
+@login_required
+@require_POST
+def notifications_bulk_delete(request):
+    ids = request.POST.getlist("ids")
+    if ids:
+        Notification.objects.filter(user=request.user, pk__in=ids).delete()
+        messages.success(request, "Selected notifications deleted.")
+    else:
+        messages.info(request, "No notifications selected for deletion.")
+    return redirect("accounts:notifications")
 
 @login_required
 def notifications_feed(request):
