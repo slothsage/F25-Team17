@@ -1,5 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
+from django.core.cache import cache
+from .models import PointsConfig, POINTS_CACHE_KEY
 
 PENDING_STATUSES = {"new", "placed", "processing", "packed", "shipped"}  
 TERMINAL_STATUSES = {"delivered", "cancelled"}
@@ -38,3 +40,11 @@ def order_is_delayed(order, now=None, grace_hours=24):
     # grace
     deadline = promised + timedelta(hours=grace_hours)
     return now > deadline
+
+def get_points_per_usd():
+    val = cache.get(POINTS_CACHE_KEY)
+    if val is not None:
+        return val
+    val = PointsConfig.get_solo().points_per_usd
+    cache.set(POINTS_CACHE_KEY, val, 300)  # 5 minutes
+    return val

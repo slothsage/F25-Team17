@@ -1,8 +1,30 @@
 from pyclbr import Class
 from django.db import models
 from django.conf import settings
+from django.core.cache import cache
 # Create your models here.
 
+POINTS_CACHE_KEY = "points_per_usd:v1"
+
+class PointsConfig(models.Model):
+    points_per_usd = models.PositiveIntegerField(default=100, help_text="How many points per $1")
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name = "Points Configuration"
+        verbose_name_plural = "Points Configuration"
+
+    def __str__(self):
+        return f"{self.points_per_usd} points / USD"
+    
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={"points_per_usd": 100})
+        return obj
+    
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+        cache.delete(POINTS_CACHE_KEY)
 
 class Order(models.Model):
     STATUS_CHOICES = [

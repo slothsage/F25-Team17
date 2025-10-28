@@ -34,7 +34,7 @@
   </label>
 
   <button type="submit" class="btn">Apply</button>
-  <a href="{% url 'order_list' %}" class="btn">Reset</a>
+  <a href="{% url 'shop:order_list' %}" class="btn">Reset</a>
 </form>
 
 <!-- ORDER TABLE -->
@@ -59,7 +59,7 @@
         <td style="padding:6px;">{{ o.get_status_display }}</td>
         <td style="text-align:right; padding:6px;">{{ o.points_spent }}</td>
         <td style="text-align:center; padding:6px;">
-          <a href="{% url 'order_detail' o.id %}">View</a>
+          <a href="{% url 'shop:order_detail' o.id %}">View</a>
         </td>
       </tr>
     {% endfor %}

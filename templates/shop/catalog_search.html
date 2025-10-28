@@ -14,7 +14,7 @@
 
     <div class="row mb-4">
         <div class="col-md-8 offset-md-2">
-            <form method="GET" action="{% url 'catalog_search' %}" class="search-form">
+            <form method="GET" action="{% url 'shop:catalog_search' %}" class="search-form">
                 <div class="input-group input-group-lg">
                     <input 
                         type="text" 
@@ -202,7 +202,7 @@
             <div class="modal-body">
                 <p>Select a wishlist:</p>
                 <div id="wishlistList" class="list-group">
-                    <a href="{% url 'wishlist_list' %}" class="list-group-item list-group-item-action">
+                    <a href="{% url 'shop:wishlist_list' %}" class="list-group-item list-group-item-action">
                         <i class="fas fa-plus"></i> Create New Wishlist
                     </a>
                 </div>
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
             
             try {
-                const response = await fetch('{% url "add_to_cart_from_catalog" %}', {
+                const response = await fetch('{% url "shop:add_to_cart_from_catalog" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

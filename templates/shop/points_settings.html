@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Points Settings{% endblock title%}
+{% block content %}
+<h1>Points Settings</h1>
+
+<p class="muted">Change how many points are awarded per US dollar.</p>
+
+<form method="post" class="card" style="max-width:420px;padding:1rem;">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="field">
+        <label for="{{ form.points_per_usd.id_for_label }}"><strong>Points per USD</strong></label><br>
+        {{ form.points_per_usd }}
+        {% if form.points_per_usd.errors %}
+    <div class="error">{{ form.points_per_usd.errors.0 }}</div>
+        {% endif %}
+        {% if form.points_per_usd.help_text %}
+    <div class="help">{{ form.points_per_usd.help_text }}</div>
+        {% endif %}
+    </div>
+
+    <button class="btn" type="submit">Save</button>
+    <a class="btn" href="javascript:history.back()">Cancel</a>
+</form>
+{% endblock %}

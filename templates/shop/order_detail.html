@@ -17,18 +17,18 @@
 </ul>
 
 {% if order.status == "pending" or order.status == "processing" %}
-  <form method="post" action="{% url 'cancel_order' order.id %}" style="display:inline">
+  <form method="post" action="{% url 'shop:cancel_order' order.id %}" style="display:inline">
     {% csrf_token %}
     <button class="btn" type="submit">Cancel Order</button>
   </form>
 {% endif %}
 
 {% if order.can_mark_received %}
-  <form method="post" action="{% url 'mark_order_received' order.id %}">
+  <form method="post" action="{% url 'shop:mark_order_received' order.id %}">
     {% csrf_token %}
     <button class="btn">Mark as received</button>
   </form>
 {% endif %}
 
-<p><a class="btn" href="{% url 'order_list' %}">Back to Orders</a></p>
+<p><a class="btn" href="{% url 'shop:order_list' %}">Back to Orders</a></p>
 {% endblock %}
