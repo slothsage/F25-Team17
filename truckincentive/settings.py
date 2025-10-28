@@ -10,7 +10,7 @@ LOCAL_PATHS = [BASE_DIR / "local"]
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key")
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 LOGGING = {
@@ -130,7 +130,7 @@ LANGUAGES = [
 
 # Static files
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "staticfiles")]
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
 # Media files
 MEDIA_URL = "/media/"
