@@ -4,7 +4,13 @@
 <h1>Sent Messages</h1>
 <ul>
     {% for m in rows %}
-        <li><strong>{{ m.subject }}</strong> — {{ m.created_at|date:"Y-m-d H:i" }}</li>
+        <li>
+        <strong>{{ m.subject }}</strong> — {{ m.created_at|date:"Y-m-d H:i" }}
+        <form method="post" action="{% url 'accounts:messages_sent_delete' m.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button class="btn" type="submit" onclick="return confirm('Delete this sent message for all recipients?')">Delete</button>
+        </form>
+    </li>
     {% empty %}
         <p>No sent messages.</p>
     {% endfor %}

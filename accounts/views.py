@@ -15,6 +15,8 @@ from django.core.mail import send_mail
 from django.db.models.functions import TruncDate
 from django.db import connections
 from django.utils import timezone
+import datetime
+import os
 from datetime import timedelta
 from django.db.models import Sum
 from urllib.parse import quote
@@ -22,6 +24,7 @@ from django.templatetags.static import static
 from django.utils.timezone import now
 from django.utils.timezone import localtime
 from django.shortcuts import redirect
+from urllib3 import request
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -61,6 +64,10 @@ from django.contrib.auth import get_user_model
 
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+
+from django.http import FileResponse, HttpResponseNotFound
+from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 
 User = get_user_model()
 
@@ -564,6 +571,34 @@ def messages_sent(request):
     rows = Message.objects.filter(author = request.user).order_by("-created_at")
     return render(request, "accounts/messages_sent.html", {"rows": rows})
 
+@login_required
+@require_POST
+def message_delete(request, pk: int):
+    item = get_object_or_404(MessageRecipient, pk=pk, user=request.user)
+    item.delete()
+    messages.success(request, "Message deleted.")
+    return redirect(request.META.get("HTTP_REFERER", "accounts:messages_inbox"))
+
+@login_required
+@require_POST
+def messages_bulk_delete(request):
+    ids = request.POST.getlist("ids")
+    if ids:
+        (MessageRecipient.objects
+            .filter(user=request.user, pk__in=ids)
+            .delete())
+        messages.success(request, "Selected messages deleted.")
+    else:
+        messages.info(request, "No messages selected for deletion.")
+    return redirect("accounts:messages_inbox")
+
+@staff_member_required
+@require_POST
+def message_sent_delete(request, pk: int):
+    msg = get_object_or_404(Message, pk=pk, author=request.user)
+    msg.delete()
+    messages.success(request, "Sent message deleted.")
+    return redirect("accounts:messages_sent")
 
 @staff_member_required
 def login_activity(request):
@@ -749,6 +784,24 @@ def toggle_lock_user(request, user_id):
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
 @staff_member_required
+@require_POST
+def toggle_suspend_user(request, user_id):
+    """Suspend or unsuspend a user account."""
+    user = get_object_or_404(User, id=user_id)
+    profile = getattr(user, "driver_profile", None)
+
+    if not profile:
+        messages.error(request, "User does not have a driver profile.")
+        return redirect("admin_user_search")
+
+    profile.is_suspended = not profile.is_suspended
+    profile.save()
+
+    status = "unsuspended" if not profile.is_suspended else "suspended"
+    messages.success(request, f"User '{user.username}' has been {status}.")
+    return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
+
+@staff_member_required
 def force_logout_user(request, user_id):
     if request.method != "POST":
         messages.error(request, "Invalid request method.")
@@ -823,6 +876,25 @@ def notifications_clear(request):
     MessageRecipient.objects.filter(user=request.user).delete()
     messages.success(request, "All notifications & messages cleared.")
     return redirect("accounts:notifications_feed")
+
+@login_required
+@require_POST
+def notification_delete(request, pk: int):
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    notif.delete()
+    messages.success(request, "Notification deleted.")
+    return redirect(request.META.get("HTTP_REFERER", "accounts:notifications"))
+
+@login_required
+@require_POST
+def notifications_bulk_delete(request):
+    ids = request.POST.getlist("ids")
+    if ids:
+        Notification.objects.filter(user=request.user, pk__in=ids).delete()
+        messages.success(request, "Selected notifications deleted.")
+    else:
+        messages.info(request, "No notifications selected for deletion.")
+    return redirect("accounts:notifications")
 
 @login_required
 def notifications_feed(request):
@@ -1263,3 +1335,42 @@ def stop_impersonation(request):
     messages.success(request, f"Returned to admin account: {original_user.username}{duration_str}")
     return redirect("admin_user_search")
 
+def custom_permission_denied_view(request, exception=None):
+    """Global 403 Forbidden handler."""
+    return render(request, "errors/403_account_blocked.html", {
+        "reason": "You do not have permission to access this page or your account has been restricted."
+    }, status=403)
+
+
+@staff_member_required
+def download_error_log(request):
+    """Allows admin to download the latest error log file."""
+    log_path = settings.LOG_DIR / "error.log"
+
+    if not log_path.exists():
+        return HttpResponseNotFound("No error log file found.")
+
+    date_str = request.GET.get("date")
+    if date_str:
+        try:
+            target_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return HttpResponse("Invalid date format. Use YYYY-MM-DD.", status=400)
+
+        # Filter lines that contain  date
+        date_prefix = f"[{target_date.isoformat()}"
+        filtered_lines = []
+        with open(log_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if date_prefix in line:
+                    filtered_lines.append(line)
+
+        if not filtered_lines:
+            return HttpResponse(f"No log entries found for {date_str}.", content_type="text/plain")
+
+        response = HttpResponse("".join(filtered_lines), content_type="text/plain")
+        response["Content-Disposition"] = f'attachment; filename="error_{date_str}.log"'
+        return response
+
+    # Default: send full log
+    return FileResponse(open(log_path, "rb"), as_attachment=True, filename="error.log")

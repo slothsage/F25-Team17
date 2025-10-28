@@ -12,6 +12,11 @@
                     <div class="toolbar-right">
                       <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
                       <a class="btn btn-primary" href="{% url 'accounts:admin_active_sessions' %}">Active Sessions</a>
+                      <!-- Error Log Download (with Date Filter) -->
+                      <form method="get" action="{% url 'accounts:download_error_log' %}" style="display:inline-flex; align-items:center; gap:4px;">
+                        <input type="date" name="date" class="input" style="height: 32px; padding: 2px 6px;">
+                        <button class="btn btn-danger btn-sm" type="submit">Download Logs</button>
+                      </form>
                     </div>
                   </header>
 
@@ -116,6 +121,8 @@
                                 style="background-color: rgba(255, 100, 100, 0.08);"
                               {% elif u.driver_profile.is_locked %}
                                 style="background-color: rgba(255, 0, 0, 0.15);"
+                              {% elif u.driver_profile.is_suspended %}
+                                style="background-color: rgba(255, 200, 0, 0.15);"
                               {% endif %}
                             >
                               <td class="mono">{{ u.id }}</td>
@@ -185,6 +192,16 @@
                                     <button class="btn btn-success" type="submit" onclick="return confirm('Unlock this user?');">Unlock</button>
                                   {% else %}
                                     <button class="btn btn-dark" type="submit" onclick="return confirm('Lock this user?');">Lock</button>
+                                  {% endif %}
+                                </form>
+
+                                <!-- Suspend -->
+                                <form method="post" action="{% url 'accounts:toggle_suspend_user' u.id %}" style="display:inline; margin-left: 5px;">
+                                  {% csrf_token %}
+                                  {% if u.driver_profile.is_suspended %}
+                                    <button class="btn btn-secondary" type="submit" onclick="return confirm('Unsuspend this user?');">Unsuspend</button>
+                                  {% else %}
+                                    <button class="btn btn-dark" type="submit" onclick="return confirm('Suspend this user?');">Suspend</button>
                                   {% endif %}
                                 </form>
 

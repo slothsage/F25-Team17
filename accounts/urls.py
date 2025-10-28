@@ -18,7 +18,9 @@ urlpatterns = [
     path("messages/sent/", views.messages_sent, name="messages_sent"),
     path("messages/compose/", views.messages_compose, name="message_compose"),
     path("messages/item/<int:pk>/", views.message_detail, name="messages_detail"),
-    
+    path("messages/delete/<int:pk>/", views.message_delete, name="messages_delete"),
+    path("messages/bulk-delete/", views.messages_bulk_delete, name="messages_bulk_delete"),
+    path("messages/sent/delete/<int:pk>/", views.message_sent_delete, name="messages_sent_delete"),
     
     # Password change (while logged in)
     path("password/change/", auth_views.PasswordChangeView.as_view(
@@ -63,6 +65,10 @@ urlpatterns = [
     path("admin/sessions/terminate/<str:session_key>/", views.terminate_session, name="terminate_session"),
     # Lock user
     path("admin/user/<int:user_id>/toggle-lock/", views.toggle_lock_user, name="toggle_lock_user"),
+    # Suspend
+    path("admin/user/<int:user_id>/toggle-suspend/", views.toggle_suspend_user, name="toggle_suspend_user"),
+    # Error logs
+    path("admin/download-error-log/", views.download_error_log, name="download_error_log"),
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience
@@ -77,6 +83,8 @@ urlpatterns = [
     path("notifications/feed/", views.notifications_feed, name="notifications_feed"),
     path("notifications/clear/", views.notifications_clear, name="notifications_clear"),
     path("notifications/settings/", views.notification_settings, name="notification_settings"),
+    path("notifications/delete/<int:pk>/", views.notification_delete, name="notification_delete"),
+    path("notifications/bulk-delete/", views.notifications_bulk_delete, name="notifications_bulk_delete"),
     
     
     path("points/", views.points_history, name="points_history"),

@@ -4,6 +4,11 @@
 <h1>{{ item.message.subject }}</h1>
 <p><em>From:</em> {{ item.message.author.username }} | {{ item.message.created_at|date:"Y-m-d H:i" }}</p>
 <hr>
+
 <p style="white-space: pre-wrap;">{{ item.message.body }}</p>
+<form method="post" action="{% url 'accounts:messages_delete' item.pk %}" style="display:inline;">
+    {% csrf_token %}
+    <button class="btn" type="submit" onclick="return confirm('Delete this message?')">Delete</button>
+</form>
 <a class="btn" href="{% url 'accounts:messages_inbox' %}">Back</a>
 {% endblock content %}

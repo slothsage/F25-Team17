@@ -4,12 +4,40 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+LOG_DIR = BASE_DIR / "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
 LOCAL_PATHS = [BASE_DIR / "local"]
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key")
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "file": {
+            "level": "ERROR",
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "error.log",
+            "formatter": "verbose",
+        },
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["file", "console"],
+        "level": "WARNING",
+    },
+}
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -59,7 +87,7 @@ WSGI_APPLICATION = "truckincentive.wsgi.application"
 DATABASES = {
 
 }
-
+ 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
@@ -109,8 +137,6 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 # Email prints to console for password reset demo
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
-
-# (Removed duplicate STATIC_URL and MEDIA_URL definitions below)
 
 
 EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'

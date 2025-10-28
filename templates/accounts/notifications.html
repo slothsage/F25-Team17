@@ -3,27 +3,38 @@
   <h1>Notifications</h1> 
 <div style="margin-bottom: 1rem;">
   <a class="btn" href="{% url 'accounts:notifications_history' %}">View History</a>
-  <a href="{% url 'accounts:notification_settings' %}" class="btn btn-primary">
-    Notification Settings
-  </a>
+  <a class="btn" href="{% url 'accounts:notification_settings' %}">Notification Settings</a>
 </div>
 
   <p>Viewing as: <strong>{{ request.user.username }}</strong></p>
 
-<form method="post" action="{% url 'accounts:notifications_clear' %}" style="margin-bottom:1rem">
-    {% csrf_token %}
-    <button class="btn" type="submit">Clear All</button>
-</form>
+<form method="post" action="{% url 'accounts:notifications_bulk_delete' %}" style="margin-bottom:1rem">
+  {% csrf_token %}
+  <button class="btn" type="submit">Delete selected</button>
+  <label style="margin-left:1rem;">
+    <input id="select-all" type="checkbox"> Select all
+  </label>
 
   {% if rows %}
     <ul>
       {% for n in rows %}
         <li>
-          {% if not n.read %}<strong>[new]</strong>{% endif %}
-          <strong>{{ n.title }}</strong> — {{ n.created_at|date:"Y-m-d H:i" }}
-          {% if n.url %}
-            — <a href="{{ n.url }}" target="_blank" rel="noopener">View</a>
-          {% endif %}
+          <label style="margin-right:.5rem;">
+            <input type="checkbox" name="ids" value="{{ n.pk }}">
+          </label>
+
+        {% if not n.read %}<strong>[new]</strong>{% endif %}
+        <strong>{{ n.title }}</strong> — {{ n.created_at|date:"Y-m-d H:i" }}
+        {% if n.url %} — <a href="{{ n.url }}" target="_blank" rel="noopener">View</a>{% endif %}
+
+        <button class="btn"
+                type="submit"
+                formaction="{% url 'accounts:notification_delete' n.pk %}"
+                formmethod="post"
+                onclick="return confirm('Delete this notification?')">
+          Delete
+        </button>
+
           <div style="white-space:pre-wrap; margin:.25rem 0 0 .5rem;">{{ n.body }}</div>
         </li>
       {% endfor %}
@@ -31,4 +42,15 @@
   {% else %}
     <p>No notifications yet for this user.</p>
   {% endif %}
+</form>
+
+<script>
+  (function(){
+    const all = document.getElementById('select-all');
+    if (!all) return;
+    all.addEventListener('change', function(){
+      document.querySelectorAll('input[name="ids"]').forEach(cb => cb.checked = all.checked);
+    });
+  })();
+</script>
 {% endblock content %}
