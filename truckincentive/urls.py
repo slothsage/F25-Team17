@@ -14,7 +14,7 @@ urlpatterns = [
     # real admin site moved to /admin/site/
     path("admin/site/", admin.site.urls),
     path("", include("accounts.urls")),
-    path("", include("shop.urls")),
+    path("", include(("shop.urls", "shop"), namespace="shop")),
     path("about/", accounts_views.about, name="about"),
     path("faqs/", accounts_views.faqs, name="faqs"),
     path("i18n/", include("django.conf.urls.i18n")),

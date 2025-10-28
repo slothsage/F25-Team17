@@ -7,14 +7,24 @@
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
-            <h2>Product Catalog</h2>
-            <p class="text-muted">Search for products to add to your wishlist or cart</p>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2>Product Catalog</h2>
+                    <p class="text-muted mb-0">Search for products to add to your wishlist or cart</p>
+                </div>
+                <div>
+                    <a href="{% url 'shop:cart' %}" class="btn btn-primary">
+                        <i class="fas fa-shopping-cart"></i> View Cart
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Search Form -->
     <div class="row mb-4">
         <div class="col-md-8 offset-md-2">
-            <form method="GET" action="{% url 'catalog_search' %}" class="search-form">
+            <form method="GET" action="{% url 'shop:catalog_search' %}" class="search-form">
                 <div class="input-group input-group-lg">
                     <input 
                         type="text" 
@@ -33,6 +43,7 @@
     </div>
 
     {% if error %}
+    <!-- Error Message -->
     <div class="row">
         <div class="col-12">
             <div class="alert alert-danger" role="alert">
@@ -43,6 +54,7 @@
     {% endif %}
 
     {% if results %}
+    <!-- Results Header -->
     <div class="row mb-3">
         <div class="col-12">
             <h4>
@@ -54,6 +66,7 @@
         </div>
     </div>
 
+    <!-- Products Grid -->
     <div class="row">
         {% for product in results.products %}
         <div class="col-md-4 col-lg-3 mb-4">
@@ -64,10 +77,11 @@
                     class="card-img-top product-image" 
                     alt="{{ product.name }}"
                     loading="lazy"
+                    onerror="this.onerror=null; this.src='https://via.placeholder.com/200x200/e5e7eb/6b7280?text=No+Image'; this.style.objectFit='contain';"
                 >
                 {% else %}
                 <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
-                    <i class="fas fa-image fa-3x text-muted"></i>
+                    <span style="color: #6b7280; font-size: 14px;">No Image Available</span>
                 </div>
                 {% endif %}
                 
@@ -132,6 +146,7 @@
         {% endfor %}
     </div>
 
+    <!-- Pagination -->
     {% if results.has_prev or results.has_next %}
     <div class="row mt-4">
         <div class="col-12">
@@ -163,6 +178,7 @@
     {% endif %}
 
     {% elif query %}
+    <!-- No results but query exists -->
     <div class="row">
         <div class="col-12">
             <div class="alert alert-info">
@@ -172,6 +188,7 @@
         </div>
     </div>
     {% else %}
+    <!-- No search yet - show suggestions -->
     <div class="row">
         <div class="col-md-8 offset-md-2 text-center">
             <div class="card">
@@ -192,6 +209,7 @@
     {% endif %}
 </div>
 
+<!-- Wishlist Selection Modal -->
 <div class="modal fade" id="wishlistModal" tabindex="-1" aria-labelledby="wishlistModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -202,7 +220,8 @@
             <div class="modal-body">
                 <p>Select a wishlist:</p>
                 <div id="wishlistList" class="list-group">
-                    <a href="{% url 'wishlist_list' %}" class="list-group-item list-group-item-action">
+                    <!-- Wishlists will be loaded here via AJAX or you can pre-populate -->
+                    <a href="{% url 'shop:wishlist_list' %}" class="list-group-item list-group-item-action">
                         <i class="fas fa-plus"></i> Create New Wishlist
                     </a>
                 </div>
@@ -233,18 +252,24 @@
 </style>
 
 <script>
+// Add to Cart functionality
 document.addEventListener('DOMContentLoaded', function() {
+    // Add to Cart buttons
     document.querySelectorAll('.add-to-cart-btn').forEach(button => {
         button.addEventListener('click', async function() {
             const ebayId = this.dataset.ebayId;
             const productName = this.dataset.productName;
+            const points = parseInt(this.dataset.points) || 0;  
             
+            console.log('Adding to cart:', { ebayId, productName, points }); 
+            
+            // Disable button during request
             this.disabled = true;
             const originalText = this.innerHTML;
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
             
             try {
-                const response = await fetch('{% url "add_to_cart_from_catalog" %}', {
+                const response = await fetch('{% url "shop:add_to_cart_from_catalog" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -252,6 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     body: JSON.stringify({
                         ebay_item_id: ebayId,
+                        product_name: productName,
+                        points: points,
                         quantity: 1
                     })
                 });
@@ -263,8 +290,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.classList.remove('btn-outline-primary');
                     this.classList.add('btn-success');
                     
+                    // Show success message
                     alert(data.message || 'Product added to cart!');
                     
+                    // Reset button after 2 seconds
                     setTimeout(() => {
                         this.innerHTML = originalText;
                         this.classList.remove('btn-success');
@@ -275,6 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(data.error || 'Failed to add to cart');
                 }
             } catch (error) {
+                console.error('Cart error:', error); 
                 alert('Error: ' + error.message);
                 this.innerHTML = originalText;
                 this.disabled = false;
@@ -282,11 +312,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Add to Wishlist buttons
     document.querySelectorAll('.add-to-wishlist-btn').forEach(button => {
         button.addEventListener('click', function() {
             const ebayId = this.dataset.ebayId;
             const productName = this.dataset.productName;
             
+            // Store for later use in modal
             document.getElementById('wishlistModal').dataset.ebayId = ebayId;
             document.getElementById('wishlistModal').dataset.productName = productName;
         });

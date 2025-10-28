@@ -3,6 +3,7 @@ import base64
 from django.core.cache import cache
 from django.conf import settings
 import logging
+from .utils import get_points_per_usd
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ class EbayService:
             'ebay_item_id': ebay_item.get('itemId', ''),
             'name': ebay_item.get('title', 'Unknown Product'),
             'price_usd': price_value,
-            'price_points': int(price_value * 100),  
+            'price_points': int(price_value * get_points_per_usd()),
             'description': ebay_item.get('shortDescription', ebay_item.get('title', '')),
             'image_url': image_url,
             'category': (

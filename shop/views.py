@@ -1,8 +1,11 @@
 from datetime import timedelta, timezone
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
+from .models import PointsConfig
+from .forms import PointsConfigForm
 from .models import Order, OrderItem, CartItem
 from django.urls import reverse
 from .models import Wishlist, WishListItem
@@ -18,13 +21,27 @@ try:
 except Exception:
     send_in_app_notification = None
 
+@staff_member_required
+def points_settings(request):
+    cfg = PointsConfig.get_solo()
+    if request.method == "POST":
+        form = PointsConfigForm(request.POST, instance=cfg)
+        if form.is_valid():
+            form.save()  # model.save() clears the cache in your model hook
+            messages.success(request, "Points per USD updated.")
+            return redirect("shop:points_settings")
+    else:
+        form = PointsConfigForm(instance=cfg)
+
+    return render(request, "shop/points_settings.html", {"form": form})
+
 @login_required
 @transaction.atomic
 def cancel_order(request, order_id):
     order = get_object_or_404(Order, id=order_id, driver=request.user)
 
     if request.method != "POST":
-        return redirect("order_detail", order_id=order.id)
+        return redirect("shop:order_detail", order_id=order.id)
 
     # Only allow cancel before ship/delivered
     cancellable_statuses = {"pending", "processing"}
@@ -40,14 +57,14 @@ def cancel_order(request, order_id):
                     "orders",
                     "Order Cancelled",
                     f"Order #{order.id} was cancelled.",
-                    url=reverse("order_detail", args=[order.id]),
+                    url=reverse("shop:order_detail", args=[order.id]),
                 )
             except Exception:
                 pass
     else:
         messages.error(request, "This order can’t be cancelled at its current status.")
 
-    return redirect("order_detail", order_id=order.id)
+    return redirect("shop:order_detail", order_id=order.id)
 
 # STORY: Order Status (list)
 @login_required
@@ -55,12 +72,12 @@ def order_list(request):
     """
     Full order history for the logged-in driver with filters + pagination.
     GET params:
-      status=<pending|confirmed|shipped|delivered|cancelled>
-      sponsor=<substring>
-      date_from=YYYY-MM-DD
-      date_to=YYYY-MM-DD
-      per_page=<int>
-      page=<int>
+        status=<pending|confirmed|shipped|delivered|cancelled>
+        sponsor=<substring>
+        date_from=YYYY-MM-DD
+        date_to=YYYY-MM-DD
+        per_page=<int>
+        page=<int>
     """
     qs = Order.objects.filter(driver=request.user).order_by("-placed_at")
 
@@ -142,8 +159,8 @@ def mark_order_received(request, order_id):
             messages.success(request, "Thanks! Order marked as received.")
         else:
             messages.error(request, "This order cannot be marked as received.")
-        return redirect("order_detail", order_id=order.id)
-    return redirect("order_detail", order_id=order.id)
+        return redirect("shop:order_detail", order_id=order.id)
+    return redirect("shop:order_detail", order_id=order.id)
 
 # STORY: Clear Cart (and cart view)
 @login_required
@@ -161,7 +178,7 @@ def cart_view(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Delivery address updated.")
-            return redirect("cart")
+            return redirect("shop:cart")
     else:
         form = AddressForm(instance=profile)
 
@@ -186,8 +203,8 @@ def clear_cart(request):
             messages.success(request, "Cart cleared.")
         else:
             messages.info(request, "Your cart is already empty.")
-        return redirect("cart")
-    return redirect("cart")
+        return redirect("shop:cart")
+    return redirect("shop:cart")
 
 @login_required
 def wishlist_list(request):
@@ -204,7 +221,7 @@ def wishlist_list(request):
             else:
                 Wishlist.objects.get_or_create(user=request.user, name=name)
                 messages.success(request, f"Wishlist '{name}' created.")
-            return redirect("wishlist_list")
+            return redirect("shop:wishlist_list")
 
         elif action == "delete_wishlist":
             wid = request.POST.get("wishlist_id")
@@ -212,7 +229,7 @@ def wishlist_list(request):
             nm = wl.name
             wl.delete()
             messages.success(request, f"Deleted wishlist '{nm}'.")
-            return redirect("wishlist_list")
+            return redirect("shop:wishlist_list")
 
         elif action == "add_item":
             wid = request.POST.get("wishlist_id")
@@ -236,7 +253,7 @@ def wishlist_list(request):
                 )
                 wl.save(update_fields=["updated_at"])
                 messages.success(request, f"Added '{name}' to '{wl.name}'.")
-            return redirect("wishlist_list")
+            return redirect("shop:wishlist_list")
 
         elif action == "remove_item":
             wid = request.POST.get("wishlist_id")
@@ -246,7 +263,7 @@ def wishlist_list(request):
             it.delete()
             wl.save(update_fields=["updated_at"])
             messages.success(request, "Item removed.")
-            return redirect("wishlist_list")
+            return redirect("shop:wishlist_list")
 
     # GET: fetch ALL wishlists + their items
     wishlists = (
@@ -305,7 +322,7 @@ def catalog_search(request):
             
         except Exception as e:
             context['error'] = str(e)
-    
+
     return render(request, 'shop/catalog_search.html', context)
 
 
@@ -346,7 +363,7 @@ def catalog_search_ajax(request):
 def add_to_cart_from_catalog(request):
     """
     Add an eBay product directly to cart
-    POST with: ebay_item_id, quantity (optional)
+    Simplified version for sandbox compatibility
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -354,40 +371,38 @@ def add_to_cart_from_catalog(request):
     try:
         data = json.loads(request.body)
         ebay_item_id = data.get('ebay_item_id')
+        product_name = data.get('product_name')  
+        points = int(data.get('points', 0))
         quantity = int(data.get('quantity', 1))
         
-        if not ebay_item_id:
-            return JsonResponse({'error': 'Missing ebay_item_id'}, status=400)
+        if not ebay_item_id or not product_name:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
         
-        product = ebay_service.get_product_details(ebay_item_id)
-        formatted = ebay_service.format_product(product)
-        
-        if not formatted['is_available']:
-            return JsonResponse({
-                'error': 'This product is no longer available'
-            }, status=400)
-        
+        # Add directly to cart without checking eBay availability
         cart_item, created = CartItem.objects.get_or_create(
             driver=request.user,
-            name_snapshot=formatted['name'],
+            name_snapshot=product_name,
             defaults={
-                'points_each': formatted['price_points'],
+                'points_each': points,
                 'quantity': quantity
             }
         )
         
         if not created:
+            # Update quantity if already exists
             cart_item.quantity += quantity
-            cart_item.points_each = formatted['price_points']  
             cart_item.save()
+        
+        # Calculate cart total
+        total_points = sum(
+            item.points_each * item.quantity 
+            for item in CartItem.objects.filter(driver=request.user)
+        )
         
         return JsonResponse({
             'success': True,
             'message': 'Added to cart!',
-            'cart_total': sum(
-                item.points_each * item.quantity 
-                for item in CartItem.objects.filter(driver=request.user)
-            )
+            'cart_total': total_points
         })
         
     except Exception as e:
