@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <h1>Bulk Upload Users</h1>
+    <p>Upload a CSV file to create multiple driver or sponsor accounts at once.</p>
+
+    <div class="card p-4 mt-3">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+        <label for="file" class="form-label">CSV File</label>
+        <input type="file" name="file" accept=".csv" class="form-control" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Upload</button>
+        <a href="{% url 'admin_user_search' %}" class="btn btn-secondary ms-2">Cancel</a>
+    </form>
+    </div>
+
+    <div class="mt-4">
+        <h4>Expected CSV Format</h4>
+        <p>Each row in your CSV must include <strong>all of the following columns</strong> in this exact order:</p>
+
+        <pre style="background:#f8f9fa; padding:1rem; border-radius:8px; font-size:0.9rem; overflow-x:auto;">
+            username,email,password,user_type,phone,address,sponsor_name,sponsor_email
+        </pre>
+
+        <p class="mt-2"><strong>Example:</strong></p>
+        <pre style="background:#f8f9fa; padding:1rem; border-radius:8px; font-size:0.9rem; overflow-x:auto;">
+            bulkupload_test1,driver1@example.com,DriverPass123!,driver,555-1234,"123 Main St",,
+            bulkupload_test2,driver2@example.com,DriverPass456!,driver,555-5678,"456 Oak Rd",,
+            bulkupload_test3,sponsor1@example.com,SponsorPass123!,sponsor,,,Acme Logistics,sponsor1@acme.com
+        </pre>
+    </div>
+</div>
+{% endblock %}

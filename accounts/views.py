@@ -68,6 +68,12 @@ from django.http import FileResponse, HttpResponseNotFound
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 
+import csv
+from io import TextIOWrapper
+from django.contrib.auth.models import Group
+from django.views.decorators.http import require_POST
+from django.contrib.admin.views.decorators import staff_member_required
+
 User = get_user_model()
 
 try:
@@ -689,6 +695,71 @@ def create_sponsor(request):
 
     return render(request, "accounts/create_sponsor.html", {"form": form})
 
+@staff_member_required
+def bulk_upload_users(request):
+    """
+    Admin-only view to bulk upload users (drivers or sponsors) from a CSV file.
+    CSV format:
+    username,email,password,user_type,phone,address,sponsor_name,sponsor_email
+    """
+    if request.method == "POST":
+        csv_file = request.FILES.get("file")
+        if not csv_file or not csv_file.name.endswith(".csv"):
+            messages.error(request, "Please upload a valid .csv file.")
+            return redirect("admin_user_search")
+
+        file_data = TextIOWrapper(csv_file.file, encoding="utf-8")
+        reader = csv.DictReader(file_data)
+
+        created_count = 0
+        skipped_count = 0
+        errors = []
+
+        for row in reader:
+            username = row.get("username", "").strip()
+            email = row.get("email", "").strip()
+            password = row.get("password", "").strip()
+            user_type = row.get("user_type", "").strip().lower()
+
+            if not username or not password or not email or user_type not in ["driver", "sponsor"]:
+                skipped_count += 1
+                errors.append(f"Invalid data for user {username or '(missing username)'}")
+                continue
+
+            # Skip duplicates
+            if User.objects.filter(username=username).exists():
+                skipped_count += 1
+                errors.append(f"User '{username}' already exists.")
+                continue
+
+            # Create user
+            user = User.objects.create_user(username=username, email=email, password=password)
+            user.is_active = True
+            user.save()
+
+            # Handle driver creation
+            if user_type == "driver":
+                phone = row.get("phone", "").strip()
+                address = row.get("address", "").strip()
+                DriverProfile.objects.create(user=user, phone=phone, address=address)
+
+            # Handle sponsor group
+            elif user_type == "sponsor":
+                sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
+                user.groups.add(sponsor_group)
+
+            created_count += 1
+
+        summary = f"✅ {created_count} users created, ⚠️ {skipped_count} skipped."
+        if errors:
+            summary += f" ({len(errors)} errors logged.)"
+            for e in errors[:5]:  # show first few
+                messages.warning(request, e)
+
+        messages.success(request, summary)
+        return redirect("admin_user_search")
+
+    return render(request, "accounts/bulk_upload.html")
 
 @staff_member_required
 def toggle_user_active(request, user_id):
