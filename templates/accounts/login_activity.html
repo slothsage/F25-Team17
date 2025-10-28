@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Admin: Login Activity</h1>
+
+<form method="get" class="form-inline mb-3">
+  <label>Filter user:</label>
+  <input type="text" name="user" value="{{ user_q }}" placeholder="username or id" />
+  <label>Status:</label>
+  <select name="status">
+    <option value="" {% if status == "" %}selected{% endif %}>All</option>
+    <option value="success" {% if status == "success" %}selected{% endif %}>Successful</option>
+    <option value="fail" {% if status == "fail" %}selected{% endif %}>Failed</option>
+  </select>
+  <button class="btn">Apply</button>
+</form>
+
+<table class="table">
+  <thead>
+    <tr><th>Time</th><th>User</th><th>Username</th><th>Result</th><th>IP</th></tr>
+  </thead>
+  <tbody>
+    {% for rec in page %}
+    <tr>
+      <td>{{ rec.created_at|date:"Y-m-d H:i:s" }}</td>
+      <td>{% if rec.user %}<a href="{% url 'admin:auth_user_change' rec.user.id %}">{{ rec.user.username }}</a>{% else %}-{% endif %}</td>
+      <td>{{ rec.username }}</td>
+      <td>{% if rec.successful %}<span style="color:green;">Success</span>{% else %}<span style="color:red;">Fail</span>{% endif %}</td>
+      <td>{{ rec.ip_address }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6">No login activity found.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div>
+  {% if page.has_previous %}
+    <a href="?user={{ user_q }}&status={{ status }}&page={{ page.previous_page_number }}">Previous</a>
+  {% endif %}
+  Page {{ page.number }} of {{ page.paginator.num_pages }}
+  {% if page.has_next %}
+    <a href="?user={{ user_q }}&status={{ status }}&page={{ page.next_page_number }}">Next</a>
+  {% endif %}
+</div>
+
+{% endblock content %}

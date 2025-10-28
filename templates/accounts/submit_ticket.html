@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Submit Support Ticket{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Submit Support Ticket</h2>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">New Support Request</h5>
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_subject" class="form-label">Subject</label>
+                            {{ form.subject }}
+                            {% if form.subject.errors %}
+                                <div class="text-danger">{{ form.subject.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_description" class="form-label">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Submit Ticket</button>
+                        <a href="{% url 'accounts:profile' %}" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Support Tips</h6>
+                    <ul class="small">
+                        <li>Be specific about your issue</li>
+                        <li>Include relevant details (order numbers, dates, etc.)</li>
+                        <li>You'll receive a notification when your ticket is resolved</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if user_tickets %}
+        <div class="mt-4">
+            <h4>Your Tickets</h4>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Subject</th>
+                            <th>Status</th>
+                            <th>Submitted</th>
+                            <th>Resolved</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in user_tickets %}
+                            <tr>
+                                <td>#{{ ticket.id }}</td>
+                                <td>{{ ticket.subject }}</td>
+                                <td>
+                                    {% if ticket.status == 'open' %}
+                                        <span class="badge bg-warning text-dark">Open</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Resolved</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ ticket.created_at|date:"M d, Y g:i A" }}</td>
+                                <td>
+                                    {% if ticket.resolved_at %}
+                                        {{ ticket.resolved_at|date:"M d, Y g:i A" }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    #id_subject {
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #495057;
+        background-color: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
+    
+    #id_description {
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #495057;
+        background-color: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
+</style>
+{% endblock %}

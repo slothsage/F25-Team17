@@ -1,32 +1,23 @@
 {# templates/registration/login.html #}
 {% extends "base.html" %}
-
-{% block title %}Login{% endblock %}
-
 {% block content %}
-  <h1>Sign In</h1>
-
-  <form method="post" action="{% url 'accounts:login' %}">
-    {% csrf_token %}
-    <div>
-      <label>Username
-        <input type="text" name="username" required>
-      </label>
+<div class="center-narrow">
+  <div class="card" style="max-width: 420px; margin: 1.5rem auto;">
+    <div class="card-header"><h1 class="card-title">Sign in</h1></div>
+    <div class="card-body">
+      <form method="post" class="stack gap-sm">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <label class="label">Username</label>
+        {{ form.username }}
+        <label class="label">Password</label>
+        {{ form.password }}
+        <button class="btn btn-primary" type="submit">Log in</button>
+      </form>
+      <div style="margin-top:.75rem">
+        <a href="{% url 'accounts:password_reset' %}">Forgot password?</a>
+      </div>
     </div>
-
-    <div>
-      <label>Password
-        <input type="password" name="password" required>
-      </label>
-    </div>
-
-    <div>
-      <p>Select your login type:</p>
-      <label><input type="radio" name="user_type" value="driver" checked> Driver</label>
-      <label><input type="radio" name="user_type" value="sponsor"> Sponsor</label>
-      <label><input type="radio" name="user_type" value="admin"> Admin</label>
-    </div>
-
-    <button class="btn" type="submit">Log In</button>
-  </form>
+  </div>
+</div>
 {% endblock %}

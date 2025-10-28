@@ -48,6 +48,8 @@ TEMPLATES = [{
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
         "accounts.context_processors.theme",
+        "accounts.context_processors.user_session_timeout",
+        "accounts.context_processors.unread_counts",
     ]},
 }]
 
@@ -56,10 +58,10 @@ WSGI_APPLICATION = "truckincentive.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "your_db_name"),
-        "USER": os.getenv("MYSQL_USER", "your_db_user"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", "your_db_password"),
-        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
+        "NAME": os.getenv("MYSQL_DATABASE", "Team17_DB"),
+        "USER": os.getenv("MYSQL_USER", "CPSC4911_admin"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "ytnSLOSNK4cB0ulSmGqJ"),
+        "HOST": os.getenv("MYSQL_HOST", "cpsc4910-f25.cobd8enwsupz.us-east-1.rds.amazonaws.com"),
         "PORT": os.getenv("MYSQL_PORT", "3306"),
         "OPTIONS": {
             "charset": "utf8mb4",
@@ -97,16 +99,13 @@ LANGUAGES = [
     ('fr', 'Français'),
 ]
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-]
+# Static files
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
-# media
+# Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
-# STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Auth flow
@@ -122,10 +121,7 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
 
-STATIC_URL = "static/"
-
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# (Removed duplicate STATIC_URL and MEDIA_URL definitions below)
 
 
 EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'

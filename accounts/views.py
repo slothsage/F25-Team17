@@ -40,6 +40,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django import db as django_db
 from django.db import models
+from .models import LoginActivity
 from shop.models import Order
 from shop.utils import order_is_delayed
 from django.core.paginator import Paginator
@@ -54,7 +55,21 @@ from django.contrib.auth import get_user_model
 from django import forms
 from django.contrib.admin.views.decorators import staff_member_required
 
+from django.http import JsonResponse
+from django.db.models import Q
+from django.contrib.auth import get_user_model
+
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
 User = get_user_model()
+
+try:
+    from shop.models import Sponsor
+    HAS_SPONSOR_MODEL = True
+except Exception:
+    Sponsor = None
+    HAS_SPONSOR_MODEL = False
 
 @login_required
 def profile(request):
@@ -167,6 +182,65 @@ def set_temporary_password(request, user_id):
     )
     messages.success(request, f"Temporary password emailed to {user.email}.")
     return redirect(request.META.get("HTTP_REFERER", "admin:index"))
+
+
+class AdminSetPasswordForm(forms.Form):
+    password = forms.CharField(widget=forms.PasswordInput, label="New password")
+    confirm = forms.CharField(widget=forms.PasswordInput, label="Confirm password")
+
+    def clean(self):
+        cleaned = super().clean()
+        p = cleaned.get("password")
+        c = cleaned.get("confirm")
+        if p != c:
+            raise forms.ValidationError("Passwords do not match")
+        return cleaned
+
+
+@staff_member_required
+def admin_set_password(request, user_id):
+    User = get_user_model()
+    user = get_object_or_404(User, pk=user_id)
+    if request.method == "POST":
+        form = AdminSetPasswordForm(request.POST)
+        if form.is_valid():
+            user.set_password(form.cleaned_data["password"])
+            user.save()
+            # show a simple success page with link back to admin search
+            messages.success(request, f"Password updated for {user.username}.")
+            return render(request, "accounts/admin_set_password_success.html", {"target_user": user})
+    else:
+        form = AdminSetPasswordForm()
+    return render(request, "accounts/admin_set_password.html", {"form": form, "target_user": user})
+
+
+class AdminSetTimeoutForm(forms.Form):
+    # allow blank to unset and use default
+    session_timeout_seconds = forms.IntegerField(label="Session timeout (seconds)", required=False, min_value=30, help_text="Blank = use system default")
+
+
+@staff_member_required
+def admin_set_timeout(request, user_id):
+    User = get_user_model()
+    user = get_object_or_404(User, pk=user_id)
+    profile = getattr(user, "driver_profile", None)
+    if request.method == "POST":
+        form = AdminSetTimeoutForm(request.POST)
+        if form.is_valid():
+            val = form.cleaned_data.get("session_timeout_seconds")
+            if profile:
+                profile.session_timeout_seconds = val if val else None
+                profile.save()
+            else:
+                # if the user has no DriverProfile, create one to store the setting
+                from .models import DriverProfile
+                profile = DriverProfile.objects.create(user=user, session_timeout_seconds=(val if val else None))
+            messages.success(request, f"Session timeout updated for {user.username}.")
+            return render(request, "accounts/admin_set_timeout_success.html", {"target_user": user})
+    else:
+        initial = {"session_timeout_seconds": profile.session_timeout_seconds if profile else None}
+        form = AdminSetTimeoutForm(initial=initial)
+    return render(request, "accounts/admin_set_timeout.html", {"form": form, "target_user": user})
 
 @login_required
 def admin_user_search(request):
@@ -332,11 +406,63 @@ def admin_user_search(request):
         },
     )
 
+
+@login_required
+def sponsor_driver_search(request):
+    """Sponsor-facing search: allow sponsor users to search drivers (no admin actions)."""
+    # only sponsor group members may access
+    if not request.user.groups.filter(name="sponsor").exists():
+        messages.error(request, "Access denied")
+        return redirect("accounts:profile")
+
+    q = request.GET.get("q", "").strip()
+    drivers_qs = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor")
+
+    if q:
+        id_query = None
+        if q.lower().startswith("id:"):
+            maybe = q.split(":", 1)[1].strip()
+            if maybe.isdigit():
+                id_query = int(maybe)
+        elif q.isdigit():
+            id_query = int(q)
+
+        if id_query is not None:
+            drivers_qs = drivers_qs.filter(Q(pk=id_query) | Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)).distinct()
+        else:
+            drivers_qs = drivers_qs.filter(
+                Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
+            ).distinct()
+
+    drivers_qs = drivers_qs.order_by("username")
+    paginator = Paginator(drivers_qs, 25)
+    page_number = request.GET.get("page", 1)
+    drivers_page = paginator.get_page(page_number)
+
+    return render(request, "accounts/sponsor_driver_search.html", {"drivers": drivers_page, "q": q})
+
 @login_required
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, driver=request.user)
     is_delayed = order_is_delayed(order)
     return render(request, "shop/order_detail.html", {"order": order, "is_delayed": is_delayed})
+
+
+def landing_url_for(user) -> str:
+    """
+    Decide where a user should land after login based on role.
+    Order matters: Admin > Sponsor > Driver > fallback.
+    """
+    if user.is_staff or user.is_superuser:
+        return reverse("admin_user_search")  # your custom admin landing
+    if user.groups.filter(name="sponsor").exists():
+        return reverse("accounts:sponsor_driver_search")
+    if hasattr(user, "driver_profile"):
+        return reverse("accounts:profile")  # or 'accounts:profile_preview'
+    # Fallback if the account has no role markers
+    return reverse("about")
+
+from django.contrib.auth.views import LoginView
 
 class FrontLoginView(LoginView):
     template_name = "registration/login.html"
@@ -354,49 +480,10 @@ class FrontLoginView(LoginView):
         return self.request.META.get('REMOTE_ADDR')
 
     def form_valid(self, form):
-        # user_type is chosen on the login form (driver/sponsor/admin)
-        user = form.get_user()
-        user_type = self.request.POST.get("user_type")
-
-        # log the user in using parent behavior
+        # Let Django log them in first
         response = super().form_valid(form)
-
-        # Enforce user_type role restrictions
-        if user_type == "driver":
-            # disallow staff/superuser choosing driver (admins must pick admin)
-            if user.is_staff or user.is_superuser:
-                auth_logout(self.request)
-                messages.error(self.request, "Admin accounts must sign in as Admin. Please choose Admin on the login form.")
-                return redirect("login")
-            # must have a DriverProfile
-            if not hasattr(user, "driver_profile"):
-                auth_logout(self.request)
-                messages.error(self.request, "This account is not a driver. Please select the correct user type.")
-                return redirect("accounts:login")
-
-        if user_type == "sponsor":
-            # disallow staff/superuser choosing sponsor
-            if user.is_staff or user.is_superuser:
-                auth_logout(self.request)
-                messages.error(self.request, "Admin accounts must sign in as Admin. Please choose Admin on the login form.")
-                return redirect("login")
-            # must be in sponsor group
-            if not user.groups.filter(name="sponsor").exists():
-                auth_logout(self.request)
-                messages.error(self.request, "This account is not a sponsor. Please select the correct user type.")
-                return redirect("login")
-
-        if user_type == "admin":
-            if not (user.is_staff or user.is_superuser):
-                auth_logout(self.request)
-                messages.error(self.request, "This account is not an admin. Please select the correct user type.")
-                return redirect("login")
-
-        # if admin and has privileges, go to admin landing
-        if user_type == "admin" and (user.is_staff or user.is_superuser):
-            return redirect(resolve_url("admin_user_search"))
-
-        return response
+        # Then override the redirect to be role-aware
+        return HttpResponseRedirect(landing_url_for(self.request.user))
 
 
 @staff_member_required
@@ -455,6 +542,34 @@ def messages_inbox(request):
 def messages_sent(request):
     rows = Message.objects.filter(author = request.user).order_by("-created_at")
     return render(request, "accounts/messages_sent.html", {"rows": rows})
+
+
+@staff_member_required
+def login_activity(request):
+    """Admin page: list login activity records with optional user filter and success/failure filter."""
+    qs = LoginActivity.objects.select_related("user").all()
+    user_q = request.GET.get("user", "").strip()
+    status = request.GET.get("status", "")  # 'success' | 'fail' | ''
+
+    if user_q:
+        # allow searching by username or id
+        if user_q.isdigit():
+            qs = qs.filter(models.Q(user__id=int(user_q)) | models.Q(username__icontains=user_q))
+        else:
+            qs = qs.filter(models.Q(user__username__icontains=user_q) | models.Q(username__icontains=user_q))
+
+    if status == "success":
+        qs = qs.filter(successful=True)
+    elif status == "fail":
+        qs = qs.filter(successful=False)
+
+    qs = qs.order_by("-created_at")
+
+    paginator = Paginator(qs, 50)
+    page = request.GET.get("page", 1)
+    page_obj = paginator.get_page(page)
+
+    return render(request, "accounts/login_activity.html", {"page": page_obj, "user_q": user_q, "status": status})
 
 @login_required
 def message_detail(request, pk: int):
@@ -834,3 +949,210 @@ def about(request):
 def faqs(request):
     """Simple FAQs page."""
     return render(request, "faqs.html")
+
+def api_driver_suggest(request):
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse([], safe=False)
+    qs = (User.objects
+          .filter(Q(username__icontains=q) |
+                  Q(email__icontains=q) |
+                  Q(driver_profile__phone__icontains=q) |
+                  Q(driver_profile__address__icontains=q))
+          .order_by("username")[:12])
+    data = [{
+        "label": u.username,
+        "value": u.username,             # what goes into the input on select
+        "hint":  f"{u.email or '—'}"
+    } for u in qs]
+    return JsonResponse(data, safe=False)
+
+def api_sponsor_suggest(request):
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse([], safe=False)
+
+    if HAS_SPONSOR_MODEL:
+        qs = (Sponsor.objects
+              .filter(Q(name__icontains=q) | Q(email__icontains=q))
+              .order_by("name")[:12])
+        data = [{
+            "label": getattr(s, "name", str(s)),
+            "value": getattr(s, "name", str(s)),
+            "hint":  getattr(s, "email", "") or "—",
+        } for s in qs]
+        return JsonResponse(data, safe=False)
+    else:
+        # Fallback: suggest USERS in the 'sponsor' group
+        from django.contrib.auth.models import Group
+        g = Group.objects.filter(name__iexact="sponsor").first()
+        user_qs = User.objects.none()
+        if g:
+            user_qs = (
+                User.objects.filter(groups=g)
+                .filter(Q(username__icontains=q) | Q(email__icontains=q))
+                .order_by("username")[:12]
+            )
+        data = [{
+            "label": u.username,
+            "value": u.username,
+            "hint":  u.email or "—",
+        } for u in user_qs]
+        return JsonResponse(data, safe=False)
+
+
+# --- Support Tickets ---
+class SupportTicketForm(forms.Form):
+    subject = forms.CharField(max_length=200, widget=forms.TextInput(attrs={"placeholder": "Brief summary of your issue"}))
+    description = forms.CharField(widget=forms.Textarea(attrs={"placeholder": "Please describe your issue in detail", "rows": 6}))
+
+
+@login_required
+def submit_ticket(request):
+    """Driver-only page to submit a support ticket."""
+    if request.method == "POST":
+        form = SupportTicketForm(request.POST)
+        if form.is_valid():
+            from .models import SupportTicket
+            ticket = SupportTicket.objects.create(
+                driver=request.user,
+                subject=form.cleaned_data["subject"],
+                description=form.cleaned_data["description"],
+                status="open"
+            )
+            messages.success(request, f"Support ticket #{ticket.id} submitted. You will be notified when it is resolved.")
+            return redirect("accounts:submit_ticket")
+    else:
+        form = SupportTicketForm()
+    
+    # Show user's existing tickets
+    from .models import SupportTicket
+    user_tickets = SupportTicket.objects.filter(driver=request.user).order_by("-created_at")
+    
+    return render(request, "accounts/submit_ticket.html", {"form": form, "user_tickets": user_tickets})
+
+
+@staff_member_required
+def admin_tickets(request):
+    """Admin page to view and resolve support tickets."""
+    from .models import SupportTicket
+    
+    status_filter = request.GET.get("status", "open")
+    tickets_qs = SupportTicket.objects.select_related("driver", "resolved_by").all()
+    
+    if status_filter == "open":
+        tickets_qs = tickets_qs.filter(status="open")
+    elif status_filter == "resolved":
+        tickets_qs = tickets_qs.filter(status="resolved")
+    
+    tickets_qs = tickets_qs.order_by("-created_at")
+    
+    paginator = Paginator(tickets_qs, 25)
+    page_number = request.GET.get("page", 1)
+    tickets_page = paginator.get_page(page_number)
+    
+    return render(request, "accounts/admin_tickets.html", {"tickets": tickets_page, "status_filter": status_filter})
+
+
+@staff_member_required
+@require_POST
+def resolve_ticket(request, ticket_id):
+    """Admin action to resolve a support ticket and notify the driver."""
+    from .models import SupportTicket, Notification
+    
+    ticket = get_object_or_404(SupportTicket, id=ticket_id)
+    ticket.status = "resolved"
+    ticket.resolved_at = timezone.now()
+    ticket.resolved_by = request.user
+    ticket.save()
+    
+    # Create notification for the driver
+    Notification.objects.create(
+        user=ticket.driver,
+        kind="promotions",  # or create a new kind like "support"
+        title=f"Support Ticket #{ticket.id} Resolved",
+        body=f"Your support ticket '{ticket.subject}' has been resolved by our team.",
+        url=""
+    )
+    
+    messages.success(request, f"Ticket #{ticket.id} marked as resolved and driver notified.")
+    return redirect(request.META.get("HTTP_REFERER", "accounts:admin_tickets"))
+
+
+# --- Complaints ---
+class ComplaintForm(forms.Form):
+    subject = forms.CharField(max_length=200, widget=forms.TextInput(attrs={"placeholder": "Brief summary of your complaint"}))
+    description = forms.CharField(widget=forms.Textarea(attrs={"placeholder": "Please describe your complaint in detail", "rows": 6}))
+
+
+@login_required
+def submit_complaint(request):
+    """Driver-only page to submit a complaint."""
+    if request.method == "POST":
+        form = ComplaintForm(request.POST)
+        if form.is_valid():
+            from .models import Complaint
+            complaint = Complaint.objects.create(
+                driver=request.user,
+                subject=form.cleaned_data["subject"],
+                description=form.cleaned_data["description"],
+                status="open"
+            )
+            messages.success(request, f"Complaint #{complaint.id} submitted. You will be notified when it is resolved.")
+            return redirect("accounts:submit_complaint")
+    else:
+        form = ComplaintForm()
+    
+    # Show user's existing complaints
+    from .models import Complaint
+    user_complaints = Complaint.objects.filter(driver=request.user).order_by("-created_at")
+    
+    return render(request, "accounts/submit_complaint.html", {"form": form, "user_complaints": user_complaints})
+
+
+@staff_member_required
+def admin_complaints(request):
+    """Admin page to view and resolve complaints."""
+    from .models import Complaint
+    
+    status_filter = request.GET.get("status", "open")
+    complaints_qs = Complaint.objects.select_related("driver", "resolved_by").all()
+    
+    if status_filter == "open":
+        complaints_qs = complaints_qs.filter(status="open")
+    elif status_filter == "resolved":
+        complaints_qs = complaints_qs.filter(status="resolved")
+    
+    complaints_qs = complaints_qs.order_by("-created_at")
+    
+    paginator = Paginator(complaints_qs, 25)
+    page_number = request.GET.get("page", 1)
+    complaints_page = paginator.get_page(page_number)
+    
+    return render(request, "accounts/admin_complaints.html", {"complaints": complaints_page, "status_filter": status_filter})
+
+
+@staff_member_required
+@require_POST
+def resolve_complaint(request, complaint_id):
+    """Admin action to resolve a complaint and notify the driver."""
+    from .models import Complaint, Notification
+    
+    complaint = get_object_or_404(Complaint, id=complaint_id)
+    complaint.status = "resolved"
+    complaint.resolved_at = timezone.now()
+    complaint.resolved_by = request.user
+    complaint.save()
+    
+    # Create notification for the driver
+    Notification.objects.create(
+        user=complaint.driver,
+        kind="promotions",  # or create a new kind like "complaints"
+        title=f"Complaint #{complaint.id} Resolved",
+        body=f"Your complaint '{complaint.subject}' has been resolved by our team.",
+        url=""
+    )
+    
+    messages.success(request, f"Complaint #{complaint.id} marked as resolved and driver notified.")
+    return redirect(request.META.get("HTTP_REFERER", "accounts:admin_complaints"))
+

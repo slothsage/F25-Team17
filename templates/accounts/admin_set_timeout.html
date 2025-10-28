@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+  <h2>Set session timeout for {{ target_user.username }}</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button class="btn" type="submit">Save</button>
+    <a class="btn" href="/admin/">Back</a>
+  </form>
+{% endblock %}
