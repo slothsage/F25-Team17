@@ -12,12 +12,16 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.core.mail import send_mail
+from django.db.models.functions import TruncDate
 from django.db import connections
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum
 from urllib.parse import quote
 from django.templatetags.static import static
+from django.utils.timezone import now
+from django.utils.timezone import localtime
+from django.shortcuts import redirect
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
@@ -25,6 +29,7 @@ from .models import DriverProfile
 from .models import Notification
 from .models import PointsLedger
 from .models import Message, MessageRecipient
+from .models import FailedLoginAttempt
 from .forms import MessageComposeForm
 from .forms import NotificationPreferenceForm
 
@@ -382,6 +387,8 @@ def admin_user_search(request):
 
         return response
 
+    failed_logins = FailedLoginAttempt.objects.order_by('-timestamp')[:25]
+
     return render(
         request,
         "accounts/admin_user_search.html",
@@ -395,6 +402,7 @@ def admin_user_search(request):
             "drivers_matching_count": drivers_matching_count,
             "total_sponsors_count": total_sponsors_count,
             "sponsors_matching_count": sponsors_matching_count,
+            "failed_logins": failed_logins,  
         },
     )
 
@@ -458,6 +466,18 @@ from django.contrib.auth.views import LoginView
 
 class FrontLoginView(LoginView):
     template_name = "registration/login.html"
+
+    def form_invalid(self, form):
+        username = self.request.POST.get("username", "")
+        ip_address = self.get_client_ip()
+        FailedLoginAttempt.objects.create(username=username, ip_address=ip_address)
+        return super().form_invalid(form)
+
+    def get_client_ip(self):
+        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0]
+        return self.request.META.get('REMOTE_ADDR')
 
     def form_valid(self, form):
         # Let Django log them in first
@@ -557,8 +577,9 @@ def message_detail(request, pk: int):
                             pk=pk, user=request.user)
     if not item.is_read:
         item.is_read = True
-        item.save(update_fields = ["is_read"])
-    return render(request, "accounts/message_detail.html", {"item":item})
+        item.read_at = timezone.now()
+        item.save(update_fields = ["is_read", "read_at"])
+    return render(request, "accounts/messages_detail.html", {"item":item})
 
 @staff_member_required
 def create_driver(request):
@@ -682,6 +703,29 @@ def toggle_user_active(request, user_id):
     messages.success(request, f"User '{user.username}' has been {action}.")
     return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
+@staff_member_required
+def toggle_lock_user(request, user_id):
+    """
+    Admin-only action: toggles a driver's locked status.
+    Locked users cannot log in or access protected pages.
+    """
+    if request.method != "POST":
+        messages.error(request, "Invalid request method.")
+        return redirect("admin_user_search")
+
+    user = get_object_or_404(User, id=user_id)
+    profile = getattr(user, "driver_profile", None)
+
+    if not profile:
+        messages.error(request, "This user does not have a driver profile.")
+        return redirect("admin_user_search")
+
+    profile.is_locked = not profile.is_locked
+    profile.save()
+
+    action = "locked" if profile.is_locked else "unlocked"
+    messages.success(request, f"Driver '{user.username}' has been {action}.")
+    return redirect(request.META.get("HTTP_REFERER", "admin_user_search"))
 
 @staff_member_required
 def force_logout_user(request, user_id):
@@ -720,10 +764,9 @@ class NotificationPrefsForm(forms.ModelForm):
 ########################################################
 @login_required
 def notifications(request):
-    rows = (MessageRecipient.objects
-        .select_related("message", "message__author")
+    rows = (Notification.objects
         .filter(user=request.user)
-        .order_by("-delivered_at"))
+        .order_by("-created_at"))
     return render(request, "accounts/notifications.html", {"rows": rows})
 
 @login_required
@@ -765,6 +808,48 @@ def notifications_feed(request):
     rows = Notification.objects.filter(user=request.user).order_by("-created_at")[:50]
     return render(request, "accounts/notifications_feed.html", {"rows": rows})
 
+
+@login_required
+def notifications_history(request):
+    """
+    Dashboard list of all notifications with search, filters, pagination.
+    Groups by day in the template via the annotated 'day' field.
+    """
+    qs = (
+        Notification.objects
+        .filter(user=request.user)
+        .order_by("-created_at")
+        .annotate(day=TruncDate("created_at"))
+    )
+
+    # filters
+    kind = request.GET.get("kind", "")
+    if kind:
+        qs = qs.filter(kind=kind)
+
+    read = request.GET.get("read", "")
+    if read == "unread":
+        qs = qs.filter(read=False)
+    elif read == "read":
+        qs = qs.filter(read=True)
+
+    q = request.GET.get("q", "").strip()
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(body__icontains=q))
+
+    paginator = Paginator(qs, 15)  
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    context = {
+        "page_obj": page_obj,
+        "q": q,
+        "read": read,
+        "kind": kind,
+        "kind_choices": Notification.KIND_CHOICES,
+    }
+    return render(request, "accounts/notification_history.html", context)
+
+
 @login_required
 def points_history(request):
     rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
@@ -792,6 +877,44 @@ def contact_sponsor(request):
     })
 
 
+
+@staff_member_required
+def admin_active_sessions(request):
+    sort = request.GET.get("sort", "recent")
+    sessions = []
+    for session in Session.objects.all():
+        data = session.get_decoded()
+        user_id = data.get('_auth_user_id')
+        if user_id:
+            try:
+                user = User.objects.get(id=user_id)
+                sessions.append({
+                    "user": user,
+                    "session_key": session.session_key,
+                    "ip": data.get("ip_address", "N/A"),  
+                    "last_activity": localtime(session.expire_date),
+                })
+            except User.DoesNotExist:
+                pass
+
+    reverse = sort != "oldest"
+    sessions.sort(key=lambda s: s["last_activity"], reverse=reverse)
+
+    return render(request, "accounts/admin_active_sessions.html", {
+        "sessions": sessions,
+        "sort": sort,
+    })
+
+@staff_member_required
+@require_POST
+def terminate_session(request, session_key):
+    try:
+        session = Session.objects.get(session_key=session_key)
+        session.delete()
+        messages.success(request, f"Session {session_key} terminated.")
+    except Session.DoesNotExist:
+        messages.error(request, f"Session {session_key} not found.")
+    return redirect("accounts:admin_active_sessions")
 
 def about(request):
     connected = False

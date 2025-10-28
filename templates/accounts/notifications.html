@@ -2,10 +2,12 @@
 {% block content %}
   <h1>Notifications</h1> 
 <div style="margin-bottom: 1rem;">
+  <a class="btn" href="{% url 'accounts:notifications_history' %}">View History</a>
   <a href="{% url 'accounts:notification_settings' %}" class="btn btn-primary">
     Notification Settings
   </a>
 </div>
+
   <p>Viewing as: <strong>{{ request.user.username }}</strong></p>
 
 <form method="post" action="{% url 'accounts:notifications_clear' %}" style="margin-bottom:1rem">
@@ -14,16 +16,19 @@
 </form>
 
   {% if rows %}
-  <ul>
-    {% for r in rows %}
-      <li>
-        {% if not r.is_read %}<strong>[new]</strong>{% endif %}
-        <a href="{% url 'accounts:message_detail' r.message.pk %}">{{ r.message.subject }}</a>
-        — from {{ r.message.author.username }} — {{ r.message.created_at|date:"Y-m-d H:i" }}
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>No notifications yet for this user.</p>
-{% endif %}
+    <ul>
+      {% for n in rows %}
+        <li>
+          {% if not n.read %}<strong>[new]</strong>{% endif %}
+          <strong>{{ n.title }}</strong> — {{ n.created_at|date:"Y-m-d H:i" }}
+          {% if n.url %}
+            — <a href="{{ n.url }}" target="_blank" rel="noopener">View</a>
+          {% endif %}
+          <div style="white-space:pre-wrap; margin:.25rem 0 0 .5rem;">{{ n.body }}</div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No notifications yet for this user.</p>
+  {% endif %}
 {% endblock content %}

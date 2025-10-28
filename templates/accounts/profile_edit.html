@@ -5,7 +5,7 @@
 {% block content %}
 <h1>Edit Profile</h1>
 
-<form method="post" enctype="multipart/form-data">
+<form id="profile-edit-form" method="post" enctype="multipart/form-data">
   {% csrf_token %}
   {{ form.non_field_errors }}
 
@@ -29,12 +29,12 @@
     <br><small>Current:</small><br>
     {% if request.user.driver_profile and request.user.driver_profile.image %}
       <img src="{{ request.user.driver_profile.image.url }}"
-           alt="Current photo"
-           style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
+          alt="Current photo"
+          style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
     {% else %}
       <img src="{% static 'defaults/avatar.png' %}"
-           alt="Default avatar"
-           style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
+          alt="Default avatar"
+          style="width:80px;height:80px;object-fit:cover;border-radius:40px;border:1px solid #ddd;">
     {% endif %}
     {% if form.image.errors %}<div class="error">{{ form.image.errors }}</div>{% endif %}
   </p>
@@ -46,6 +46,26 @@
     {% if form.description.errors %}<div class="error">{{ form.description.errors }}</div>{% endif %}
   </p>
 
-  <button class="btn btn-sm btn-muted">Save</button>
+  <button type="submit" id="save-profile-btn" class="btn btn-primary">Save changes</button>
 </form>
+
+<script>
+  (function () {
+    const form = document.getElementById('profile-edit-form');
+    if (!form) return;
+
+    let submitting = false;
+
+    form.addEventListener('submit', function (e) {
+      if (submitting) return;
+      e.preventDefault();
+
+      const ok = window.confirm('Save these changes to your profile?');
+      if (ok) {
+        submitting = true;
+        form.submit();
+      }
+    });
+  })();
+</script>
 {% endblock content %}

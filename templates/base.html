@@ -53,27 +53,29 @@
         {% if user.is_authenticated %}
           <a class="nav-link d-inline-block" href="{% url 'accounts:profile' %}">Profile</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:notifications_feed' %}">Notifications</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:message_inbox' %}">Messages</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:notifications' %}">Notifications</a>
+          <a class="nav-link d-inline-block" href="{% url 'accounts:messages_inbox' %}">Messages</a>
+          <a class="nav-link d-inline-block" href="{% url 'catalog_search' %}">Browse Catalog</a>
           <a class="nav-link d-inline-block" href="{% url 'wishlist_list' %}">Wishlists</a>
+          <a class="nav-link d-inline-block" href="{% url 'order_list' %}">Orders</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:password_change' %}">Change Password</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:submit_ticket' %}">Support</a>
           <a class="nav-link d-inline-block" href="{% url 'accounts:submit_complaint' %}">Complaints</a>
-                {% load group_filters %}
-                {% if user.is_authenticated and user|has_group:"sponsor" %}
+          {% load group_filters %}
+          {% if user|has_group:"sponsor" %}
             <a class="nav-link d-inline-block" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
           {% endif %}
           <a class="nav-link d-inline-block" href="{% url 'faqs' %}">FAQs</a>
-        {% if user.is_staff or user.is_superuser %}
-          <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
-          <a class="nav-link d-inline-block" href="/admin/create-driver/">Create Driver</a>
-          <a class="nav-link d-inline-block" href="/admin/create-sponsor/">Create Sponsor</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:message_compose' %}">Send Messages</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:admin_tickets' %}">Support Tickets</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:admin_complaints' %}">Complaints</a>
+          {% if user.is_staff or user.is_superuser %}
+            <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
+            <a class="nav-link d-inline-block" href="/admin/create-driver/">Create Driver</a>
+            <a class="nav-link d-inline-block" href="/admin/create-sponsor/">Create Sponsor</a>
+            <a class="nav-link d-inline-block" href="{% url 'accounts:message_compose' %}">Send Messages</a>
+            <a class="nav-link d-inline-block" href="{% url 'accounts:admin_tickets' %}">Support Tickets</a>
+            <a class="nav-link d-inline-block" href="{% url 'accounts:admin_complaints' %}">Complaints</a>
           {% endif %}
         {% endif %}
         </ul>

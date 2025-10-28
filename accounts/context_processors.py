@@ -1,4 +1,8 @@
-from .models import DriverNotificationPreference
+from .models import (
+    DriverNotificationPreference,
+    Notification,
+    MessageRecipient,
+)
 from django.utils import translation
 from django.conf import settings
 
@@ -44,3 +48,16 @@ def user_session_timeout(request):
     except Exception:
         pass
     return {"user_session_timeout": int(default)}
+
+# Unread counters for notifications and messages
+def unread_counts(request):
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return {}
+    try:
+        return {
+            "unread_notifications": Notification.objects.filter(user=request.user, read=False).count(),
+            "unread_messages": MessageRecipient.objects.filter(user=request.user, is_read=False).count(),
+        }
+    except Exception:
+        # Be resilient if tables are missing during migrations
+        return {}

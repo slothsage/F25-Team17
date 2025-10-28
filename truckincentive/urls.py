@@ -10,6 +10,7 @@ urlpatterns = [
     path("admin/create-driver/", accounts_views.create_driver, name="create_driver"),
     path("admin/create-sponsor/", accounts_views.create_sponsor, name="create_sponsor"),
     path("admin/user/<int:user_id>/toggle-active/", accounts_views.toggle_user_active, name="toggle_user_active"),
+    path("admin/user/<int:user_id>/toggle-lock/", accounts_views.toggle_lock_user, name="toggle_lock_user"),
     # real admin site moved to /admin/site/
     path("admin/site/", admin.site.urls),
     path("", include("accounts.urls")),

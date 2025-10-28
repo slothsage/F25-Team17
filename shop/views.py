@@ -6,6 +6,12 @@ from django.db import transaction
 from .models import Order, OrderItem, CartItem
 from django.urls import reverse
 from .models import Wishlist, WishListItem
+from django.core.paginator import Paginator
+from .ebay_service import ebay_service
+from django.utils.dateparse import parse_date
+from django.http import JsonResponse
+import json
+
 
 try:
     from accounts.notifications import send_in_app_notification
@@ -46,11 +52,66 @@ def cancel_order(request, order_id):
 # STORY: Order Status (list)
 @login_required
 def order_list(request):
-    status = request.GET.get("status")
+    """
+    Full order history for the logged-in driver with filters + pagination.
+    GET params:
+      status=<pending|confirmed|shipped|delivered|cancelled>
+      sponsor=<substring>
+      date_from=YYYY-MM-DD
+      date_to=YYYY-MM-DD
+      per_page=<int>
+      page=<int>
+    """
     qs = Order.objects.filter(driver=request.user).order_by("-placed_at")
+
+    # filters 
+    status = request.GET.get("status", "").strip()
     if status:
         qs = qs.filter(status=status)
-    return render(request, "shop/order_list.html", {"orders": qs, "status": status})
+
+    sponsor = request.GET.get("sponsor", "").strip()
+    if sponsor:
+        qs = qs.filter(sponsor_name__icontains=sponsor)
+
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+
+    if date_from_str:
+        d = parse_date(date_from_str) 
+        if d:
+            start_dt = timezone.make_aware(timezone.datetime.combine(d, timezone.datetime.min.time()))
+            qs = qs.filter(placed_at__gte=start_dt)
+
+    if date_to_str:
+        d = parse_date(date_to_str)
+        if d:
+            end_dt = timezone.make_aware(timezone.datetime.combine(d, timezone.datetime.max.time()))
+            qs = qs.filter(placed_at__lte=end_dt)
+
+    # pagination 
+    try:
+        per_page = int(request.GET.get("per_page", "10"))
+    except ValueError:
+        per_page = 10
+    per_page = max(1, min(per_page, 200))
+
+    paginator = Paginator(qs, per_page)
+    page_number = request.GET.get("page") or 1
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+        "orders": page_obj.object_list,
+        "filters": {
+            "status": status,
+            "sponsor": sponsor,
+            "date_from": date_from_str,
+            "date_to": date_to_str,
+            "per_page": per_page,
+        },
+        "STATUS_CHOICES": [("", "All")] + list(Order.STATUS_CHOICES),
+    }
+    return render(request, "shop/order_list.html", context)
 
 # STORY: Order Status (detail) + base for "Mark as Received"
 @login_required
@@ -130,73 +191,246 @@ def clear_cart(request):
 
 @login_required
 def wishlist_list(request):
-    """ 
-    WISHLIST VIEW LANDING PAGE - shows all wishlists for the logged in user
     """
-    if request.method == "POST":
-        name = (request.POST.get("name") or "").strip()
-        if not name:
-            messages.error(request, "Please name your wishlist.")
-        else:
-            Wishlist.objects.get_or_create(user=request.user, name=name)
-            messages.success(request, f'Wishlist "{name}" created.')
+    /wishlists/ - lists all wishlists, create, delete, add/remove items from wishlists
+    """
+    action = request.POST.get("action")
+
+    if request.method == "POST" and action:
+        if action == "create_wishlist":
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                messages.error(request, "Please enter a wishlist name.")
+            else:
+                Wishlist.objects.get_or_create(user=request.user, name=name)
+                messages.success(request, f"Wishlist '{name}' created.")
             return redirect("wishlist_list")
-    
-    lists = Wishlist.objects.filter(user=request.user).order_by("-updated_at", "-created_at")
-    return render(request, "shop/wishlist_list.html", {"wishlists": lists})
 
-@login_required
-def wishlist_detail(request, wishlist_id):
-    """
-    Details Page - shows all items in a wishlist.
-    """
-    wl = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
+        elif action == "delete_wishlist":
+            wid = request.POST.get("wishlist_id")
+            wl = get_object_or_404(Wishlist, id=wid, user=request.user)
+            nm = wl.name
+            wl.delete()
+            messages.success(request, f"Deleted wishlist '{nm}'.")
+            return redirect("wishlist_list")
 
-    if request.method == "POST" and request.POST.get("action") == "add_item":
-        # NOTE: When eBay is wired up, fill product_id/product_url/thumb_url here.
-        name = (request.POST.get("name_snapshot") or "").strip()
-        points = int(request.POST.get("points_each") or 0)
-        qty = max(1, int(request.POST.get("quantity") or 1))
-    
-        if not name:
-            messages.error(request, "Item name is required.")
-        else:
-            WishListItem.objects.create(
-                wishlist=wl,
-                name_snapshot=name,
-                points_each=points,
-                quantity=qty,
-                # product_id=request.POST.get("product_id", ""),
-                # product_url=request.POST.get("product_url", ""),
-                # thumb_url=request.POST.get("thumb_url", ""),
-            )
+        elif action == "add_item":
+            wid = request.POST.get("wishlist_id")
+            wl = get_object_or_404(Wishlist, id=wid, user=request.user)
+
+            name = (request.POST.get("name_snapshot") or "").strip()
+            points = int(request.POST.get("points_each") or 0)
+            qty = max(1, int(request.POST.get("quantity") or 1))
+
+            if not name:
+                messages.error(request, "Item name is required.")
+            else:
+                WishListItem.objects.create(
+                    wishlist=wl,
+                    name_snapshot=name,
+                    points_each=points,
+                    quantity=qty,
+                    # product_id=request.POST.get("product_id",""),
+                    # product_url=request.POST.get("product_url",""),
+                    # thumb_url=request.POST.get("thumb_url",""),
+                )
+                wl.save(update_fields=["updated_at"])
+                messages.success(request, f"Added '{name}' to '{wl.name}'.")
+            return redirect("wishlist_list")
+
+        elif action == "remove_item":
+            wid = request.POST.get("wishlist_id")
+            iid = request.POST.get("item_id")
+            wl = get_object_or_404(Wishlist, id=wid, user=request.user)
+            it = get_object_or_404(WishListItem, id=iid, wishlist=wl)
+            it.delete()
             wl.save(update_fields=["updated_at"])
-            messages.success(request, f"Added '{name}' to {wl.name}.")
-            return redirect("wishlist_detail", wishlist_id=wl.id)
+            messages.success(request, "Item removed.")
+            return redirect("wishlist_list")
+
+    # GET: fetch ALL wishlists + their items
+    wishlists = (
+        Wishlist.objects
+        .filter(user=request.user)
+        .prefetch_related("items")
+        .order_by("-updated_at", "-created_at")
+    )
+
+    return render(
+        request,
+        "shop/wishlist_list.html",
+        {"wishlists": wishlists},
+    )
+
+
+@login_required
+def catalog_search(request):
+    """
+    Main catalog search page - shows search form and results
+    Available to all logged-in users (drivers can browse, sponsors can add to catalog)
+    """
+    query = request.GET.get('q', '').strip()
+    page_num = request.GET.get('page', '1')
     
-    return render(request, "shop/wishlist_detail.html", {"wishlist": wl, "items": wl.items.all()})
+    try:
+        page_num = int(page_num)
+    except ValueError:
+        page_num = 1
+    
+    limit = 20
+    offset = (page_num - 1) * limit
+    
+    context = {
+        'query': query,
+        'page': page_num,
+        'results': None,
+        'error': None
+    }
+    
+    if query:
+        try:
+            results = ebay_service.search_products(query, limit=limit, offset=offset)
+            
+            products = [
+                ebay_service.format_product(item)
+                for item in results.get('itemSummaries', [])
+            ]
+            
+            context['results'] = {
+                'products': products,
+                'total': results.get('total', 0),
+                'has_next': results.get('next') is not None,
+                'has_prev': page_num > 1
+            }
+            
+        except Exception as e:
+            context['error'] = str(e)
+    
+    return render(request, 'shop/catalog_search.html', context)
+
 
 @login_required
-@transaction.atomic
-def wishlist_delete(request, wishlist_id):
-    """Delete an entire wishlist (POST only)."""
-    wl = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
-    if request.method == "POST":
-        name = wl.name
-        wl.delete()
-        messages.success(request, f"Deleted wishlist '{name}'.")
-        return redirect("wishlist_list")
-    return redirect("wishlist_detail", wishlist_id=wishlist_id)
+def catalog_search_ajax(request):
+    """
+    AJAX endpoint for searching products
+    Returns JSON response for dynamic searching
+    """
+    query = request.GET.get('q', '').strip()
+    limit = min(int(request.GET.get('limit', 20)), 50)
+    offset = int(request.GET.get('offset', 0))
+    
+    if not query:
+        return JsonResponse({'error': 'Search query required'}, status=400)
+    
+    try:
+        results = ebay_service.search_products(query, limit=limit, offset=offset)
+        
+        products = [
+            ebay_service.format_product(item)
+            for item in results.get('itemSummaries', [])
+        ]
+        
+        return JsonResponse({
+            'success': True,
+            'products': products,
+            'total': results.get('total', 0),
+            'limit': limit,
+            'offset': offset
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+    
 
 @login_required
-@transaction.atomic
-def wishlist_item_remove(request, wishlist_id, item_id):
-    """Remove a single item from a wishlist (POST only)."""
-    wl = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
-    item = get_object_or_404(WishListItem, id=item_id, wishlist=wl)
-    if request.method == "POST":
-        item.delete()
-        wl.save(update_fields=["updated_at"])
-        messages.success(request, "Item removed.")
-        return redirect("wishlist_detail", wishlist_id=wishlist_id)
-    return redirect("wishlist_detail", wishlist_id=wishlist_id)
+def add_to_cart_from_catalog(request):
+    """
+    Add an eBay product directly to cart
+    POST with: ebay_item_id, quantity (optional)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        ebay_item_id = data.get('ebay_item_id')
+        quantity = int(data.get('quantity', 1))
+        
+        if not ebay_item_id:
+            return JsonResponse({'error': 'Missing ebay_item_id'}, status=400)
+        
+        product = ebay_service.get_product_details(ebay_item_id)
+        formatted = ebay_service.format_product(product)
+        
+        if not formatted['is_available']:
+            return JsonResponse({
+                'error': 'This product is no longer available'
+            }, status=400)
+        
+        cart_item, created = CartItem.objects.get_or_create(
+            driver=request.user,
+            name_snapshot=formatted['name'],
+            defaults={
+                'points_each': formatted['price_points'],
+                'quantity': quantity
+            }
+        )
+        
+        if not created:
+            cart_item.quantity += quantity
+            cart_item.points_each = formatted['price_points']  
+            cart_item.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Added to cart!',
+            'cart_total': sum(
+                item.points_each * item.quantity 
+                for item in CartItem.objects.filter(driver=request.user)
+            )
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def add_to_wishlist_from_catalog(request):
+    """
+    Add an eBay product to a wishlist
+    POST with: wishlist_id, ebay_item_id
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        wishlist_id = data.get('wishlist_id')
+        ebay_item_id = data.get('ebay_item_id')
+        
+        if not wishlist_id or not ebay_item_id:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        
+        wishlist = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
+        
+        product = ebay_service.get_product_details(ebay_item_id)
+        formatted = ebay_service.format_product(product)
+        
+        WishListItem.objects.create(
+            wishlist=wishlist,
+            product_id=formatted['ebay_item_id'],
+            product_url=formatted['ebay_url'],
+            thumb_url=formatted['image_url'],
+            name_snapshot=formatted['name'],
+            points_each=formatted['price_points'],
+            quantity=1
+        )
+        
+        wishlist.save(update_fields=['updated_at'])
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"Added to wishlist '{wishlist.name}'"
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

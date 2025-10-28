@@ -1,27 +1,82 @@
-{% extends "base.html" %}{% block content %}
+{% extends "base.html" %}
+{% block content %}
 <h1>My Orders</h1>
 
-<form method="get" style="margin-bottom:1rem">
-  <label>Status:
-    <select name="status" onchange="this.form.submit()">
-      <option value="">All</option>
-      {% for s in "pending,confirmed,shipped,delivered,cancelled".split(',') %}
-        <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|title }}</option>
+<!-- FILTER BAR -->
+<form method="get" style="margin-bottom:1rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+  <label>
+    Status:
+    <select name="status">
+      {% for value, label in STATUS_CHOICES %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </label>
+
+  <label>
+    Sponsor:
+    <input type="text" name="sponsor" value="{{ filters.sponsor }}" placeholder="e.g. ACME">
+  </label>
+
+  <label>
+    From:
+    <input type="date" name="date_from" value="{{ filters.date_from }}">
+  </label>
+
+  <label>
+    To:
+    <input type="date" name="date_to" value="{{ filters.date_to }}">
+  </label>
+
+  <label>
+    Per page:
+    <input type="number" name="per_page" min="1" max="200" value="{{ filters.per_page }}" style="width:60px;">
+  </label>
+
+  <button type="submit" class="btn">Apply</button>
+  <a href="{% url 'order_list' %}" class="btn">Reset</a>
 </form>
 
+<!-- ORDER TABLE -->
 {% if orders %}
-  <ul>
-  {% for o in orders %}
-    <li>
-      <a href="{% url 'order_detail' o.id %}">Order #{{ o.id }}</a>
-      — {{ o.status|title }} — {{ o.points_spent }} pts — {{ o.placed_at|date:"Y-m-d H:i" }}
-    </li>
-  {% endfor %}
-  </ul>
+  <table style="width:100%; border-collapse:collapse; border:1px solid #ccc;">
+    <thead style="background:#f8f8f8;">
+      <tr>
+        <th style="text-align:left; padding:6px;">Order #</th>
+        <th style="text-align:left; padding:6px;">Placed</th>
+        <th style="text-align:left; padding:6px;">Sponsor</th>
+        <th style="text-align:left; padding:6px;">Status</th>
+        <th style="text-align:right; padding:6px;">Points</th>
+        <th style="text-align:center; padding:6px;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for o in orders %}
+      <tr style="border-top:1px solid #ddd;">
+        <td style="padding:6px;">{{ o.id }}</td>
+        <td style="padding:6px;">{{ o.placed_at|date:"Y-m-d H:i" }}</td>
+        <td style="padding:6px;">{{ o.sponsor_name|default:"—" }}</td>
+        <td style="padding:6px;">{{ o.get_status_display }}</td>
+        <td style="text-align:right; padding:6px;">{{ o.points_spent }}</td>
+        <td style="text-align:center; padding:6px;">
+          <a href="{% url 'order_detail' o.id %}">View</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- PAGINATION -->
+  <div style="margin-top:1rem; text-align:center;">
+    {% if page_obj.has_previous %}
+      <a class="btn" href="?page={{ page_obj.previous_page_number }}&status={{ filters.status }}&sponsor={{ filters.sponsor }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&per_page={{ filters.per_page }}">« Prev</a>
+    {% endif %}
+    <span style="margin:0 .5rem;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a class="btn" href="?page={{ page_obj.next_page_number }}&status={{ filters.status }}&sponsor={{ filters.sponsor }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&per_page={{ filters.per_page }}">Next »</a>
+    {% endif %}
+  </div>
 {% else %}
-  <p>No orders yet.</p>
+  <p>No orders found.</p>
 {% endif %}
 {% endblock %}

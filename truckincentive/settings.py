@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",
     "accounts",
     "shop",
 ]
@@ -31,6 +32,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'accounts.middleware.ActiveUserSessionMiddleware',
+    "accounts.middleware.BlockLockedUserMiddleware",
 ]
 
 ROOT_URLCONF = "truckincentive.urls"
@@ -45,13 +48,27 @@ TEMPLATES = [{
         "django.contrib.auth.context_processors.auth",
         "django.contrib.messages.context_processors.messages",
         "accounts.context_processors.theme",
+        "accounts.context_processors.user_session_timeout",
+        "accounts.context_processors.unread_counts",
     ]},
 }]
 
 WSGI_APPLICATION = "truckincentive.wsgi.application"
 
 DATABASES = {
-
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("MYSQL_DATABASE", "Team17_DB"),
+        "USER": os.getenv("MYSQL_USER", "CPSC4911_admin"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "ytnSLOSNK4cB0ulSmGqJ"),
+        "HOST": os.getenv("MYSQL_HOST", "cpsc4910-f25.cobd8enwsupz.us-east-1.rds.amazonaws.com"),
+        "PORT": os.getenv("MYSQL_PORT", "3306"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "use_unicode": True,
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
 }
 
 PASSWORD_HASHERS = [
@@ -82,16 +99,13 @@ LANGUAGES = [
     ('fr', 'Français'),
 ]
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
-]
+# Static files
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
-# media
+# Media files
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
-# STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Auth flow
@@ -107,7 +121,16 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
 
-STATIC_URL = "static/"
+# (Removed duplicate STATIC_URL and MEDIA_URL definitions below)
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+
+EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'
+EBAY_CLIENT_SECRET = 'SBX-df8ae938df8a-57b0-43e2-a63b-f447'
+EBAY_SANDBOX = True  # Set to False for production
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}

@@ -36,6 +36,11 @@ class DriverProfile(models.Model):
 
     # Optional per-user session timeout (seconds). If null, use system default in settings.SESSION_COOKIE_AGE
     session_timeout_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Per-user inactivity timeout in seconds (blank = use system default)")
+    is_locked = models.BooleanField(
+        default=False,
+        help_text="If checked, this user is prevented from logging in (admin only)",
+        editable=False  
+    )
 
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
@@ -59,48 +64,46 @@ class PasswordPolicy(models.Model):
 
 # --- Alert Preferences --- 
 class DriverNotificationPreference(models.Model):
+    """Per-driver notification and UX preferences."""
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notif_prefs")
- 
+
+    # Kinds
     orders = models.BooleanField(default=True)
     points = models.BooleanField(default=True)
-    promotions = models.BooleanField(default=False) 
-    # delivery channels
+    promotions = models.BooleanField(default=False)
+
+    # Delivery channels
     email_enabled = models.BooleanField(default=True)
     sms_enabled = models.BooleanField(default=False)
 
-    language = models.CharField(max_length=10, default="en")           # e.g., en, es, fr
-    theme = models.CharField(max_length=12, default="system")
-
-    SOUND_CHOICES = [
-        ("default", "Default chime"),
-        ("silent", "Silent"),
-        ("custom", "Custom file"),
-    ]
-    sound_mode = models.CharField(max_length=20, choices=SOUND_CHOICES, default="default")
-    sound_file = models.FileField(
-        upload_to="notif_sounds/",
-        blank=True, null=True,
-        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
-    )
+    # Visual theme
     THEME_CHOICES = [
         ("system", "System / Default"),
         ("light", "Light"),
         ("dark", "Dark"),
         ("contrast", "High Contrast"),
     ]
-    theme = models.CharField(
-        max_length=20,
-        choices=THEME_CHOICES,
-        default="system",
-        help_text="Visual theme preference."
-    )
-    LANGUAGE_CHOICES = [
-        ("en", "English"),
-        ("es", "Español"),
-        ("fr", "Français"),
-    ]
+    theme = models.CharField(max_length=20, choices=THEME_CHOICES, default="system", help_text="Visual theme preference.")
+
+    # Language
+    LANGUAGE_CHOICES = [("en", "English"), ("es", "Español"), ("fr", "Français")]
     language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default="en")
-    
+
+    # Sounds
+    SOUND_CHOICES = [("default", "Default chime"), ("silent", "Silent"), ("custom", "Custom file")]
+    sound_mode = models.CharField(max_length=20, choices=SOUND_CHOICES, default="default")
+    sound_file = models.FileField(
+        upload_to="notif_sounds/",
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=["mp3", "wav", "ogg"])],
+    )
+
+    # Low balance alert
+    low_balance_alert_enabled = models.BooleanField(default=True)
+    low_balance_threshold = models.PositiveIntegerField(default=100)
+
     class Meta:
         verbose_name = "Driver Notification Preference"
         verbose_name_plural = "Driver Notification Preferences"
@@ -110,8 +113,20 @@ class DriverNotificationPreference(models.Model):
 
     @classmethod
     def for_user(cls, user):
-        # create with defaults if missing
-        obj, _ = cls.objects.get_or_create(user=user, defaults={"orders": True, "points": True, "promotions": False})
+        """Get or create preferences for a user with sensible defaults."""
+        obj, _ = cls.objects.get_or_create(
+            user=user,
+            defaults={
+                "orders": True,
+                "points": True,
+                "promotions": False,
+                "email_enabled": True,
+                "sms_enabled": False,
+                "sound_mode": "default",
+                "low_balance_alert_enabled": True,
+                "low_balance_threshold": 100,
+            },
+        )
         return obj
     
 class Notification(models.Model):
@@ -256,3 +271,20 @@ class Complaint(models.Model):
 
     def __str__(self):
         return f"Complaint #{self.id} - {self.driver.username} - {self.subject} [{self.status}]"
+    
+
+class FailedLoginAttempt(models.Model):
+    username = models.CharField(max_length=150)
+    ip_address = models.GenericIPAddressField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.username} from {self.ip_address} at {self.timestamp}"
+    
+class DriverSettings(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="driver_settings")
+    low_balance_alert_enabled = models.BooleanField(default=True)
+    low_balance_threshold = models.PositiveIntegerField(default=100)
+
+    def __str__(self):
+        return f"{self.user.username} settings"

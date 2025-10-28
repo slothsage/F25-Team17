@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Active Sessions</h1>
+
+<!-- Sort Form -->
+<form method="get" class="form-inline mb-3">
+  <label for="sort">Sort by last activity:</label>
+  <select name="sort" id="sort" onchange="this.form.submit()" class="form-select form-select-sm d-inline w-auto ms-2">
+    <option value="recent" {% if sort == "recent" %}selected{% endif %}>Most recent</option>
+    <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest first</option>
+  </select>
+</form>
+
+{% if sessions %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>User ID</th>
+        <th>IP Address</th>
+        <th>Last Activity
+          {% if sort == "recent" %}
+            ↑
+          {% elif sort == "oldest" %}
+            ↓
+          {% endif %}
+        </th>
+        <th>Session Key</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td>{{ s.user.username }}</td>
+        <td>{{ s.user.id }}</td>
+        <td>{{ s.ip }}</td>
+        <td>{{ s.last_activity }}</td>
+        <td>
+          <code>{{ s.session_key }}</code>
+          <form method="post" action="{% url 'accounts:terminate_session' s.session_key %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Terminate this session?');">
+              Terminate
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No active sessions found.</p>
+{% endif %}
+{% endblock %}

@@ -12,6 +12,12 @@
       <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
     </div>
   </header>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>Admin: User & Sponsor Search</h1>
+  <a href="{% url 'accounts:admin_active_sessions' %}" class="btn btn-sm btn-primary">
+    View Active Sessions
+  </a>
+</div>
 
   <!-- Search Cards -->
   <section class="grid search-grid center-narrow">
@@ -159,6 +165,55 @@
                     {% endif %}
                   {% endif %}
                 </form>
+  <h2>Drivers</h2>
+  <p>Showing {{ drivers_matching_count }} matching drivers out of {{ total_drivers_count }} total drivers.</p>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Address</th>
+        <th>Last Login</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in drivers %}
+      <tr
+        {% if not u.is_active %}
+          style="background-color: rgba(255, 100, 100, 0.08);"
+        {% elif u.driver_profile.is_locked %}
+          style="background-color: rgba(255, 0, 0, 0.15);"
+        {% endif %} >
+  <td>{{ u.id }}</td>
+  <td>{{ u.username }}</td>
+        <td>{{ u.email }}</td>
+        <td>{{ u.driver_profile.phone }}</td>
+        <td>{{ u.driver_profile.address }}</td>
+        <td>
+          {% if u.last_login %}
+            {{ u.last_login|date:"Y-m-d H:i" }}<br>
+            <small>{{ u.last_login|timesince }} ago</small>
+          {% else %}
+            <span style="color: red;">Never</span>
+          {% endif %}
+        </td>
+        <td>
+          <form method="post" action="{% url 'toggle_user_active' u.id %}" style="display:inline">
+            {% csrf_token %}
+            {% if u == request.user %}
+              <!-- cannot change your own active status -->
+              <button class="btn" disabled>Cannot change yourself</button>
+            {% else %}
+              {% if u.is_active %}
+                <button class="btn btn-warning" type="submit">Deactivate</button>
+              {% else %}
+                <button class="btn btn-success" type="submit">Reactivate</button>
+              {% endif %}
+            {% endif %}
+          </form>
 
                 <form method="post" action="{% url 'accounts:admin_set_temp_password' u.id %}" class="inline">
                   {% csrf_token %}
@@ -167,10 +222,33 @@
 
                 <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' u.id %}">Change Password</a>
 
+<<<<<<< HEAD
                 <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" class="inline">
                   {% csrf_token %}
                   <button class="btn btn-info" type="submit">Send Reset Link</button>
                 </form>
+=======
+          <!-- Force logout Button  -->
+          <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" style="display:inline; margin-left: 5px;">
+            {% csrf_token %}
+            <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
+          </form>
+
+          <!-- Lock/Unlock Button -->
+        <form method="post" action="{% url 'accounts:toggle_lock_user' u.id %}" style="display:inline; margin-left: 5px;">
+          {% csrf_token %}
+          {% if u.driver_profile.is_locked %}
+            <button class="btn btn-success" type="submit" onclick="return confirm('Unlock this user?');">Unlock</button>
+          {% else %}
+            <button class="btn btn-dark" type="submit" onclick="return confirm('Lock this user?');">Lock</button>
+          {% endif %}
+        </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+>>>>>>> c2eca454b37ec560e386e84dda52c2a484c6c249
 
                 <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" class="inline">
                   {% csrf_token %}
@@ -391,5 +469,27 @@
 
 
 
+
+{% if failed_logins %}
+  <h2>Recent Failed Login Attempts</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>IP Address</th>
+        <th>Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for attempt in failed_logins %}
+      <tr>
+        <td>{{ attempt.username }}</td>
+        <td>{{ attempt.ip_address }}</td>
+        <td>{{ attempt.timestamp|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
 
 {% endblock content %}

@@ -2,27 +2,82 @@
 {% block content %}
 <h1>Your Wishlists</h1>
 
-<!-- Create form inline for quick add -->
-<form method="post" class="mb-3">
+<!-- Create a new wishlist -->
+<form method="post" class="mb-3" style="margin-bottom:1rem;">
     {% csrf_token %}
+    <input type="hidden" name="action" value="create_wishlist">
     <input type="text" name="name" placeholder="New wishlist name" required>
     <button type="submit">Create</button>
 </form>
 
 {% if wishlists %}
     <ul>
+<div style="display:grid; gap:1.25rem;">
     {% for wl in wishlists %}
-    <li>
-        <a href="{% url 'wishlist_detail' wl.id %}">{{ wl.name }}</a>
-        <!-- Delete as POST to prevent accidental clicks -->
-        <form method="post" action="{% url 'wishlist_delete' wl.id %}" style="display:inline;">
+    <section style="border:1px solid #ddd; padding:1rem; border-radius:.5rem;">
+        <header style="display:flex; align-items:center; justify-content:space-between;">
+        <h2 style="margin:0;">{{ wl.name }}</h2>
+
+        <!-- Delete this wishlist -->
+        <form method="post" style="margin:0;">
             {% csrf_token %}
+            <input type="hidden" name="action" value="delete_wishlist">
+            <input type="hidden" name="wishlist_id" value="{{ wl.id }}">
             <button type="submit" onclick="return confirm('Delete {{ wl.name }}?');">Delete</button>
         </form>
-    </li>
+        </header>
+
+        <!-- Add item to THIS wishlist -->
+        <h3>Add item</h3>
+        <form method="post" style="margin-bottom:1rem;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_item">
+            <input type="hidden" name="wishlist_id" value="{{ wl.id }}">
+            <input type="text" name="name_snapshot" placeholder="Item name" required>
+            <input type="number" name="points_each" placeholder="Points each" min="0" step="1">
+            <input type="number" name="quantity" value="1" min="1" step="1">
+            <!-- FUTURE: hidden fields populated from eBay result card 
+            still don't know what exactly these are going to be-->
+            <!-- <input type="hidden" name="product_id"> -->
+            <!-- <input type="hidden" name="product_url"> -->
+            <!-- <input type="hidden" name="thumb_url"> -->
+            <button type="submit">Add</button>
+        </form>
+
+        <!-- Items for THIS wishlist -->
+        <h3>Items</h3>
+        {% if wl.items.all %}
+            <ul>
+            {% for it in wl.items.all %}
+                <li>
+                {% if it.thumb_url %}
+                    <img src="{{ it.thumb_url }}" alt="" style="height:40px;vertical-align:middle;margin-right:.35rem;">
+                {% endif %}
+                <strong>{{ it.name_snapshot }}</strong>
+                ({{ it.quantity }} × {{ it.points_each }} pts = {{ it.line_points }} pts)
+                {% if it.product_url %}
+                    <a href="{{ it.product_url }}" target="_blank" rel="noopener">View</a>
+                {% endif %}
+
+                <!-- Remove item -->
+                <form method="post" style="display:inline; margin-left:.4rem;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="remove_item">
+                    <input type="hidden" name="wishlist_id" value="{{ wl.id }}">
+                    <input type="hidden" name="item_id" value="{{ it.id }}">
+                    <button type="submit">Remove</button>
+                </form>
+                </li>
+            {% endfor %}
+            </ul>
+        {% else %}
+            <p>No items yet.</p>
+        {% endif %}
+        </section>
     {% endfor %}
-    </ul>
+    </div>
 {% else %}
     <p>No wishlists yet. Create one above.</p>
 {% endif %}
+
 {% endblock %}

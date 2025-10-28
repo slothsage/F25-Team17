@@ -136,7 +136,7 @@ class AddressForm(forms.ModelForm):
 class NotificationPreferenceForm(forms.ModelForm):
     class Meta:
         model = DriverNotificationPreference
-        fields = ["orders", "points", "promotions", "email_enabled", "sms_enabled", "sound_mode", "sound_file", "theme", "language"]
+        fields = ["orders", "points", "promotions", "email_enabled", "sms_enabled", "sound_mode", "sound_file", "theme", "language", "low_balance_threshold", "low_balance_alert_enabled"]
         widgets = {
             "orders": forms.CheckboxInput(),
             "points": forms.CheckboxInput(),
@@ -144,11 +144,15 @@ class NotificationPreferenceForm(forms.ModelForm):
             "email_enabled": forms.CheckboxInput(),
             "sms_enabled": forms.CheckboxInput(),
             "theme": forms.Select(),
+            "low_balance_alert_enabled": forms.CheckboxInput(),
+            "low_balance_threshold": forms.NumberInput(attrs={"min": 0, "step": 5}),
         }
         labels = {
             "email_enabled": "Email alerts",
             "sms_enabled": "SMS alerts (preferred; no duplicate emails)",
             "theme": "Theme",
+            "low_balance_alert_enabled": "Warn me when my points are low",
+            "low_balance_threshold": "Low balance threshold (points)",
         }
 
     def clean(self):
@@ -159,4 +163,7 @@ class NotificationPreferenceForm(forms.ModelForm):
             self.add_error("sound_file", "Please upload an audio file for custom sound.")
         if mode in ("default", "silent"):
             cleaned["sound_file"] = None
+        thresh = cleaned.get("low_balance_threshold")
+        if thresh is not None and thresh < 0:
+            self.add_error("low_balance_threshold", "Threshold must be 0 or higher.")
         return cleaned

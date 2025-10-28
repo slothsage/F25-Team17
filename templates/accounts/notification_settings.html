@@ -22,6 +22,26 @@
       If SMS is enabled, duplicate email alerts will be suppressed.
     </p>
   </fieldset>
+
+    <fieldset style="margin-bottom:1rem">
+    <legend>Low Balance Alert</legend>
+
+    <label style="display:block;margin-bottom:.5rem">
+      {{ form.low_balance_enabled }}
+      Alert me when my points are low
+    </label>
+
+    <div style="margin-left:1.5rem">
+      <label for="{{ form.low_balance_threshold.id_for_label }}">
+        Minimum balance (points)
+      </label><br>
+      {{ form.low_balance_threshold }}
+      {{ form.low_balance_threshold.errors }}
+      <p style="color:#666;margin:.35rem 0 0">
+        We'll notify you if your balance drops below this number.
+      </p>
+    </div>
+  </fieldset>
   
     <fieldset style="margin-bottom:1rem">
     <legend>Theme</legend>
@@ -74,7 +94,7 @@
   </fieldset>
 
   <button class="btn" type="submit">Save</button>
-  <a class="btn" href="{% url 'accounts:notifications_feed' %}" style="margin-left:.5rem">Back to Notifications</a>
+  <a class="btn" href="{% url 'accounts:notifications' %}" style="margin-left:.5rem">Back to Notifications</a>
 </form>
 
 <script>
