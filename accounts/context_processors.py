@@ -61,3 +61,21 @@ def unread_counts(request):
     except Exception:
         # Be resilient if tables are missing during migrations
         return {}
+
+
+def impersonation_status(request):
+    """Expose impersonation status to all templates for admin troubleshooting."""
+    if not getattr(request, "user", None) or not request.user.is_authenticated:
+        return {}
+    
+    impersonate_id = request.session.get('impersonate_id')
+    impersonate_username = request.session.get('impersonate_username')
+    
+    if impersonate_id and impersonate_username:
+        return {
+            "is_impersonating": True,
+            "original_admin_username": impersonate_username,
+        }
+    
+    return {"is_impersonating": False}
+

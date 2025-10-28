@@ -50,6 +50,7 @@ TEMPLATES = [{
         "accounts.context_processors.theme",
         "accounts.context_processors.user_session_timeout",
         "accounts.context_processors.unread_counts",
+        "accounts.context_processors.impersonation_status",
     ]},
 }]
 

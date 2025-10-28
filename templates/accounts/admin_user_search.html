@@ -132,6 +132,17 @@
                                 {% endif %}
                               </td>
                               <td class="actions">
+                                <!-- View As Driver (Impersonation) -->
+                                <form method="post" action="{% url 'accounts:view_as_driver' u.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as {{ u.username }}? You will be able to see exactly what they see.');">
+                                    🔍 View As Driver
+                                  </button>
+                                </form>
+
+                                <!-- Edit Profile -->
+                                <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' u.id %}">Edit Profile</a>
+
                                 <!-- Active toggle -->
                                 <form method="post" action="{% url 'accounts:toggle_user_active' u.id %}" class="inline">
                                   {% csrf_token %}
@@ -279,6 +290,9 @@
                                 {% endif %}
                               </td>
                               <td class="actions">
+                                <!-- Edit Profile -->
+                                <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' s.id %}">Edit Profile</a>
+
                                 <form method="post" action="{% url 'accounts:toggle_user_active' s.id %}" class="inline">
                                   {% csrf_token %}
                                   {% if s == request.user %}
