@@ -4,7 +4,7 @@
 <h2>Delivery Address</h2>
 <p>Current: {{ profile.address|default:"(not set)" }}</p>
 
-<form method="post" action="{% url 'cart' %}" style="margin:.5rem 0 1rem;">
+<form method="post" action="{% url 'shop:cart' %}" style="margin:.5rem 0 1rem;">
   {% csrf_token %}
   <input type="hidden" name="action" value="update_address">
   {{ address_form.as_p }}   {# TEMP: render entire form to prove it's there #}
@@ -20,7 +20,7 @@
   </ul>
   <p><strong>Total:</strong> {{ total_points }} pts</p>
 
-  <form method="post" action="{% url 'clear_cart' %}">
+  <form method="post" action="{% url 'shop:clear_cart' %}">
     {% csrf_token %}
     <button class="btn" onclick="return confirm('Clear all items?')">Clear Cart</button>
   </form>
