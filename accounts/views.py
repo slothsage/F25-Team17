@@ -36,7 +36,7 @@ from .models import FailedLoginAttempt
 from .forms import MessageComposeForm
 from .forms import NotificationPreferenceForm
 
-from .forms import ProfileForm, DeleteAccountForm
+from .forms import ProfileForm, AdminProfileForm, DeleteAccountForm
 from .models import DriverNotificationPreference
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
@@ -95,6 +95,27 @@ def profile_edit(request):
     else:
         form = ProfileForm(instance=profile, user=request.user)
     return render(request, "accounts/profile_edit.html", {"form": form})
+
+@staff_member_required
+def admin_profile_edit(request, user_id):
+    """Allow staff to edit any user's profile (without image upload to avoid Pillow issues)."""
+    target_user = get_object_or_404(User, pk=user_id)
+    profile, _ = DriverProfile.objects.get_or_create(user=target_user)
+    
+    if request.method == "POST":
+        form = AdminProfileForm(request.POST, instance=profile, user=target_user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Profile for {target_user.username} updated successfully.")
+            return redirect("admin_user_search")
+    else:
+        form = AdminProfileForm(instance=profile, user=target_user)
+    
+    return render(request, "accounts/profile_edit.html", {
+        "form": form,
+        "editing_user": target_user,
+        "is_admin_edit": True
+    })
 
 @login_required
 def profile_preview(request):
@@ -1227,6 +1248,92 @@ def resolve_complaint(request, complaint_id):
     
     messages.success(request, f"Complaint #{complaint.id} marked as resolved and driver notified.")
     return redirect(request.META.get("HTTP_REFERER", "accounts:admin_complaints"))
+
+
+@staff_member_required
+def view_as_driver(request, user_id):
+    """
+    Admin impersonation feature - allows staff to view the site as a specific driver.
+    Stores the original admin user ID in session for troubleshooting and audit purposes.
+    """
+    User = get_user_model()
+    target_user = get_object_or_404(User, pk=user_id)
+    
+    # Prevent impersonating other staff members
+    if target_user.is_staff or target_user.is_superuser:
+        messages.error(request, "Cannot impersonate staff or admin users.")
+        return redirect("admin_user_search")
+    
+    # Save original admin info BEFORE switching users (session will be cleared on login)
+    original_admin_id = request.user.id
+    original_admin_username = request.user.username
+    impersonate_started = timezone.now().isoformat()
+    
+    # Log the impersonation action (for the admin user)
+    from .models import Notification
+    Notification.objects.create(
+        user=request.user,
+        kind="system",
+        title="Impersonation Started",
+        body=f"You are now viewing as {target_user.username} ({target_user.get_full_name() or 'No name'})",
+        url=""
+    )
+    
+    # Switch to the target user
+    from django.contrib.auth import login
+    login(request, target_user, backend='django.contrib.auth.backends.ModelBackend')
+    
+    # NOW set the impersonation session data (after login creates new session)
+    request.session['impersonate_id'] = original_admin_id
+    request.session['impersonate_username'] = original_admin_username
+    request.session['impersonate_started'] = impersonate_started
+    
+    messages.info(request, f"You are now viewing as {target_user.username}. Click 'Exit View As' to return to your admin account.")
+    return redirect("accounts:profile")
+
+
+@login_required
+def stop_impersonation(request):
+    """
+    Stop impersonating and return to original admin account.
+    """
+    impersonate_id = request.session.get('impersonate_id')
+    impersonate_username = request.session.get('impersonate_username')
+    
+    if not impersonate_id:
+        messages.warning(request, "You are not currently impersonating anyone.")
+        return redirect("about")
+    
+    # Log the impersonation end
+    impersonate_started = request.session.get('impersonate_started')
+    duration = None
+    if impersonate_started:
+        from datetime import datetime
+        start_time = datetime.fromisoformat(impersonate_started)
+        duration = timezone.now() - start_time
+    
+    # Get the original admin user
+    User = get_user_model()
+    try:
+        original_user = User.objects.get(pk=impersonate_id)
+    except User.DoesNotExist:
+        messages.error(request, "Original admin account not found. Please log in again.")
+        auth_logout(request)
+        return redirect("accounts:login")
+    
+    # Clear impersonation session data
+    del request.session['impersonate_id']
+    del request.session['impersonate_username']
+    if 'impersonate_started' in request.session:
+        del request.session['impersonate_started']
+    
+    # Log back in as original admin
+    from django.contrib.auth import login
+    login(request, original_user, backend='django.contrib.auth.backends.ModelBackend')
+    
+    duration_str = f" (Duration: {duration})" if duration else ""
+    messages.success(request, f"Returned to admin account: {original_user.username}{duration_str}")
+    return redirect("admin_user_search")
 
 def custom_permission_denied_view(request, exception=None):
     """Global 403 Forbidden handler."""

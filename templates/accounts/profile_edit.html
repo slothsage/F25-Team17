@@ -3,7 +3,12 @@
 {% block title %}Edit Profile{% endblock title %}
 
 {% block content %}
+{% if is_admin_edit %}
+<h1>Edit Profile for {{ editing_user.username }}</h1>
+<p class="info-message">You are editing this user's profile as an administrator.</p>
+{% else %}
 <h1>Edit Profile</h1>
+{% endif %}
 
 <form id="profile-edit-form" method="post" enctype="multipart/form-data">
   {% csrf_token %}
@@ -22,7 +27,8 @@
     {% endif %}
   {% endfor %}
 
-  {# Single image uploader + current/placeholder preview #}
+  {# Single image uploader + current/placeholder preview (only for non-admin edits) #}
+  {% if not is_admin_edit %}
   <p>
     <label for="{{ form.image.id_for_label }}">Profile photo</label><br>
     {{ form.image }}
@@ -38,6 +44,7 @@
     {% endif %}
     {% if form.image.errors %}<div class="error">{{ form.image.errors }}</div>{% endif %}
   </p>
+  {% endif %}
 
   {# Description once #}
   <p>

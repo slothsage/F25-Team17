@@ -52,6 +52,43 @@ class ProfileForm(forms.ModelForm):
             raise forms.ValidationError("File size is too large ( > 5MB ).")
         return img
 
+
+class AdminProfileForm(forms.ModelForm):
+    """Admin version of ProfileForm without image field to avoid Pillow dependency issues."""
+    email = forms.EmailField(required=True, label="Email")
+
+    class Meta:
+        model = DriverProfile
+        fields = [
+            "first_name",
+            "last_name",
+            "phone",
+            "address",
+            "city",
+            "state",
+            "zip_code",
+            "description",
+        ]
+        widgets = {
+            "description": forms.Textarea(
+                attrs={"rows": 4, "placeholder": "Tell sponsors a bit about yourself…"}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user")
+        super().__init__(*args, **kwargs)
+        self.fields["email"].initial = self.user.email
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+        self.user.email = self.cleaned_data["email"]
+        if commit:
+            self.user.save(update_fields=["email"])
+            profile.user = self.user
+            profile.save()
+        return profile
+
 class MessageComposeForm(forms.ModelForm):
     select_all = forms.BooleanField(required=False, label="All Users")
     include_admins = forms.BooleanField(required=False, label="Admins")

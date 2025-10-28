@@ -24,6 +24,82 @@
     nav a, nav form{margin-right:1rem;display:inline-block}
     .btn{padding:.4rem .8rem;border:1px solid #888;border-radius:.5rem;background:#f8f8f8}
 
+    /* Dropdown styles */
+    .nav-list {
+      display: flex;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      gap: 0.5rem;
+    }
+    
+    .nav-item {
+      position: relative;
+    }
+    
+    .dropdown-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: inherit;
+      font-family: inherit;
+      padding: 0.5rem 1rem;
+      color: inherit;
+    }
+    
+    .dropdown-toggle::after {
+      content: ' ▾';
+      font-size: 0.8em;
+    }
+    
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 0.375rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      list-style: none;
+      margin: 0;
+      padding: 0.5rem 0;
+      min-width: 180px;
+      z-index: 1000;
+    }
+    
+    /* Add a small invisible bridge to prevent dropdown from closing */
+    .dropdown::before {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      height: 5px;
+    }
+    
+    .dropdown.open .dropdown-menu {
+      display: block;
+    }
+    
+    .dropdown-item {
+      display: block;
+      padding: 0.5rem 1rem;
+      color: #333;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    
+    .dropdown-item:hover {
+      background-color: #f3f4f6;
+    }
+    
+    .dropdown-divider {
+      height: 1px;
+      background-color: #e5e7eb;
+      margin: 0.5rem 0;
+    }
+
     /* dark-mode overrides */
     .dark body { background:#0b1020; color:#e5e7eb; }
     .dark a { color:#a78bfa; }
@@ -32,13 +108,77 @@
       color:#e5e7eb;
       border-color:#374151;
     }
+    .dark .dropdown-toggle {
+      color: #e5e7eb;
+    }
+    .dark .dropdown-menu {
+      background: #1f2937;
+      border-color: #374151;
+    }
+    .dark .dropdown-item {
+      color: #e5e7eb;
+    }
+    .dark .dropdown-item:hover {
+      background-color: #374151;
+    }
+    .dark .dropdown-divider {
+      background-color: #4b5563;
+    }
+
+    /* Impersonation mode - Yellow navbar */
+    .impersonating-mode {
+      background: linear-gradient(135deg, #ffd43b 0%, #fab005 100%) !important;
+      box-shadow: 0 4px 12px rgba(250, 176, 5, 0.3) !important;
+    }
+    
+    .impersonating-mode .navbar-brand,
+    .impersonating-mode .nav-link,
+    .impersonating-mode .dropdown-toggle,
+    .impersonating-mode .btn {
+      color: #000 !important;
+      font-weight: 600 !important;
+    }
+    
+    .impersonating-mode .dropdown-menu {
+      background: #fff !important;
+      border-color: #fab005 !important;
+    }
+    
+    .exit-impersonation-btn {
+      background: #c92a2a !important;
+      color: white !important;
+      border: 2px solid #fff !important;
+      padding: 0.5rem 1.2rem !important;
+      border-radius: 0.375rem !important;
+      font-weight: 700 !important;
+      cursor: pointer !important;
+      box-shadow: 0 2px 8px rgba(201, 42, 42, 0.4) !important;
+      transition: all 0.2s !important;
+    }
+    
+    .exit-impersonation-btn:hover {
+      background: #a61e1e !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(201, 42, 42, 0.6) !important;
+    }
+    
+    .impersonation-badge {
+      background: #000;
+      color: #ffd43b;
+      padding: 0.25rem 0.75rem;
+      border-radius: 0.25rem;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-right: 0.5rem;
+      display: inline-block;
+    }
   </style>
 
   <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=3">
 </head>
 <body>
 
-  <nav class="navbar site-nav">
+  <nav class="navbar site-nav{% if is_impersonating %} impersonating-mode{% endif %}">
     <div class="container nav-inner">
       <div class="nav-left">
         <a class="navbar-brand" href="/">Class Demo</a>
@@ -51,31 +191,76 @@
       <div id="nav-links" class="nav-center">
         <ul class="nav-list">
         {% if user.is_authenticated %}
-          <a class="nav-link d-inline-block" href="{% url 'accounts:profile' %}">Profile</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:notifications' %}">Notifications</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:messages_inbox' %}">Messages</a>
-          <a class="nav-link d-inline-block" href="{% url 'shop:catalog_search' %}">Browse Catalog</a>
-          <a class="nav-link d-inline-block" href="{% url 'shop:wishlist_list' %}">Wishlists</a>
-          <a class="nav-link d-inline-block" href="{% url 'shop:order_list' %}">Orders</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:password_change' %}">Change Password</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:password_reset' %}">Forgot Password</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:delete_account' %}">Delete Account</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:submit_ticket' %}">Support</a>
-          <a class="nav-link d-inline-block" href="{% url 'accounts:submit_complaint' %}">Complaints</a>
+          <!-- Browse Catalog (top-level) -->
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'shop:catalog_search' %}">Browse Catalog</a>
+          </li>
+
+          <!-- Shop Dropdown -->
+          <li class="nav-item dropdown">
+            <button class="nav-link dropdown-toggle" aria-expanded="false">Shop</button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'shop:order_list' %}">Orders</a></li>
+              <li><a class="dropdown-item" href="{% url 'shop:catalog_search' %}">Browse Catalog</a></li>
+              <li><a class="dropdown-item" href="{% url 'shop:wishlist_list' %}">Wishlists</a></li>
+            </ul>
+          </li>
+
+          <!-- Profile Dropdown -->
+          <li class="nav-item dropdown">
+            <button class="nav-link dropdown-toggle" aria-expanded="false">Profile</button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">View Profile</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:profile_edit' %}">Edit Profile</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}">Change Password</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a></li>
+              <li class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:delete_account' %}">Delete Account</a></li>
+            </ul>
+          </li>
+
+          <!-- Support Dropdown -->
+          <li class="nav-item dropdown">
+            <button class="nav-link dropdown-toggle" aria-expanded="false">Support</button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'accounts:submit_ticket' %}">Support Tickets</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:submit_complaint' %}">Complaints</a></li>
+              <li><a class="dropdown-item" href="{% url 'faqs' %}">FAQs</a></li>
+            </ul>
+          </li>
+
+          <!-- Notifications (top-level) -->
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:notifications' %}">Notifications</a>
+          </li>
+
+          <!-- Messages (top-level) -->
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:messages_inbox' %}">Messages</a>
+          </li>
+
+          <!-- Sponsor-only: Search Drivers -->
           {% load group_filters %}
           {% if user|has_group:"sponsor" %}
-            <a class="nav-link d-inline-block" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
+          </li>
           {% endif %}
-          <a class="nav-link d-inline-block" href="{% url 'faqs' %}">FAQs</a>
+
+          <!-- Admin Dropdown (staff only) -->
           {% if user.is_staff or user.is_superuser %}
-            <a class="nav-link d-inline-block" href="/admin/">Admin Search</a>
-            <a class="nav-link d-inline-block" href="/admin/create-driver/">Create Driver</a>
-            <a class="nav-link d-inline-block" href="/admin/create-sponsor/">Create Sponsor</a>
-            <a class="nav-link d-inline-block" href="{% url 'accounts:message_compose' %}">Send Messages</a>
-            <a class="nav-link d-inline-block" href="{% url 'accounts:admin_tickets' %}">Support Tickets</a>
-            <a class="nav-link d-inline-block" href="{% url 'accounts:admin_complaints' %}">Complaints</a>
+          <li class="nav-item dropdown">
+            <button class="nav-link dropdown-toggle" aria-expanded="false">Admin</button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="/admin/">User Search</a></li>
+              <li><a class="dropdown-item" href="/admin/create-driver/">Create Driver</a></li>
+              <li><a class="dropdown-item" href="/admin/create-sponsor/">Create Sponsor</a></li>
+              <li class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:message_compose' %}">Send Messages</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:admin_tickets' %}">Support Tickets</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:admin_complaints' %}">Complaints</a></li>
+            </ul>
+          </li>
           {% endif %}
         {% endif %}
         </ul>
@@ -83,7 +268,16 @@
 
       <div class="nav-right">
         <div class="nav-actions">
-        {% if user.is_authenticated %}
+        {% if is_impersonating %}
+          <!-- Impersonation Exit Button -->
+          <span class="impersonation-badge">⚠️ VIEWING AS {{ user.username|upper }}</span>
+          <form method="post" action="{% url 'accounts:stop_impersonation' %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="exit-impersonation-btn">
+              ← Exit to {{ original_admin_username }}
+            </button>
+          </form>
+        {% elif user.is_authenticated %}
           <form method="post" action="{% url 'accounts:logout' %}" style="display:inline">
             {% csrf_token %}
             <button class="btn btn-muted" type="submit">Log Out</button>
@@ -212,6 +406,77 @@
         const expanded = navToggle.getAttribute('aria-expanded') === 'true';
         navToggle.setAttribute('aria-expanded', String(!expanded));
         siteNav.classList.toggle('open');
+      });
+    })();
+  </script>
+  <script>
+    // Dropdown menu functionality
+    (function () {
+      const dropdowns = document.querySelectorAll('.dropdown');
+      let closeTimeout;
+      
+      dropdowns.forEach(dropdown => {
+        const toggle = dropdown.querySelector('.dropdown-toggle');
+        const menu = dropdown.querySelector('.dropdown-menu');
+        
+        if (!toggle || !menu) return;
+        
+        // Click to toggle dropdown (for mobile/touch)
+        toggle.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Close other dropdowns
+          dropdowns.forEach(other => {
+            if (other !== dropdown) {
+              other.classList.remove('open');
+              const otherToggle = other.querySelector('.dropdown-toggle');
+              if (otherToggle) otherToggle.setAttribute('aria-expanded', 'false');
+            }
+          });
+          
+          // Toggle this dropdown
+          const isOpen = dropdown.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', String(isOpen));
+        });
+        
+        // Hover for desktop with delay
+        if (window.matchMedia('(min-width: 768px)').matches) {
+          // Open on hover (mouseenter on the entire dropdown container)
+          dropdown.addEventListener('mouseenter', function() {
+            clearTimeout(closeTimeout);
+            
+            // Close all other dropdowns
+            dropdowns.forEach(other => {
+              if (other !== dropdown) {
+                other.classList.remove('open');
+                const otherToggle = other.querySelector('.dropdown-toggle');
+                if (otherToggle) otherToggle.setAttribute('aria-expanded', 'false');
+              }
+            });
+            
+            dropdown.classList.add('open');
+            toggle.setAttribute('aria-expanded', 'true');
+          });
+          
+          // Close with delay on mouseleave
+          dropdown.addEventListener('mouseleave', function() {
+            clearTimeout(closeTimeout);
+            closeTimeout = setTimeout(function() {
+              dropdown.classList.remove('open');
+              toggle.setAttribute('aria-expanded', 'false');
+            }, 100); // 100ms delay before closing
+          });
+        }
+      });
+      
+      // Close dropdowns when clicking outside
+      document.addEventListener('click', function() {
+        dropdowns.forEach(dropdown => {
+          dropdown.classList.remove('open');
+          const toggle = dropdown.querySelector('.dropdown-toggle');
+          if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        });
       });
     })();
   </script>

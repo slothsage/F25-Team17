@@ -363,7 +363,7 @@ def catalog_search_ajax(request):
 def add_to_cart_from_catalog(request):
     """
     Add an eBay product directly to cart
-    POST with: ebay_item_id, quantity (optional)
+    Simplified version for sandbox compatibility
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
@@ -371,40 +371,38 @@ def add_to_cart_from_catalog(request):
     try:
         data = json.loads(request.body)
         ebay_item_id = data.get('ebay_item_id')
+        product_name = data.get('product_name')  
+        points = int(data.get('points', 0))
         quantity = int(data.get('quantity', 1))
         
-        if not ebay_item_id:
-            return JsonResponse({'error': 'Missing ebay_item_id'}, status=400)
+        if not ebay_item_id or not product_name:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
         
-        product = ebay_service.get_product_details(ebay_item_id)
-        formatted = ebay_service.format_product(product)
-        
-        if not formatted['is_available']:
-            return JsonResponse({
-                'error': 'This product is no longer available'
-            }, status=400)
-        
+        # Add directly to cart without checking eBay availability
         cart_item, created = CartItem.objects.get_or_create(
             driver=request.user,
-            name_snapshot=formatted['name'],
+            name_snapshot=product_name,
             defaults={
-                'points_each': formatted['price_points'],
+                'points_each': points,
                 'quantity': quantity
             }
         )
         
         if not created:
+            # Update quantity if already exists
             cart_item.quantity += quantity
-            cart_item.points_each = formatted['price_points']  
             cart_item.save()
+        
+        # Calculate cart total
+        total_points = sum(
+            item.points_each * item.quantity 
+            for item in CartItem.objects.filter(driver=request.user)
+        )
         
         return JsonResponse({
             'success': True,
             'message': 'Added to cart!',
-            'cart_total': sum(
-                item.points_each * item.quantity 
-                for item in CartItem.objects.filter(driver=request.user)
-            )
+            'cart_total': total_points
         })
         
     except Exception as e:
