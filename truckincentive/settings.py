@@ -87,10 +87,10 @@ WSGI_APPLICATION = "truckincentive.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "Team17_DB"),
-        "USER": os.getenv("MYSQL_USER", "CPSC4911_admin"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", "ytnSLOSNK4cB0ulSmGqJ"),
-        "HOST": os.getenv("MYSQL_HOST", "cpsc4910-f25.cobd8enwsupz.us-east-1.rds.amazonaws.com"),
+        "NAME": os.getenv("MYSQL_DATABASE", "your_db_name"),
+        "USER": os.getenv("MYSQL_USER", "your_db_user"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", "your_db_password"),
+        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
         "PORT": os.getenv("MYSQL_PORT", "3306"),
         "OPTIONS": {
             "charset": "utf8mb4",
