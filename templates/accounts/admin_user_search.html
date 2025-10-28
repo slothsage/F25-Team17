@@ -12,7 +12,11 @@
                     <div class="toolbar-right">
                       <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
                       <a class="btn btn-primary" href="{% url 'accounts:admin_active_sessions' %}">Active Sessions</a>
-                      <a class="btn btn-danger" href="{% url 'accounts:download_error_log' %}">Download Error Logs</a>
+                      <!-- Error Log Download (with Date Filter) -->
+                      <form method="get" action="{% url 'accounts:download_error_log' %}" style="display:inline-flex; align-items:center; gap:4px;">
+                        <input type="date" name="date" class="input" style="height: 32px; padding: 2px 6px;">
+                        <button class="btn btn-danger btn-sm" type="submit">Download Logs</button>
+                      </form>
                     </div>
                   </header>
 

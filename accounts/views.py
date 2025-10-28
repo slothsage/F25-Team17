@@ -15,6 +15,8 @@ from django.core.mail import send_mail
 from django.db.models.functions import TruncDate
 from django.db import connections
 from django.utils import timezone
+import datetime
+import os
 from datetime import timedelta
 from django.db.models import Sum
 from urllib.parse import quote
@@ -1193,6 +1195,27 @@ def download_error_log(request):
     if not log_path.exists():
         return HttpResponseNotFound("No error log file found.")
 
-    # Serve as downloadable file
-    response = FileResponse(open(log_path, "rb"), as_attachment=True, filename="error.log")
-    return response
+    date_str = request.GET.get("date")
+    if date_str:
+        try:
+            target_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return HttpResponse("Invalid date format. Use YYYY-MM-DD.", status=400)
+
+        # Filter lines that contain  date
+        date_prefix = f"[{target_date.isoformat()}"
+        filtered_lines = []
+        with open(log_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if date_prefix in line:
+                    filtered_lines.append(line)
+
+        if not filtered_lines:
+            return HttpResponse(f"No log entries found for {date_str}.", content_type="text/plain")
+
+        response = HttpResponse("".join(filtered_lines), content_type="text/plain")
+        response["Content-Disposition"] = f'attachment; filename="error_{date_str}.log"'
+        return response
+
+    # Default: send full log
+    return FileResponse(open(log_path, "rb"), as_attachment=True, filename="error.log")
