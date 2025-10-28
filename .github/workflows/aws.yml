@@ -39,6 +39,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Test SSH Connection
+        run: |
+          echo "Testing SSH connection..."
+          echo "${{ secrets.EC2_SSH_KEY }}" > id_rsa
+          chmod 600 id_rsa
+          ssh -vvv -i id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo connected
+
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
