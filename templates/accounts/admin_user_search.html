@@ -2,494 +2,417 @@
 {% load i18n %}
 
 {% block content %}
-<div class="container-main">
-  <header class="toolbar">
-    <div class="toolbar-left">
-      <h1 class="page-title">Admin: User &amp; Sponsor Search</h1>
-      <p class="page-subtitle">Find drivers and sponsors, manage accounts, and export CSVs.</p>
-    </div>
-    <div class="toolbar-right">
-      <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
-    </div>
-  </header>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h1>Admin: User & Sponsor Search</h1>
-  <a href="{% url 'accounts:admin_active_sessions' %}" class="btn btn-sm btn-primary">
-    View Active Sessions
-  </a>
-</div>
+                
+                <div class="container-main">
+                  <header class="toolbar">
+                    <div class="toolbar-left">
+                      <h1 class="page-title">Admin: User &amp; Sponsor Search</h1>
+                      <p class="page-subtitle">Find drivers and sponsors, manage accounts, and export CSVs.</p>
+                    </div>
+                    <div class="toolbar-right">
+                      <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
+                      <a class="btn btn-primary" href="{% url 'accounts:admin_active_sessions' %}">Active Sessions</a>
+                    </div>
+                  </header>
 
-  <!-- Search Cards -->
-  <section class="grid search-grid center-narrow">
-    <!-- DRIVER -->
-    <article class="card">
-      <div class="card-header"><h2 class="card-title">Driver search</h2></div>
-      <div class="card-body">
-        <form method="get" class="stack gap-sm">
-          <div class="autocomplete" data-limit="6" data-endpoint="{% url 'accounts:api_driver_suggest' %}">
-            <input
-              name="q"
-              value="{{ q }}"
-              class="input ac-input"
-              placeholder="username, email, phone, address or id:123"
-              autocomplete="off"
-              aria-label="Search drivers"
-            />
-            <div class="ac-panel" role="listbox" hidden></div>
-          </div>
-          <div class="row-actions">
-            <button class="btn btn-primary">Search Drivers</button>
-          </div>
-        </form>
-      </div>
-    </article>
+                  <!-- Search Cards -->
+                  <section class="grid search-grid center-narrow">
+                    <!-- DRIVER SEARCH -->
+                    <article class="card">
+                      <div class="card-header"><h2 class="card-title">Driver search</h2></div>
+                      <div class="card-body">
+                        <form method="get" class="stack gap-sm">
+                          <div class="autocomplete" data-limit="6" data-endpoint="{% url 'accounts:api_driver_suggest' %}">
+                            <input
+                              name="q"
+                              value="{{ q }}"
+                              class="input ac-input"
+                              placeholder="username, email, phone, address or id:123"
+                              autocomplete="off"
+                              aria-label="Search drivers"
+                            />
+                            <div class="ac-panel" role="listbox" hidden></div>
+                          </div>
+                          <div class="row-actions">
+                            <button class="btn btn-primary">Search Drivers</button>
+                          </div>
+                        </form>
+                      </div>
+                    </article>
 
-    <!-- SPONSOR -->
-    <article class="card">
-      <div class="card-header"><h2 class="card-title">Sponsor search</h2></div>
-      <div class="card-body">
-        <form method="get" class="stack gap-sm">
-          <div class="autocomplete" data-limit="6" data-endpoint="{% url 'accounts:api_sponsor_suggest' %}">
-            <input
-              name="sponsor"
-              value="{{ sponsor_q }}"
-              class="input ac-input"
-              placeholder="sponsor name, email"
-              autocomplete="off"
-              aria-label="Search sponsors"
-            />
-            <div class="ac-panel" role="listbox" hidden></div>
-          </div>
-          <div class="row-actions">
-            <button class="btn btn-primary">Search Sponsors</button>
-          </div>
-        </form>
-      </div>
-    </article>
+                    <!-- SPONSOR SEARCH -->
+                    <article class="card">
+                      <div class="card-header"><h2 class="card-title">Sponsor search</h2></div>
+                      <div class="card-body">
+                        <form method="get" class="stack gap-sm">
+                          <div class="autocomplete" data-limit="6" data-endpoint="{% url 'accounts:api_sponsor_suggest' %}">
+                            <input
+                              name="sponsor"
+                              value="{{ sponsor_q }}"
+                              class="input ac-input"
+                              placeholder="sponsor name, email"
+                              autocomplete="off"
+                              aria-label="Search sponsors"
+                            />
+                            <div class="ac-panel" role="listbox" hidden></div>
+                          </div>
+                          <div class="row-actions">
+                            <button class="btn btn-primary">Search Sponsors</button>
+                          </div>
+                        </form>
+                      </div>
+                    </article>
 
-    <!-- EXPORT -->
-    <article class="card">
-      <div class="card-header"><h2 class="card-title">Export</h2></div>
-      <div class="card-body">
-        <form method="get" class="export-form">
-          <input type="hidden" name="q" value="{{ q }}">
-          <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
-          <input type="hidden" name="export" value="csv">
-          <label class="label">Export type</label>
-          <select name="export_type" class="select">
-            <option value="drivers">Drivers</option>
-            <option value="sponsors">Sponsors</option>
-            <option value="both">Both</option>
-          </select>
-          <button class="btn">Export CSV</button>
-        </form>
-      </div>
-    </article>
-  </section>
+                    <!-- EXPORT -->
+                    <article class="card">
+                      <div class="card-header"><h2 class="card-title">Export</h2></div>
+                      <div class="card-body">
+                        <div class="row-actions">
+                          <form method="get" class="inline">
+                            <input type="hidden" name="q" value="{{ q }}" />
+                            <input type="hidden" name="sponsor" value="{{ sponsor_q }}" />
+                            <input type="hidden" name="export" value="csv" />
+                            <input type="hidden" name="export_type" value="drivers" />
+                            <button class="btn btn-muted">Export Drivers</button>
+                          </form>
+                          <form method="get" class="inline">
+                            <input type="hidden" name="q" value="{{ q }}" />
+                            <input type="hidden" name="sponsor" value="{{ sponsor_q }}" />
+                            <input type="hidden" name="export" value="csv" />
+                            <input type="hidden" name="export_type" value="sponsors" />
+                            <button class="btn btn-muted">Export Sponsors</button>
+                          </form>
+                        </div>
+                      </div>
+                    </article>
+                  </section>
 
-  {% if drivers %}
-  <!-- Driver filters -->
-  <section class="card mt-lg">
-    <div class="card-header">
-      <div class="card-title-row">
-        <h2 class="card-title">Drivers</h2>
-        <div class="pill muted">Showing {{ drivers_matching_count }} / {{ total_drivers_count }}</div>
-      </div>
-    </div>
-    <div class="card-body">
-      <form method="get" class="filters-row">
-        <input type="hidden" name="q" value="{{ q }}">
-        <label for="sort" class="label">Sort</label>
-        <select name="sort" id="sort" class="select" onchange="this.form.submit()">
-          <option value="">--</option>
-          <option value="last_login_desc" {% if request.GET.sort == "last_login_desc" %}selected{% endif %}>Most recent</option>
-          <option value="last_login_asc" {% if request.GET.sort == "last_login_asc" %}selected{% endif %}>Oldest first</option>
-        </select>
+                  <!-- DRIVERS RESULT TABLE -->
+                  <section class="card mt-lg">
+                    <div class="card-header">
+                      <div class="card-title-row">
+                        <h2 class="card-title">Drivers</h2>
+                        <div class="pill muted">Showing {{ drivers_matching_count }} / {{ total_drivers_count }}</div>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-wrap">
+                        <table class="table table-admin">
+                          <thead>
+                            <tr>
+                              <th class="col-id">ID</th>
+                              <th>Username</th>
+                              <th>Email</th>
+                              <th>Phone</th>
+                              <th>Address</th>
+                              <th>Last Login</th>
+                              <th class="col-actions">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for u in drivers %}
+                            <tr
+                              {% if not u.is_active %}
+                                style="background-color: rgba(255, 100, 100, 0.08);"
+                              {% elif u.driver_profile.is_locked %}
+                                style="background-color: rgba(255, 0, 0, 0.15);"
+                              {% endif %}
+                            >
+                              <td class="mono">{{ u.id }}</td>
+                              <td class="wrap">{{ u.username }}</td>
+                              <td class="wrap">{{ u.email }}</td>
+                              <td class="wrap">{{ u.driver_profile.phone }}</td>
+                              <td class="wrap">{{ u.driver_profile.address }}</td>
+                              <td class="nowrap">
+                                {% if u.last_login %}
+                                  {{ u.last_login|date:"Y-m-d H:i" }}<br>
+                                  <small class="subtle">{{ u.last_login|timesince }} ago</small>
+                                {% else %}
+                                  <span class="badge danger">Never</span>
+                                {% endif %}
+                              </td>
+                              <td class="actions">
+                                <!-- Active toggle -->
+                                <form method="post" action="{% url 'accounts:toggle_user_active' u.id %}" class="inline">
+                                  {% csrf_token %}
+                                  {% if u == request.user %}
+                                    <button class="btn" disabled>Cannot change yourself</button>
+                                  {% else %}
+                                    {% if u.is_active %}
+                                      <button class="btn btn-warning" type="submit">Deactivate</button>
+                                    {% else %}
+                                      <button class="btn btn-success" type="submit">Reactivate</button>
+                                    {% endif %}
+                                  {% endif %}
+                                </form>
 
-        <label for="inactive" class="label">Filter</label>
-        <select name="inactive" id="inactive" class="select" onchange="this.form.submit()">
-          <option value="">All users</option>
-          <option value="never" {% if request.GET.inactive == "never" %}selected{% endif %}>Never logged in</option>
-          <option value="30days" {% if request.GET.inactive == "30days" %}selected{% endif %}>Inactive &gt; 30 days</option>
-        </select>
+                                <!-- Temp password -->
+                                <form method="post" action="{% url 'accounts:admin_set_temp_password' u.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-secondary" type="submit">Temp Password</button>
+                                </form>
 
-        <div class="spacer"></div>
-        <form method="get" class="inline">
-          <input type="hidden" name="q" value="{{ q }}">
-          <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
-          <input type="hidden" name="export" value="csv">
-          <input type="hidden" name="export_type" value="drivers">
-          <button class="btn btn-muted">Export Drivers</button>
-        </form>
-      </form>
+                                <!-- Change password page -->
+                                <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' u.id %}">Change Password</a>
 
-      <div class="table-wrap">
-        <table class="table table-admin">
-          <thead>
-            <tr>
-              <th class="col-id">ID</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Phone</th>
-              <th>Address</th>
-              <th>Last Login</th>
-              <th class="col-actions">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for u in drivers %}
-            <tr class="{% if not u.is_active %}row-inactive{% endif %}">
-              <td class="mono">{{ u.id }}</td>
-              <td class="wrap">{{ u.username }}</td>
-              <td class="wrap">{{ u.email }}</td>
-              <td class="wrap">{{ u.driver_profile.phone }}</td>
-              <td class="wrap">{{ u.driver_profile.address }}</td>
-              <td class="nowrap">
-                {% if u.last_login %}
-                  {{ u.last_login|date:"Y-m-d H:i" }}<br>
-                  <span class="subtle">{{ u.last_login|timesince }} ago</span>
-                {% else %}
-                  <span class="badge danger">Never</span>
-                {% endif %}
-              </td>
-              <td class="actions">
-                <form method="post" action="{% url 'toggle_user_active' u.id %}" class="inline">
-                  {% csrf_token %}
-                  {% if u == request.user %}
-                    <button class="btn" disabled>Cannot change yourself</button>
-                  {% else %}
-                    {% if u.is_active %}
-                      <button class="btn btn-warning" type="submit">Deactivate</button>
-                    {% else %}
-                      <button class="btn btn-success" type="submit">Reactivate</button>
-                    {% endif %}
+                                <!-- Send reset link -->
+                                <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-info" type="submit">Send Reset Link</button>
+                                </form>
+
+                                <!-- Force logout -->
+                                <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
+                                </form>
+
+                                <!-- Lock/Unlock -->
+                                <form method="post" action="{% url 'accounts:toggle_lock_user' u.id %}" class="inline">
+                                  {% csrf_token %}
+                                  {% if u.driver_profile.is_locked %}
+                                    <button class="btn btn-success" type="submit" onclick="return confirm('Unlock this user?');">Unlock</button>
+                                  {% else %}
+                                    <button class="btn btn-dark" type="submit" onclick="return confirm('Lock this user?');">Lock</button>
+                                  {% endif %}
+                                </form>
+
+                                <!-- Session timeout -->
+                                <a class="btn btn-secondary" href="{% url 'accounts:admin_set_timeout' u.id %}">Set Timeout</a>
+                              </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                              <td colspan="7" class="muted">No drivers found.</td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <nav class="pagination">
+                        {% if drivers.has_previous %}
+                          <a class="page-link" href="?q={{ q }}&page={{ drivers.previous_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">Previous</a>
+                        {% endif %}
+                        <span class="page-status">Page {{ drivers.number }} of {{ drivers.paginator.num_pages }}</span>
+                        {% if drivers.has_next %}
+                          <a class="page-link" href="?q={{ q }}&page={{ drivers.next_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">Next</a>
+                        {% endif %}
+                      </nav>
+                    </div>
+                  </section>
+
+                  {% if sponsors %}
+                  <section class="card mt-lg">
+                    <div class="card-header">
+                      <div class="card-title-row">
+                        <h2 class="card-title">Sponsors</h2>
+                        <div class="pill muted">Showing {{ sponsors_matching_count }} / {{ total_sponsors_count }}</div>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-wrap">
+                        <table class="table table-admin">
+                          <thead>
+                            <tr>
+                              <th>Name</th>
+                              <th>Order Count</th>
+                              <th>Sample Drivers</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for s in sponsors %}
+                            <tr>
+                              <td class="wrap">{{ s.name }}</td>
+                              <td class="mono">{{ s.count }}</td>
+                              <td class="wrap">
+                                {% for d in s.drivers %}
+                                  <span class="chip">{{ d }}</span>
+                                {% endfor %}
+                              </td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <form method="get" class="inline">
+                        <input type="hidden" name="q" value="{{ q }}">
+                        <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
+                        <input type="hidden" name="export" value="csv">
+                        <input type="hidden" name="export_type" value="sponsors">
+                        <button class="btn btn-muted">Export Sponsors</button>
+                      </form>
+                    </div>
+                  </section>
                   {% endif %}
-                </form>
-  <h2>Drivers</h2>
-  <p>Showing {{ drivers_matching_count }} matching drivers out of {{ total_drivers_count }} total drivers.</p>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Username</th>
-        <th>Email</th>
-        <th>Phone</th>
-        <th>Address</th>
-        <th>Last Login</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for u in drivers %}
-      <tr
-        {% if not u.is_active %}
-          style="background-color: rgba(255, 100, 100, 0.08);"
-        {% elif u.driver_profile.is_locked %}
-          style="background-color: rgba(255, 0, 0, 0.15);"
-        {% endif %} >
-  <td>{{ u.id }}</td>
-  <td>{{ u.username }}</td>
-        <td>{{ u.email }}</td>
-        <td>{{ u.driver_profile.phone }}</td>
-        <td>{{ u.driver_profile.address }}</td>
-        <td>
-          {% if u.last_login %}
-            {{ u.last_login|date:"Y-m-d H:i" }}<br>
-            <small>{{ u.last_login|timesince }} ago</small>
-          {% else %}
-            <span style="color: red;">Never</span>
-          {% endif %}
-        </td>
-        <td>
-          <form method="post" action="{% url 'toggle_user_active' u.id %}" style="display:inline">
-            {% csrf_token %}
-            {% if u == request.user %}
-              <!-- cannot change your own active status -->
-              <button class="btn" disabled>Cannot change yourself</button>
-            {% else %}
-              {% if u.is_active %}
-                <button class="btn btn-warning" type="submit">Deactivate</button>
-              {% else %}
-                <button class="btn btn-success" type="submit">Reactivate</button>
-              {% endif %}
-            {% endif %}
-          </form>
 
-                <form method="post" action="{% url 'accounts:admin_set_temp_password' u.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="btn btn-secondary" type="submit">Temp Password</button>
-                </form>
+                  {% if sponsor_users %}
+                  <section class="card mt-lg">
+                    <div class="card-header">
+                      <div class="card-title-row">
+                        <h2 class="card-title">Sponsor Users</h2>
+                        <div class="pill muted">Showing {{ sponsor_users|length }}</div>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-wrap">
+                        <table class="table table-admin">
+                          <thead>
+                            <tr>
+                              <th>Username</th>
+                              <th>Email</th>
+                              <th>Status</th>
+                              <th class="col-actions">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for s in sponsor_users %}
+                            <tr class="{% if not s.is_active %}row-inactive{% endif %}">
+                              <td class="wrap">{{ s.username }}</td>
+                              <td class="wrap">{{ s.email }}</td>
+                              <td>
+                                {% if s.is_active %}
+                                  <span class="badge success">Active</span>
+                                {% else %}
+                                  <span class="badge danger">Inactive</span>
+                                {% endif %}
+                              </td>
+                              <td class="actions">
+                                <form method="post" action="{% url 'accounts:toggle_user_active' s.id %}" class="inline">
+                                  {% csrf_token %}
+                                  {% if s == request.user %}
+                                    <button class="btn" disabled>Cannot change yourself</button>
+                                  {% else %}
+                                    {% if s.is_active %}
+                                      <button class="btn btn-warning" type="submit">Deactivate</button>
+                                    {% else %}
+                                      <button class="btn btn-success" type="submit">Reactivate</button>
+                                    {% endif %}
+                                  {% endif %}
+                                </form>
 
-                <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' u.id %}">Change Password</a>
+                                <form method="post" action="{% url 'accounts:admin_set_temp_password' s.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-secondary" type="submit">Temp Password</button>
+                                </form>
 
-<<<<<<< HEAD
-                <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="btn btn-info" type="submit">Send Reset Link</button>
-                </form>
-=======
-          <!-- Force logout Button  -->
-          <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" style="display:inline; margin-left: 5px;">
-            {% csrf_token %}
-            <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
-          </form>
+                                <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' s.id %}">Change Password</a>
 
-          <!-- Lock/Unlock Button -->
-        <form method="post" action="{% url 'accounts:toggle_lock_user' u.id %}" style="display:inline; margin-left: 5px;">
-          {% csrf_token %}
-          {% if u.driver_profile.is_locked %}
-            <button class="btn btn-success" type="submit" onclick="return confirm('Unlock this user?');">Unlock</button>
-          {% else %}
-            <button class="btn btn-dark" type="submit" onclick="return confirm('Lock this user?');">Lock</button>
-          {% endif %}
-        </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
->>>>>>> c2eca454b37ec560e386e84dda52c2a484c6c249
+                                <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-info" type="submit">Send Reset Link</button>
+                                </form>
 
-                <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
-                </form>
-
-                <a class="btn btn-secondary" href="{% url 'accounts:admin_set_timeout' u.id %}">Set Timeout</a>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <nav class="pagination">
-        {% if drivers.has_previous %}
-          <a class="page-link" href="?q={{ q }}&page={{ drivers.previous_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">Previous</a>
-        {% endif %}
-        <span class="page-status">Page {{ drivers.number }} of {{ drivers.paginator.num_pages }}</span>
-        {% if drivers.has_next %}
-          <a class="page-link" href="?q={{ q }}&page={{ drivers.next_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">Next</a>
-        {% endif %}
-      </nav>
-    </div>
-  </section>
-  {% endif %}
-
-  {% if sponsors %}
-  <section class="card mt-lg">
-    <div class="card-header">
-      <div class="card-title-row">
-        <h2 class="card-title">Sponsors</h2>
-        <div class="pill muted">Showing {{ sponsors_matching_count }} / {{ total_sponsors_count }}</div>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table class="table table-admin">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Order Count</th>
-              <th>Sample Drivers</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in sponsors %}
-            <tr>
-              <td class="wrap">{{ s.name }}</td>
-              <td class="mono">{{ s.count }}</td>
-              <td class="wrap">
-                {% for d in s.drivers %}
-                  <span class="chip">{{ d }}</span>
-                {% endfor %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <form method="get" class="inline">
-        <input type="hidden" name="q" value="{{ q }}">
-        <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
-        <input type="hidden" name="export" value="csv">
-        <input type="hidden" name="export_type" value="sponsors">
-        <button class="btn btn-muted">Export Sponsors</button>
-      </form>
-    </div>
-  </section>
-  {% endif %}
-
-  {% if sponsor_users %}
-  <section class="card mt-lg">
-    <div class="card-header">
-      <div class="card-title-row">
-        <h2 class="card-title">Sponsor Users</h2>
-        <div class="pill muted">Showing {{ sponsor_users|length }}</div>
-      </div>
-    </div>
-    <div class="card-body">
-      <div class="table-wrap">
-        <table class="table table-admin">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Status</th>
-              <th class="col-actions">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for s in sponsor_users %}
-            <tr class="{% if not s.is_active %}row-inactive{% endif %}">
-              <td class="wrap">{{ s.username }}</td>
-              <td class="wrap">{{ s.email }}</td>
-              <td>
-                {% if s.is_active %}
-                  <span class="badge success">Active</span>
-                {% else %}
-                  <span class="badge danger">Inactive</span>
-                {% endif %}
-              </td>
-              <td class="actions">
-                <form method="post" action="{% url 'toggle_user_active' s.id %}" class="inline">
-                  {% csrf_token %}
-                  {% if s == request.user %}
-                    <button class="btn" disabled>Cannot change yourself</button>
-                  {% else %}
-                    {% if s.is_active %}
-                      <button class="btn btn-warning" type="submit">Deactivate</button>
-                    {% else %}
-                      <button class="btn btn-success" type="submit">Reactivate</button>
-                    {% endif %}
+                                <form method="post" action="{% url 'accounts:admin_force_logout_user' s.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
+                                </form>
+                              </td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </section>
                   {% endif %}
-                </form>
+                </div>
 
-                <form method="post" action="{% url 'accounts:admin_set_temp_password' s.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="btn btn-secondary" type="submit">Temp Password</button>
-                </form>
+                <script>
+                (function () {
+                  const els = document.querySelectorAll('.autocomplete');
+                  if (!els.length) return;
 
-                <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' s.id %}">Change Password</a>
+                  function h(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text) e.textContent=text; return e; }
 
-                <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="btn btn-info" type="submit">Send Reset Link</button>
-                </form>
+                  els.forEach(wrapper => {
+                    const input = wrapper.querySelector('.ac-input') || wrapper.querySelector('input');
+                    const panel = wrapper.querySelector('.ac-panel');
+                    const endpoint = wrapper.dataset.endpoint;
+                    const limit = parseInt(wrapper.dataset.limit || "8", 10);
 
-                <form method="post" action="{% url 'accounts:admin_force_logout_user' s.id %}" class="inline">
-                  {% csrf_token %}
-                  <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-  {% endif %}
-</div>
+                    let aborter = null, items = [], index = -1, lastQ = "";
 
-<script>
-(function () {
-  const els = document.querySelectorAll('.autocomplete');
-  if (!els.length) return;
+                    function clearPanel(){
+                      panel.innerHTML = "";
+                      panel.hidden = true;
+                      wrapper.classList.remove('open');
+                      items = []; index = -1;
+                    }
 
-  function h(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text) e.textContent=text; return e; }
+                    function render(list){
+                      panel.innerHTML = "";
+                      list.slice(0, limit).forEach((row) => {
+                        const it = h('div', 'ac-item'); it.setAttribute('role','option');
+                        it.dataset.value = row.value || row.label || "";
+                        it.append(h('div','ac-label', row.label || row.value || ""));
+                        if (row.hint) it.append(h('div','ac-hint', row.hint));
+                        it.addEventListener('mousedown', (e)=>{ e.preventDefault(); commit(it.dataset.value); });
+                        panel.append(it);
+                      });
+                      panel.hidden = list.length === 0;
+                      if (!panel.hidden) wrapper.classList.add('open');
+                      items = Array.from(panel.children);
+                      index = items.length ? 0 : -1;
+                      highlight();
+                    }
 
-  els.forEach(wrapper => {
-    const input = wrapper.querySelector('.ac-input') || wrapper.querySelector('input');
-    const panel = wrapper.querySelector('.ac-panel');
-    const endpoint = wrapper.dataset.endpoint;
-    const limit = parseInt(wrapper.dataset.limit || "8", 10);
+                    function highlight(){ items.forEach((el,i)=>el.setAttribute('aria-selected', i===index ? 'true':'false')); }
+                    function commit(val){ input.value = val; clearPanel(); }
 
-    let aborter = null, items = [], index = -1, lastQ = "";
+                    async function fetchData(q){
+                      if (!endpoint || !q) { clearPanel(); return; }
+                      try {
+                        if (aborter) aborter.abort();
+                        aborter = new AbortController();
+                        const res = await fetch(`${endpoint}?q=` + encodeURIComponent(q), {signal:aborter.signal});
+                        const data = await res.json();
+                        render(Array.isArray(data) ? data : []);
+                      } catch (_) {}
+                    }
 
-    function clearPanel(){
-      panel.innerHTML = "";
-      panel.hidden = true;
-      wrapper.classList.remove('open');   // << added
-      items = []; index = -1;
-    }
+                    input.setAttribute('autocomplete','off');
+                    input.addEventListener('input', (e) => {
+                      const q = e.target.value.trim();
+                      if (q === lastQ) return; lastQ = q;
+                      if (!q) { clearPanel(); return; }
+                      fetchData(q);
+                    });
 
-    function render(list){
-      panel.innerHTML = "";
-      list.slice(0, limit).forEach((row) => {
-        const it = h('div', 'ac-item'); it.setAttribute('role','option');
-        it.dataset.value = row.value || row.label || "";
-        it.append(h('div','ac-label', row.label || row.value || ""));
-        if (row.hint) it.append(h('div','ac-hint', row.hint));
-        it.addEventListener('mousedown', (e)=>{ e.preventDefault(); commit(it.dataset.value); });
-        panel.append(it);
-      });
-      panel.hidden = list.length === 0;
-      if (!panel.hidden) wrapper.classList.add('open');  // << added
-      items = Array.from(panel.children);
-      index = items.length ? 0 : -1;
-      highlight();
-    }
+                    input.addEventListener('keydown', (e) => {
+                      if (panel.hidden) return;
+                      if (e.key === 'ArrowDown'){ e.preventDefault(); index = Math.min(index+1, items.length-1); highlight(); }
+                      else if (e.key === 'ArrowUp'){ e.preventDefault(); index = Math.max(index-1, 0); highlight(); }
+                      else if (e.key === 'Enter'){ if (index>=0){ e.preventDefault(); commit(items[index].dataset.value); } }
+                      else if (e.key === 'Escape'){ clearPanel(); }
+                    });
 
-    function highlight(){ items.forEach((el,i)=>el.setAttribute('aria-selected', i===index ? 'true':'false')); }
-    function commit(val){ input.value = val; clearPanel(); }
+                    input.addEventListener('blur', () => setTimeout(clearPanel, 100));
+                  });
+                })();
+                </script>
 
-    async function fetchData(q){
-      if (!endpoint || !q) { clearPanel(); return; }
-      try {
-        if (aborter) aborter.abort();
-        aborter = new AbortController();
-        const res = await fetch(`${endpoint}?q=` + encodeURIComponent(q), {signal:aborter.signal});
-        const data = await res.json();
-        render(Array.isArray(data) ? data : []);
-      } catch (_) {}
-    }
+                {% if failed_logins %}
+                  <h2>Recent Failed Login Attempts</h2>
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>IP Address</th>
+                        <th>Timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for attempt in failed_logins %}
+                      <tr>
+                        <td>{{ attempt.username }}</td>
+                        <td>{{ attempt.ip_address }}</td>
+                        <td>{{ attempt.timestamp|date:"Y-m-d H:i:s" }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                {% endif %}
 
-    input.setAttribute('autocomplete','off');
-    input.addEventListener('input', (e) => {
-      const q = e.target.value.trim();
-      if (q === lastQ) return; lastQ = q;
-      if (!q) { clearPanel(); return; }
-      fetchData(q);
-    });
-
-    input.addEventListener('keydown', (e) => {
-      if (panel.hidden) return;
-      if (e.key === 'ArrowDown'){ e.preventDefault(); index = Math.min(index+1, items.length-1); highlight(); }
-      else if (e.key === 'ArrowUp'){ e.preventDefault(); index = Math.max(index-1, 0); highlight(); }
-      else if (e.key === 'Enter'){ if (index>=0){ e.preventDefault(); commit(items[index].dataset.value); } }
-      else if (e.key === 'Escape'){ clearPanel(); }
-    });
-
-    input.addEventListener('blur', () => setTimeout(clearPanel, 100));
-  });
-})();
-</script>
-
-
-
-
-{% if failed_logins %}
-  <h2>Recent Failed Login Attempts</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Username</th>
-        <th>IP Address</th>
-        <th>Timestamp</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for attempt in failed_logins %}
-      <tr>
-        <td>{{ attempt.username }}</td>
-        <td>{{ attempt.ip_address }}</td>
-        <td>{{ attempt.timestamp|date:"Y-m-d H:i:s" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
-
-{% endblock content %}
+                {% endblock content %}
