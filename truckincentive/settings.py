@@ -149,8 +149,6 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
 
-# (Removed duplicate STATIC_URL and MEDIA_URL definitions below)
-
 
 EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'
 EBAY_CLIENT_SECRET = 'SBX-df8ae938df8a-57b0-43e2-a63b-f447'
