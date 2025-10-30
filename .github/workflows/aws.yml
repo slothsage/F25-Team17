@@ -55,8 +55,6 @@ jobs:
 
           echo "Deployment successful at $(date)" >> $LOGFILE
           tail -n 15 $LOGFILE > /tmp/deploy_summary.log
-          scp /tmp/deploy_summary.log github_runner:/tmp/deploy_summary.log || true
-          scp $LOGFILE github_runner:/tmp/latest_deploy.log || true
           EOF
 
       - name: Upload Deployment Log
