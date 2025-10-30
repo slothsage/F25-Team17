@@ -3,7 +3,7 @@
 import os
 import sys
 
-# test comment 5
+# test comment 6
 
 def main():
     """Run administrative tasks."""
