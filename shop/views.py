@@ -1,9 +1,12 @@
 from datetime import timedelta, timezone
+from io import BytesIO
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
+from django.template.loader import render_to_string
+from django.http import HttpResponse
 from .models import PointsConfig
 from .forms import PointsConfigForm
 from .models import Order, OrderItem, CartItem
@@ -13,6 +16,7 @@ from django.core.paginator import Paginator
 from .ebay_service import ebay_service
 from django.utils.dateparse import parse_date
 from django.http import JsonResponse
+from xhtml2pdf import pisa
 import json
 
 
@@ -469,3 +473,34 @@ def add_to_wishlist_from_catalog(request):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def order_receipt_pdf(request, order_id: int):
+    """Generate a PDF receipt for the logged-in driver's order."""
+    order = get_object_or_404(Order, id=order_id, driver=request.user)
+    items = order.items.all()
+    subtotal_points = sum(i.points_each * i.quantity for i in items)
+
+    html = render_to_string(
+        "shop/order_receipt.html",
+        {
+            "order": order,
+            "items": items,
+            "subtotal_points": subtotal_points,
+            "user": request.user,
+            "base_url": request.build_absolute_uri("/"),
+        },
+    )
+
+    pdf_io = BytesIO()
+    # Let xhtml2pdf resolve relative URLs (images, css) via link_callback
+    result = pisa.CreatePDF(src=html, dest=pdf_io, encoding="UTF-8")
+
+    if result.err:
+        return HttpResponse(html)
+
+    pdf = pdf_io.getvalue()
+    filename = f"order_{order.id}_receipt.pdf"
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
