@@ -1,9 +1,12 @@
 from datetime import timedelta, timezone
+from io import BytesIO
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
+from django.template.loader import render_to_string
+from django.http import HttpResponse
 from .models import PointsConfig
 from .forms import PointsConfigForm
 from .models import Order, OrderItem, CartItem
@@ -13,7 +16,20 @@ from django.core.paginator import Paginator
 from .ebay_service import ebay_service
 from django.utils.dateparse import parse_date
 from django.http import JsonResponse
+from xhtml2pdf import pisa
 import json
+
+
+# A tiny, editable set of eBay category IDs (Browse API uses numeric IDs)
+EBAY_CATEGORY_CHOICES = [
+    ("", "All Categories"),
+    ("9355", "Cell Phones & Smartphones"),
+    ("9359", "Cases, Covers & Skins"),
+    ("15032", "Headphones"),
+    ("58058", "Home Audio"),
+    ("177", "Books"),
+    ("293", "Music"),
+]
 
 
 try:
@@ -284,55 +300,63 @@ def wishlist_list(request):
 def catalog_search(request):
     """
     Main catalog search page - shows search form and results
-    Available to all logged-in users (drivers can browse, sponsors can add to catalog)
     """
-    query = request.GET.get('q', '').strip()
-    page_num = request.GET.get('page', '1')
-    
+    query = request.GET.get("q", "").strip()
+    category_id = request.GET.get("cat", "").strip()  
+    page_num = request.GET.get("page", "1")
+
     try:
         page_num = int(page_num)
     except ValueError:
         page_num = 1
-    
+
     limit = 20
     offset = (page_num - 1) * limit
-    
+
     context = {
-        'query': query,
-        'page': page_num,
-        'results': None,
-        'error': None
+        "query": query,
+        "category_id": category_id,                 
+        "category_choices": EBAY_CATEGORY_CHOICES,  
+        "page": page_num,
+        "results": None,
+        "error": None,
     }
-    
+
     if query:
         try:
-            results = ebay_service.search_products(query, limit=limit, offset=offset)
-            
+            # pass category if selected
+            results = ebay_service.search_products(
+                query,
+                limit=limit,
+                offset=offset,
+                category_id=category_id or None, 
+            )
+
             products = [
                 ebay_service.format_product(item)
-                for item in results.get('itemSummaries', [])
+                for item in results.get("itemSummaries", [])
             ]
-            
-            context['results'] = {
-                'products': products,
-                'total': results.get('total', 0),
-                'has_next': results.get('next') is not None,
-                'has_prev': page_num > 1
-            }
-            
-        except Exception as e:
-            context['error'] = str(e)
 
-    return render(request, 'shop/catalog_search.html', context)
+            context["results"] = {
+                "products": products,
+                "total": results.get("total", 0),
+                "has_next": results.get("next") is not None,
+                "has_prev": page_num > 1,
+            }
+
+        except Exception as e:
+            context["error"] = str(e)
+
+    return render(request, "shop/catalog_search.html", context)
 
 
 @login_required
 def catalog_search_ajax(request):
     """
     AJAX endpoint for searching products
-    Returns JSON response for dynamic searching
     """
     query = request.GET.get('q', '').strip()
+    category_id= request.GET.get('cat', '').strip()
     limit = min(int(request.GET.get('limit', 20)), 50)
     offset = int(request.GET.get('offset', 0))
     
@@ -449,3 +473,34 @@ def add_to_wishlist_from_catalog(request):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def order_receipt_pdf(request, order_id: int):
+    """Generate a PDF receipt for the logged-in driver's order."""
+    order = get_object_or_404(Order, id=order_id, driver=request.user)
+    items = order.items.all()
+    subtotal_points = sum(i.points_each * i.quantity for i in items)
+
+    html = render_to_string(
+        "shop/order_receipt.html",
+        {
+            "order": order,
+            "items": items,
+            "subtotal_points": subtotal_points,
+            "user": request.user,
+            "base_url": request.build_absolute_uri("/"),
+        },
+    )
+
+    pdf_io = BytesIO()
+    # Let xhtml2pdf resolve relative URLs (images, css) via link_callback
+    result = pisa.CreatePDF(src=html, dest=pdf_io, encoding="UTF-8")
+
+    if result.err:
+        return HttpResponse(html)
+
+    pdf = pdf_io.getvalue()
+    filename = f"order_{order.id}_receipt.pdf"
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp

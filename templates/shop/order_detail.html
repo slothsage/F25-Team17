@@ -16,6 +16,12 @@
 {% endfor %}
 </ul>
 
+<p>
+  <a class="btn" href="{% url 'shop:order_receipt_pdf' order.id %}">
+    <i class="fas fa-file-pdf"></i> Download Receipt (PDF)
+  </a>
+</p>
+
 {% if order.status == "pending" or order.status == "processing" %}
   <form method="post" action="{% url 'shop:cancel_order' order.id %}" style="display:inline">
     {% csrf_token %}
