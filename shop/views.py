@@ -16,6 +16,18 @@ from django.http import JsonResponse
 import json
 
 
+# A tiny, editable set of eBay category IDs (Browse API uses numeric IDs)
+EBAY_CATEGORY_CHOICES = [
+    ("", "All Categories"),
+    ("9355", "Cell Phones & Smartphones"),
+    ("9359", "Cases, Covers & Skins"),
+    ("15032", "Headphones"),
+    ("58058", "Home Audio"),
+    ("177", "Books"),
+    ("293", "Music"),
+]
+
+
 try:
     from accounts.notifications import send_in_app_notification
 except Exception:
@@ -284,55 +296,63 @@ def wishlist_list(request):
 def catalog_search(request):
     """
     Main catalog search page - shows search form and results
-    Available to all logged-in users (drivers can browse, sponsors can add to catalog)
     """
-    query = request.GET.get('q', '').strip()
-    page_num = request.GET.get('page', '1')
-    
+    query = request.GET.get("q", "").strip()
+    category_id = request.GET.get("cat", "").strip()  
+    page_num = request.GET.get("page", "1")
+
     try:
         page_num = int(page_num)
     except ValueError:
         page_num = 1
-    
+
     limit = 20
     offset = (page_num - 1) * limit
-    
+
     context = {
-        'query': query,
-        'page': page_num,
-        'results': None,
-        'error': None
+        "query": query,
+        "category_id": category_id,                 
+        "category_choices": EBAY_CATEGORY_CHOICES,  
+        "page": page_num,
+        "results": None,
+        "error": None,
     }
-    
+
     if query:
         try:
-            results = ebay_service.search_products(query, limit=limit, offset=offset)
-            
+            # pass category if selected
+            results = ebay_service.search_products(
+                query,
+                limit=limit,
+                offset=offset,
+                category_id=category_id or None, 
+            )
+
             products = [
                 ebay_service.format_product(item)
-                for item in results.get('itemSummaries', [])
+                for item in results.get("itemSummaries", [])
             ]
-            
-            context['results'] = {
-                'products': products,
-                'total': results.get('total', 0),
-                'has_next': results.get('next') is not None,
-                'has_prev': page_num > 1
-            }
-            
-        except Exception as e:
-            context['error'] = str(e)
 
-    return render(request, 'shop/catalog_search.html', context)
+            context["results"] = {
+                "products": products,
+                "total": results.get("total", 0),
+                "has_next": results.get("next") is not None,
+                "has_prev": page_num > 1,
+            }
+
+        except Exception as e:
+            context["error"] = str(e)
+
+    return render(request, "shop/catalog_search.html", context)
 
 
 @login_required
 def catalog_search_ajax(request):
     """
     AJAX endpoint for searching products
-    Returns JSON response for dynamic searching
     """
     query = request.GET.get('q', '').strip()
+    category_id= request.GET.get('cat', '').strip()
     limit = min(int(request.GET.get('limit', 20)), 50)
     offset = int(request.GET.get('offset', 0))
     

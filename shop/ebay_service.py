@@ -1,5 +1,7 @@
+import token
 import requests
 import base64
+import logging
 from django.core.cache import cache
 from django.conf import settings
 import logging
@@ -73,34 +75,48 @@ class EbayService:
             raise Exception(f"Failed to authenticate with eBay: {str(e)}")
     
     def search_products(self, query, limit=20, offset=0, category_ids=None):
-        """Search for products on eBay"""
+        """Search for products on eBay."""
         token = self.get_access_token()
-        
         url = f"{self.base_url}/buy/browse/v1/item_summary/search"
-        
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json'
-        }
-        
-        params = {
-            'q': query,
-            'limit': min(limit, 200),  
-            'offset': offset
-        }
-        
+
+        # Build category_ids param 
+        cat_param = None
         if category_ids:
-            params['category_ids'] = category_ids
-        
+            if isinstance(category_ids, (list, tuple, set)):
+                cats = [
+                    str(c).strip()
+                    for c in category_ids
+                    if str(c).strip() and str(c).strip().lower() not in {"all", "0"}
+                ]
+                if cats:
+                    cat_param = ",".join(cats)
+            else:
+                c = str(category_ids).strip()
+                if c and c.lower() not in {"all", "0"}:
+                    cat_param = c
+
+        params = {
+            "q": query,
+            "limit": min(int(limit or 20), 200),
+            "offset": int(offset or 0),
+        }
+        if cat_param:
+            params["category_ids"] = cat_param
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+
         try:
-            response = requests.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            return response.json()
-            
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            resp.raise_for_status()
+            return resp.json()
         except requests.exceptions.RequestException as e:
-            logger.error(f'Error searching products: {e}')
-            raise Exception(f"Failed to search eBay products: {str(e)}")
+            logger.error("Error searching products: %s (params=%s)", e, params)
+            raise Exception(f"Failed to search eBay products: {e}")
     
+
     def get_product_details(self, item_id):
         """Get detailed information about a specific product"""
         token = self.get_access_token()
@@ -150,6 +166,5 @@ class EbayService:
             'is_available': ebay_item.get('availableQuantity', 0) > 0,
             'ebay_url': ebay_item.get('itemWebUrl', '')
         }
-
 
 ebay_service = EbayService()

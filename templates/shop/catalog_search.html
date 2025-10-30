@@ -21,26 +21,42 @@
         </div>
     </div>
 
-    <!-- Search Form -->
-    <div class="row mb-4">
-        <div class="col-md-8 offset-md-2">
-            <form method="GET" action="{% url 'shop:catalog_search' %}" class="search-form">
-                <div class="input-group input-group-lg">
-                    <input 
-                        type="text" 
-                        name="q" 
-                        class="form-control" 
-                        placeholder="Search for products (e.g., laptop, headphones, camera...)" 
-                        value="{{ query }}"
-                        required
-                    >
-                    <button class="btn btn-primary" type="submit">
-                        <i class="fas fa-search"></i> Search
-                    </button>
-                </div>
-            </form>
+ <!-- Search Form -->
+<div class="row mb-4">
+  <div class="col-md-10 offset-md-1">
+    <form method="GET" action="{% url 'shop:catalog_search' %}" class="search-form">
+      <div class="row g-2 align-items-stretch">
+        <!-- Search Box -->
+        <div class="col-lg-6">
+          <input 
+            type="text" 
+            name="q" 
+            class="form-control form-control-lg" 
+            placeholder="Search for products (e.g., laptop, headphones, camera...)" 
+            value="{{ query }}"
+            required
+          >
         </div>
-    </div>
+
+        <!-- Category Dropdown -->
+        <div class="col-lg-3">
+          <select name="cat" class="form-select form-select-lg" onchange="this.form.submit()">
+            {% for cid, label in category_choices %}
+              <option value="{{ cid }}" {% if category_id == cid %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="col-lg-3 d-grid">
+          <button class="btn btn-primary btn-lg" type="submit">
+            <i class="fas fa-search"></i> Search
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
 
     {% if error %}
     <!-- Error Message -->
@@ -146,36 +162,38 @@
         {% endfor %}
     </div>
 
-    <!-- Pagination -->
-    {% if results.has_prev or results.has_next %}
-    <div class="row mt-4">
-        <div class="col-12">
-            <nav aria-label="Product pagination">
-                <ul class="pagination justify-content-center">
-                    {% if results.has_prev %}
-                    <li class="page-item">
-                        <a class="page-link" href="?q={{ query }}&page={{ page|add:'-1' }}">
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </a>
-                    </li>
-                    {% endif %}
-                    
-                    <li class="page-item active">
-                        <span class="page-link">Page {{ page }}</span>
-                    </li>
-                    
-                    {% if results.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?q={{ query }}&page={{ page|add:'1' }}">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        </div>
-    </div>
-    {% endif %}
+<!-- Pagination -->
+{% if results.has_prev or results.has_next %}
+<div class="row mt-4">
+  <div class="col-12">
+    <nav aria-label="Product pagination">
+      <ul class="pagination justify-content-center">
+        {% if results.has_prev %}
+        <li class="page-item">
+          <a class="page-link" 
+             href="?q={{ query|urlencode }}&cat={{ category_id|urlencode }}&page={{ page|add:'-1' }}">
+            <i class="fas fa-chevron-left"></i> Previous
+          </a>
+        </li>
+        {% endif %}
+
+        <li class="page-item active">
+          <span class="page-link">Page {{ page }}</span>
+        </li>
+
+        {% if results.has_next %}
+        <li class="page-item">
+          <a class="page-link" 
+             href="?q={{ query|urlencode }}&cat={{ category_id|urlencode }}&page={{ page|add:'1' }}">
+            Next <i class="fas fa-chevron-right"></i>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+</div>
+{% endif %}
 
     {% elif query %}
     <!-- No results but query exists -->
