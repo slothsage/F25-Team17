@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>{{ title }}</h2>
+
+  <form method="get" class="row gy-2 gx-2 align-items-end mb-3">
+    <div class="col-md-3">
+      <label class="form-label">Category</label>
+      <select name="category" class="form-select">
+        <option value="login_attempts" {% if category == "login_attempts" %}selected{% endif %}>Login attempts</option>
+        <option value="point_changes" {% if category == "point_changes" %}selected{% endif %}>Point changes</option>
+        <option value="password_changes" {% if category == "password_changes" %}selected{% endif %}>Password changes</option>
+        <option value="driver_applications" {% if category == "driver_applications" %}selected{% endif %}>Driver applications</option>
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label">Start</label>
+      <input type="date" name="start" class="form-control" value="{{ start }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">End</label>
+      <input type="date" name="end" class="form-control" value="{{ end }}">
+    </div>
+
+    {% if is_admin %}
+    <div class="col-md-3">
+      <label class="form-label">Sponsor</label>
+      <select name="sponsor" class="form-select">
+        <option value="">All sponsors</option>
+        {% for s in sponsor_names %}
+          <option value="{{ s }}" {% if sponsor == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <div class="col-md-3">
+      <label class="form-label">Sponsor</label>
+      <input class="form-control" value="{{ sponsor }}" disabled>
+      <input type="hidden" name="sponsor" value="{{ sponsor }}">
+    </div>
+    {% endif %}
+
+    <div class="col-md-2 d-flex gap-2">
+      <button class="btn btn-primary w-100" type="submit">Run</button>
+      <a class="btn btn-outline-secondary"
+         href="?category={{ category }}&start={{ start }}&end={{ end }}&sponsor={{ sponsor }}&format=csv">
+        CSV
+      </a>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+      <thead>
+        <tr>
+          {% for col in columns %}<th>{{ col }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% if rows and rows|length %}
+          {% for r in rows %}
+            <tr>
+              {% for cell in r %}<td>{{ cell }}</td>{% endfor %}
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="{{ columns|length }}" class="text-muted">No results.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

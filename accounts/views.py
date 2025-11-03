@@ -1,3 +1,4 @@
+from multiprocessing import context
 from django.contrib import messages
 from django import forms
 from django.views.decorators.http import require_POST
@@ -70,10 +71,12 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 
 import csv
-from io import TextIOWrapper
+from io import StringIO, TextIOWrapper
 from django.contrib.auth.models import Group
 from django.views.decorators.http import require_POST
 from django.contrib.admin.views.decorators import staff_member_required
+
+from .models import LoginActivity, PointChangeLog, PasswordChangeLog, DriverApplicationLog
 
 User = get_user_model()
 
@@ -83,6 +86,197 @@ try:
 except Exception:
     Sponsor = None
     HAS_SPONSOR_MODEL = False
+
+def _field_exists(model, name: str) -> bool:
+    return any(f.name == name for f in model._meta.get_fields())
+
+def _parse_date_yyyy_mm_dd(s: str):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+@login_required
+def audit_report(request):
+    """
+    Reporting – Audit Log
+    Roles: Admin or Sponsor
+    Filters: sponsor (admin only can pick 'All' or one sponsor), date range, category
+    Categories: login_attempts, point_changes, password_changes, driver_applications
+    CSV export: add ?format=csv
+    Sponsor users ONLY see data for their own sponsor organization.
+    """
+    user = request.user
+    is_admin = user.is_staff
+
+    # --- Inputs ---
+    category = request.GET.get("category", "login_attempts").strip() or "login_attempts"
+    start_str = (request.GET.get("start") or "").strip()
+    end_str = (request.GET.get("end") or "").strip()
+    sponsor_param = (request.GET.get("sponsor") or "").strip()
+    want_csv = (request.GET.get("format") or "").lower() == "csv"
+
+    # --- Sponsor scoping & sponsor options list ---
+    # Distinct sponsor names from DriverProfile 
+    sponsor_names = (
+        DriverProfile.objects.exclude(sponsor_name="")
+        .values_list("sponsor_name", flat=True)
+        .distinct()
+        .order_by("sponsor_name")
+    )
+
+    if is_admin:
+        sponsor_scope = sponsor_param  # '' means all sponsors
+    else:
+        # Non-admin: fix scope to their own sponsor (or blank if not set)
+        sponsor_scope = getattr(getattr(user, "driver_profile", None), "sponsor_name", "") or ""
+        sponsor_param = sponsor_scope 
+
+    # --- Date range (defaults: last 30 days) ---
+    today = timezone.localdate()
+    start_date = _parse_date_yyyy_mm_dd(start_str) or (today - timedelta(days=30))
+    end_date = _parse_date_yyyy_mm_dd(end_str) or today
+
+    # normalize to datetimes for DB range filtering
+    start_dt = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min))
+    end_dt   = timezone.make_aware(datetime.datetime.combine(end_date,   datetime.time.max))
+
+    columns = []
+    rows = []
+
+    # Helper to selectively sponsor-filter a queryset by driver’s sponsor name
+    def filter_by_sponsor_via_driver(qs, driver_field="user"):
+        """Filter qs by related driver_field's driver_profile.sponsor_name == sponsor_scope."""
+        if not sponsor_scope:
+            return qs
+        return qs.filter(**{f"{driver_field}__driver_profile__sponsor_name": sponsor_scope})
+
+    # --- Build dataset per category ---
+    if category == "login_attempts":
+        qs = LoginActivity.objects.filter(created_at__range=(start_dt, end_dt))
+
+        if sponsor_scope:
+            # usernames for users that belong to that sponsor
+            sponsor_usernames = list(
+                DriverProfile.objects.filter(sponsor_name=sponsor_scope, user__isnull=False)
+                .values_list("user__username", flat=True)
+            )
+            # Either matched user belongs to sponsor OR attempted username in that set
+            qs = qs.filter(
+                Q(user__driver_profile__sponsor_name=sponsor_scope) |
+                Q(username__in=sponsor_usernames)
+            )
+
+        qs = qs.select_related("user").order_by("-created_at")
+
+        columns = ["Date", "Username", "Success", "IP"]
+        for rec in qs:
+            rows.append([
+                timezone.localtime(rec.created_at).strftime("%Y-%m-%d %H:%M"),
+                (rec.user.username if rec.user else rec.username) or "",
+                "OK" if rec.successful else "FAIL",
+                rec.ip_address or "",
+            ])
+
+    elif category == "point_changes":
+        qs = PointChangeLog.objects.filter(created_at__range=(start_dt, end_dt))
+
+        # Prefer direct sponsor_name filter if that field exists; otherwise via driver profile
+        if sponsor_scope:
+            if _field_exists(PointChangeLog, "sponsor_name"):
+                qs = qs.filter(sponsor_name=sponsor_scope)
+            else:
+                qs = filter_by_sponsor_via_driver(qs, driver_field="driver")
+
+        qs = qs.select_related("driver").order_by("-created_at")
+
+        columns = ["Date", "Sponsor", "Driver", "Points", "Reason"]
+        for rec in qs:
+            sponsor_name = getattr(rec, "sponsor_name", "") or getattr(
+                getattr(rec.driver, "driver_profile", None), "sponsor_name", ""
+            )
+            rows.append([
+                timezone.localtime(rec.created_at).strftime("%Y-%m-%d %H:%M"),
+                sponsor_name or "",
+                rec.driver.username if rec.driver_id else "",
+                rec.points_changed,
+                rec.reason or "",
+            ])
+
+    elif category == "password_changes":
+        qs = PasswordChangeLog.objects.filter(created_at__range=(start_dt, end_dt))
+        qs = filter_by_sponsor_via_driver(qs, driver_field="user")
+        qs = qs.select_related("user").order_by("-created_at")
+
+        columns = ["Date", "User", "Type"]
+        for rec in qs:
+            rows.append([
+                timezone.localtime(rec.created_at).strftime("%Y-%m-%d %H:%M"),
+                rec.user.username if rec.user_id else "",
+                rec.change_type,
+            ])
+
+    elif category == "driver_applications":
+        qs = DriverApplicationLog.objects.filter(created_at__range=(start_dt, end_dt))
+        # Prefer direct sponsor_name if present, else via driver profile
+        if sponsor_scope:
+            if _field_exists(DriverApplicationLog, "sponsor_name"):
+                qs = qs.filter(sponsor_name=sponsor_scope)
+            else:
+                qs = filter_by_sponsor_via_driver(qs, driver_field="driver")
+
+        qs = qs.select_related("driver").order_by("-created_at")
+
+        # Handle both schemas (with sponsor_name or without)
+        has_sponsor_name = _field_exists(DriverApplicationLog, "sponsor_name")
+        columns = ["Date", "Sponsor", "Driver", "Status", "Reason"]
+        for rec in qs:
+            sponsor_name = (
+                getattr(rec, "sponsor_name", None)
+                if has_sponsor_name
+                else getattr(getattr(rec.driver, "driver_profile", None), "sponsor_name", None)
+            ) or ""
+            rows.append([
+                timezone.localtime(rec.created_at).strftime("%Y-%m-%d %H:%M"),
+                sponsor_name,
+                rec.driver.username if rec.driver_id else "",
+                rec.status,
+                rec.reason or "",
+            ])
+
+    context = {
+        "title": "Audit Report",
+        "is_admin": is_admin,
+        "category": category,
+        "start": start_date.isoformat(),
+        "end": end_date.isoformat(),
+        "sponsor": sponsor_param,
+        "sponsor_names": sponsor_names,
+        "columns": columns,
+        "rows": rows,
+    }
+
+    # --- CSV export ---
+    if want_csv:
+        buf = StringIO()
+        writer = csv.writer(buf)
+
+        
+        writer.writerow(columns)
+
+        
+        for r in rows:
+            writer.writerow([str(c) if c is not None else "" for c in r])
+
+        
+        filename = f"audit_{category}_{start_date.isoformat()}_{end_date.isoformat()}.csv"
+        response = HttpResponse(buf.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    
+    return render(request, "accounts/audit_report.html", context)
+
 
 @login_required
 def profile(request):

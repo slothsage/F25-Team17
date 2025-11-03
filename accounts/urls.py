@@ -108,4 +108,6 @@ urlpatterns = [
     # Admin impersonation
     path("admin/users/<int:user_id>/view-as/", views.view_as_driver, name="view_as_driver"),
     path("admin/stop-impersonation/", views.stop_impersonation, name="stop_impersonation"),
+
+    path("audit/", views.audit_report, name="audit_report"),
 ]

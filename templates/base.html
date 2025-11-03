@@ -246,8 +246,13 @@
             <a class="nav-link" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
           </li>
           {% endif %}
+          {% if user|has_group:"sponsor" %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:audit_report' %}">Audit Logs</a>
+          </li>
+          {% endif %}
 
-          <!-- Admin Dropdown (staff only) -->
+           <!-- Admin Dropdown (staff only) -->
           {% if user.is_staff or user.is_superuser %}
           <li class="nav-item dropdown">
             <button class="nav-link dropdown-toggle" aria-expanded="false">Admin</button>
@@ -259,6 +264,7 @@
               <li><a class="dropdown-item" href="{% url 'accounts:message_compose' %}">Send Messages</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:admin_tickets' %}">Support Tickets</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:admin_complaints' %}">Complaints</a></li>
+              <li><a class="dropdown-item" href="{% url 'accounts:audit_report' %}">Audit Logs</a></li>
             </ul>
           </li>
           {% endif %}

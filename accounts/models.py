@@ -227,7 +227,50 @@ class LoginActivity(models.Model):
     def __str__(self):
         who = self.user.username if self.user else (self.username or "<unknown>")
         return f"LoginActivity<{who}> {'OK' if self.successful else 'FAIL'} @ {self.created_at:%Y-%m-%d %H:%M}"
+    
 
+class PointChangeLog(models.Model):
+    driver = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="point_logs"
+    )
+    sponsor_name = models.CharField(max_length=120, blank=True)   
+    sponsor_email = models.EmailField(blank=True)                 
+    points_changed = models.IntegerField()
+    reason = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.driver} {self.points_changed} pts @ {self.created_at:%Y-%m-%d}"
+
+# --- Password Change Audit ---
+class PasswordChangeLog(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="password_logs"
+    )
+    change_type = models.CharField(
+        max_length=20, choices=[("manual", "Manual"), ("reset", "Reset by Admin")]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Password change for {self.user} ({self.change_type})"
+    
+# --- Driver Application Audit ---
+class DriverApplicationLog(models.Model):
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    sponsor_name = models.CharField(max_length=120, blank=True)   
+    sponsor_email = models.EmailField(blank=True)                 
+    status = models.CharField(
+        choices=[("approved","Approved"),("rejected","Rejected")], max_length=20
+    )
+    reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.driver} {self.status} @ {self.created_at:%Y-%m-%d}"
 
 # --- Support Tickets ---
 class SupportTicket(models.Model):
