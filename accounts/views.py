@@ -86,6 +86,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.views import PasswordChangeView, PasswordResetConfirmView
 from django.contrib import messages
 from .services import notify_password_change
+from .forms import LabelForm, AssignLabelForm
+from .models import CustomLabel, DriverProfile
 
 User = get_user_model()
 
@@ -542,6 +544,7 @@ def admin_user_search(request):
     sponsor_q = request.GET.get("sponsor", "").strip()
     sort = request.GET.get("sort", "")
     inactive = request.GET.get("inactive", "")
+    label_filter = request.GET.get("label", "").strip()
     nav_type = request.GET.get("type")
     if nav_type == "driver" and q == "":
         q = request.GET.get("q", "").strip()
@@ -628,6 +631,11 @@ def admin_user_search(request):
     admin_users_matching_count = admin_users_qs.count()
     total_admin_users_count = User.objects.filter(is_staff=True).count()
     
+    if label_filter:
+        drivers_qs = drivers_qs.filter(driver_profile__labels__name=label_filter)
+
+    labels = CustomLabel.objects.all().order_by("name") 
+
     # simple pagination for drivers
     page_number = request.GET.get("page", 1)
     paginator = Paginator(drivers_qs, 25)
@@ -693,6 +701,8 @@ def admin_user_search(request):
         "accounts/admin_user_search.html",
         {
             "drivers": drivers_page,
+            "labels": labels,
+            "selected_label": label_filter,
             "sponsors": sponsors,
             "sponsor_users": sponsor_users_qs,
             "admin_users": admin_users_qs,
@@ -1825,6 +1835,38 @@ def download_error_log(request):
 
     # Default: send full log
     return FileResponse(open(log_path, "rb"), as_attachment=True, filename="error.log")
+
+
+@staff_member_required
+def manage_labels(request):
+    """Admin page to create and view labels."""
+    labels = CustomLabel.objects.all().order_by("name")
+    if request.method == "POST":
+        form = LabelForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Label saved successfully.")
+            return redirect("accounts:manage_labels")
+    else:
+        form = LabelForm()
+    return render(request, "accounts/manage_labels.html", {"form": form, "labels": labels})
+
+
+@staff_member_required
+def assign_labels(request):
+    """Admin page to assign labels to drivers."""
+    if request.method == "POST":
+        form = AssignLabelForm(request.POST)
+        if form.is_valid():
+            driver = form.cleaned_data["driver"]
+            labels = form.cleaned_data["labels"]
+            driver.labels.set(labels)
+            messages.success(request, f"Labels updated for {driver.user.username}.")
+            return redirect("accounts:assign_labels")
+    else:
+        form = AssignLabelForm()
+    return render(request, "accounts/assign_labels.html", {"form": form})
+
 
 #Multifactor Authentication (MFA) Views
 @login_required

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Manage Labels{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-3"> Manage User Labels</h2>
+  <p class="text-muted">
+    Create and manage labels that can be assigned to drivers for organization or quick filtering.
+  </p>
+
+  <!-- Django messages -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Add New Label</div>
+    <div class="card-body">
+      <form method="post" class="row gy-2 gx-3 align-items-center">
+        {% csrf_token %}
+        <div class="col-md-5">
+          {{ form.name.label_tag }} {{ form.name }}
+        </div>
+        <div class="col-md-3">
+          {{ form.color.label_tag }} {{ form.color }}
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add Label
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Existing Labels</div>
+    <div class="card-body">
+      {% if labels %}
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Color</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for label in labels %}
+              <tr>
+                <td>{{ label.name }}</td>
+                <td>
+                  <span class="badge" style="background-color: {{ label.color }};">
+                    {{ label.color }}
+                  </span>
+                </td>
+                <td>{{ label.created_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted mb-0">No labels have been created yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

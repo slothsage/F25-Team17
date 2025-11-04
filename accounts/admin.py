@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import DriverProfile
+from .models import DriverProfile, CustomLabel
 from .models import FailedLoginAttempt
 from .models import PasswordPolicy
 
@@ -56,12 +56,17 @@ class UserAdmin(DjangoUserAdmin):
 
 @admin.register(DriverProfile)
 class DriverProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "phone", "address")
+    list_display = ("user", "phone", "address", "is_locked")
     search_fields = ("user__username", "user__email", "phone", "address")
     readonly_fields = ("is_locked",)
-    list_filter = ("is_locked",)
-    ist_display = ("user", "phone", "address", "is_locked")
+    list_filter = ("is_locked", "is_suspended", "labels")
+    filter_horizontal = ("labels",)
 
+
+@admin.register(CustomLabel)
+class CustomLabelAdmin(admin.ModelAdmin):
+    list_display = ("name", "color", "created_at")
+    search_fields = ("name",)
 
 @admin.register(FailedLoginAttempt)
 class FailedLoginAttemptAdmin(admin.ModelAdmin):

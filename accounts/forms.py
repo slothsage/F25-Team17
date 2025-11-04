@@ -2,6 +2,7 @@ from django import forms
 from .models import DriverProfile
 from .models import Message
 from .models import DriverNotificationPreference
+from .models import CustomLabel
 from .models import SecurityQuestion, UserSecurityAnswer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
@@ -251,3 +252,29 @@ class NotificationPreferenceForm(forms.ModelForm):
         if thresh is not None and thresh < 0:
             self.add_error("low_balance_threshold", "Threshold must be 0 or higher.")
         return cleaned
+    
+
+class LabelForm(forms.ModelForm):
+    """Create or edit a label."""
+    class Meta:
+        model = CustomLabel
+        fields = ["name", "color"]
+        widgets = {
+            "color": forms.TextInput(attrs={"type": "color", "style": "width: 90px;"}),
+            "name": forms.TextInput(attrs={"placeholder": "Label name"}),
+        }
+
+
+class AssignLabelForm(forms.Form):
+    """Assign one or more labels to a driver."""
+    from .models import DriverProfile
+    driver = forms.ModelChoiceField(
+        queryset=DriverProfile.objects.select_related("user").order_by("user__username"),
+        label="Select driver",
+    )
+    labels = forms.ModelMultipleChoiceField(
+        queryset=CustomLabel.objects.all().order_by("name"),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Assign labels",
+    )

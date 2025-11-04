@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Assign Labels{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-3">🏷️ Assign Labels to Drivers</h2>
+  <p class="text-muted">
+    Select a driver and choose one or more labels to assign.
+  </p>
+
+  <!-- Django messages -->
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ form.driver.label }}</label>
+          {{ form.driver }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">{{ form.labels.label }}</label>
+          <div class="form-check-group border rounded p-3 bg-light">
+            {% for checkbox in form.labels %}
+              <div class="form-check">
+                {{ checkbox.tag }}
+                <label class="form-check-label">{{ checkbox.choice_label }}</label>
+              </div>
+            {% empty %}
+              <p class="text-muted">No labels available yet. 
+                <a href="{% url 'accounts:manage_labels' %}">Create one</a>.
+              </p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success">
+          <i class="bi bi-check-circle"></i> Save Labels
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -14,6 +14,24 @@ def avatar_upload_path_to(instance, filename):
     ext = ext if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"] else ".jpg"
     return f"avatars/user_{instance.user_id}{ext}"
 
+class CustomLabel(models.Model):
+    """Labels that admins can assign to users for organization or tracking"""
+    name = models.CharField(max_length=50, unique=True)
+    color = models.CharField(
+        max_length=7,
+        default="#007bff",
+        help_text="Hex color code for label display (e.g. #ff0000)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Custom Label"
+        verbose_name_plural = "Custom Labels"
+
+    def __str__(self):
+        return self.name
+
 class DriverProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="driver_profile")
     first_name = models.CharField(max_length=30, blank=True)
@@ -47,6 +65,14 @@ class DriverProfile(models.Model):
         default=False,
         help_text="If checked, this user is temporarily suspended and cannot access any part of the system (admin only)",
         editable=False
+    )
+
+    # Admin-assigned user tags / labels
+    labels = models.ManyToManyField(
+        "CustomLabel",
+        blank=True,
+        related_name="drivers",
+        help_text="Admin-assigned tags for categorizing users."
     )
     
     def __str__(self):
