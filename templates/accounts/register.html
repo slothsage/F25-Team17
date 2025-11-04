@@ -23,7 +23,7 @@
   {{ form.password2.errors }}
   <p>{{ form.password2.label_tag }} {{ form.password2 }}</p>
 
-  <button class="btn">Create account</button>
+  <button class="btn" type="submit">Create account</button>
 </form>
 <script src="{% static 'accounts/password_strength.js' %}"></script>
 {% endblock %}
