@@ -52,6 +52,8 @@
                       </a>
                     </div>
 
+                    
+
                   </header>
 
                   <!-- Search Cards -->
@@ -165,6 +167,17 @@
                               <th>Phone</th>
                               <th>Address</th>
                               <th>Labels</th>
+                              <th>
+                                {% with current_q=request.GET.q|default:"" current_label=request.GET.label|default:"" %}
+                                  {% if request.GET.sort == "sponsor_asc" %}
+                                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_desc" class="link-muted">Sponsor ▼</a>
+                                  {% elif request.GET.sort == "sponsor_desc" %}
+                                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="link-muted">Sponsor ▲</a>
+                                  {% else %}
+                                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="link-muted">Sponsor</a>
+                                  {% endif %}
+                                {% endwith %}
+                              </th>
                               <th>Last Login</th>
                               <th class="col-actions">Actions</th>
                             </tr>
@@ -185,6 +198,7 @@
                               <td class="wrap">{{ u.email }}</td>
                               <td class="wrap">{{ u.driver_profile.phone }}</td>
                               <td class="wrap">{{ u.driver_profile.address }}</td>
+                              <!-- Labels -->
                               <td>
                                 {% for label in u.driver_profile.labels.all %}
                                   <span class="badge" style="background-color: {{ label.color }}; color: #fff;">
@@ -194,6 +208,17 @@
                                   <span class="text-muted">—</span>
                                 {% endfor %}
                               </td>
+                              <!-- New Sponsor Column -->
+                              <td class="wrap">
+                                {% if u.driver_profile.sponsor_name %}
+                                  <span class="badge info">{{ u.driver_profile.sponsor_name }}</span><br>
+                                  <small class="subtle">{{ u.driver_profile.sponsor_email }}</small>
+                                {% else %}
+                                  <span class="muted">No Sponsor</span>
+                                {% endif %}
+                              </td>
+
+                              <!-- Last Login -->
                               <td class="nowrap">
                                 {% if u.last_login %}
                                   {{ u.last_login|date:"Y-m-d H:i" }}<br>
@@ -213,6 +238,11 @@
 
                                 <!-- Edit Profile -->
                                 <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' u.id %}">Edit Profile</a>
+
+                                <!-- Transfer Sponsor -->
+                                <a class="btn btn-outline-info" href="{% url 'accounts:transfer_driver_sponsor' u.id %}">
+                                  Transfer Sponsor
+                                </a>
 
                                 <!-- Active toggle -->
                                 <form method="post" action="{% url 'accounts:toggle_user_active' u.id %}" class="inline">

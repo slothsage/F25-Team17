@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-main">
+  <h1>Transfer Driver Sponsor</h1>
+  <p><strong>Driver:</strong> {{ driver.username }} ({{ driver.email }})</p>
+  <p><strong>Current Sponsor:</strong> {{ profile.sponsor_name|default:"None" }}</p>
+
+  <form method="post" class="stack gap-md">
+    {% csrf_token %}
+    <label for="sponsor_name">New Sponsor:</label>
+    <select name="sponsor_name" id="sponsor_name" class="input" required>
+      <option value="">-- Select Sponsor --</option>
+      {% for s in sponsor_users %}
+        <option value="{{ s.username }}" data-email="{{ s.email }}">{{ s.username }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="sponsor_email">Sponsor Email (auto-filled):</label>
+    <input type="email" name="sponsor_email" id="sponsor_email" class="input" placeholder="Select sponsor to auto-fill email">
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const select = document.getElementById("sponsor_name");
+      const emailInput = document.getElementById("sponsor_email");
+
+      select.addEventListener("change", function() {
+        const selectedOption = select.options[select.selectedIndex];
+        const sponsorEmail = selectedOption.getAttribute("data-email");
+        emailInput.value = sponsorEmail || "";
+      });
+    });
+    </script>
+
+    <div class="row-actions mt-md">
+      <button class="btn btn-primary" type="submit">Transfer</button>
+      <a href="{% url 'admin_user_search' %}" class="btn btn-muted">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

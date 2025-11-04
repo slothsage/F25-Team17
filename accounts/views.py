@@ -353,6 +353,68 @@ def admin_profile_edit(request, user_id):
         "is_admin_edit": True
     })
 
+@staff_member_required
+def transfer_driver_sponsor(request, user_id):
+    """Admin: Reassign a driver's sponsor to a valid sponsor user."""
+    driver_user = get_object_or_404(User, pk=user_id)
+    profile = getattr(driver_user, "driver_profile", None)
+
+    if not profile:
+        messages.error(request, "This user has no driver profile.")
+        return redirect("admin_user_search")
+
+    # Get actual sponsor users
+    sponsor_users = (
+        User.objects.filter(groups__name="sponsor")
+        .values("username", "email")
+        .order_by("username")
+    )
+
+    if request.method == "POST":
+        sponsor_id = request.POST.get("sponsor_name")
+        new_email = request.POST.get("sponsor_email", "").strip()
+
+        if not sponsor_id:
+            messages.error(request, "Sponsor selection is required.")
+        else:
+            try:
+                new_sponsor = User.objects.get(username=sponsor_id, groups__name="sponsor")
+            except User.DoesNotExist:
+                messages.error(request, "Selected sponsor is invalid.")
+                return redirect(request.path)
+
+            old_sponsor = profile.sponsor_name or "None"
+            profile.sponsor_name = new_sponsor.username
+            profile.sponsor_email = new_email or new_sponsor.email
+            profile.save()
+
+            # Update orders
+            Order.objects.filter(driver=driver_user).update(sponsor_name=new_sponsor.username)
+
+            # Notify driver
+            Notification.objects.create(
+                user=driver_user,
+                kind="system",
+                title="Sponsor Reassigned",
+                body=f"Your sponsor has been changed from {old_sponsor} to {new_sponsor.username}.",
+            )
+
+            messages.success(
+                request,
+                f"Driver {driver_user.username} reassigned from {old_sponsor} → {new_sponsor.username}.",
+            )
+            return redirect("admin_user_search")
+
+    return render(
+        request,
+        "accounts/transfer_driver_sponsor.html",
+        {
+            "driver": driver_user,
+            "profile": profile,
+            "sponsor_users": sponsor_users,
+        }
+    )
+
 @login_required
 def profile_preview(request):
     # Sponsor-visible projection 
@@ -581,6 +643,10 @@ def admin_user_search(request):
         drivers_qs = drivers_qs.order_by("-last_login")
     elif sort == "last_login_asc":
         drivers_qs = drivers_qs.order_by("last_login")
+    elif sort == "sponsor_asc":
+        drivers_qs = drivers_qs.order_by("driver_profile__sponsor_name")
+    elif sort == "sponsor_desc":
+        drivers_qs = drivers_qs.order_by("-driver_profile__sponsor_name")
 
     # counts: total drivers in system, and matching drivers for this query
     total_drivers_count = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor").count()
