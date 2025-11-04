@@ -13,6 +13,11 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("register/", views.register, name="register"),
 
+    # Multi-factor authentication (MFA)
+    path("mfa/setup/", views.mfa_setup, name="mfa_setup"),
+    path("mfa/", views.mfa_challenge_view, name="mfa_challenge"),
+    path("mfa/toggle/", views.mfa_toggle, name="mfa_toggle"),
+
     # Messaging
     path("messages/", views.messages_inbox, name="messages_inbox"),
     path("messages/sent/", views.messages_sent, name="messages_sent"),
@@ -87,7 +92,6 @@ urlpatterns = [
     path("notifications/settings/", views.notification_settings, name="notification_settings"),
     path("notifications/delete/<int:pk>/", views.notification_delete, name="notification_delete"),
     path("notifications/bulk-delete/", views.notifications_bulk_delete, name="notifications_bulk_delete"),
-    
     
     path("points/", views.points_history, name="points_history"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),

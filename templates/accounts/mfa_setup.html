@@ -1,0 +1,24 @@
+<h1>Multi-Factor Authentication Setup</h1>
+
+{% if already_enabled %}
+<p>MFA is already enabled on your account. You can rescan the QR code below
+    if you're adding a new device.</p>
+{% endif %}
+
+<p>Step 1: Open Google Authenticator / Authy / Microsoft Authenticator.</p>
+<p>Step 2: Choose "Scan a QR code".</p>
+
+<img src="data:image/png;base64,{{ qr_b64 }}" alt="Scan this QR code to set up MFA">
+
+<p>Step 3: Enter one of the 6-digit codes from the app to confirm.</p>
+
+{% for message in messages %}
+<p style="color:red;">{{ message }}</p>
+{% endfor %}
+
+<form method="post">
+    {% csrf_token %}
+    <label>Verification code:</label>
+    <input name="code" maxlength="6" required autocomplete="one-time-code">
+    <button type="submit">Enable MFA</button>
+</form>

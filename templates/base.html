@@ -191,10 +191,7 @@
       <div id="nav-links" class="nav-center">
         <ul class="nav-list">
         {% if user.is_authenticated %}
-          <!-- Browse Catalog (top-level) -->
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'shop:catalog_search' %}">Browse Catalog</a>
-          </li>
+          <!-- removed `Browse Catalog` solo option-->
 
           <!-- Shop Dropdown -->
           <li class="nav-item dropdown">

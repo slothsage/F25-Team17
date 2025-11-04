@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.core.validators import validate_email
 from django.core.validators import FileExtensionValidator # for validating uploaded file types
 import os
+import pyotp
 
 def avatar_upload_path_to(instance, filename):
     base, ext = os.path.splitext(filename.lower())
@@ -336,3 +337,32 @@ class DriverSettings(models.Model):
 
     def __str__(self):
         return f"{self.user.username} settings"
+    
+class UserMFA(models.Model):
+    user = models.OneToOneField(
+            settings.AUTH_USER_MODEL,
+            on_delete=models.CASCADE,
+            related_name="mfa",
+    )
+    mfa_enabled = models.BooleanField(default=False)
+    mfa_totp_secret = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        help_text="Base32 secret for authenticator apps like Google Authenticator (TOTP)."
+    )
+
+    def get_totp(self):
+        if not self.mfa_totp_secret:
+            return None
+        return pyotp.TOTP(self.mfa_totp_secret)
+    
+    @classmethod
+    def for_user(cls, user):
+        obj, _ = cls.objects.get_or_create(user=user)
+        return obj
+    
+    def __str__(self):
+        status = "ENABLED" if self.mfa_enabled else "DISABLED"
+        return f"UserMFA<{self.user.username}> {status}"
+    

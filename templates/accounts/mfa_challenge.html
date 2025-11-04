@@ -1,0 +1,14 @@
+<h1>Two-Step Verification</h1>
+
+<p>Enter the 6-digit code from your authenticator app to finish signing in.</p>
+
+{% for message in messages %}
+<p style="color:red;">{{ message }}</p>
+{% endfor %}
+
+<form method="post">
+    {% csrf_token %}
+    <label>Code:</label>
+    <input name="code" maxlength="6" required autocomplete="one-time-code">
+    <button type="submit">Verify &amp; Continue</button>
+</form>

@@ -27,7 +27,44 @@
 {% else %}
   <p>No driver profile found yet.</p>
 {% endif %}
-<hr>
 <a class="btn btn-sm btn-muted" href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
 <a class="btn btn-sm btn-muted" href="{% url 'accounts:profile_preview' %}">Preview as Sponsor</a>
+<hr>
+<h2>Multi-Factor Authentication</h2>
+
+<p>Status:
+  {% if request.user.mfa and request.user.mfa.mfa_enabled %}
+    <strong>Enabled</strong>
+  {% else %}
+    <strong>Disabled</strong>
+  {% endif %}
+</p>
+
+<form method="post" action="{% url 'accounts:mfa_toggle' %}" onsubmit="return confirmToggle();">
+  {% csrf_token %}
+  {% if request.user.mfa and request.user.mfa.mfa_enabled %}
+    <input type="hidden" name="action" value="disable">
+    <p>Enter a 6-digit code to disable:</p>
+  {% else %}
+    <input type="hidden" name="action" value="enable">
+    <p>Enter a 6-digit code to enable:</p>
+    <p class="text-sm">
+      First time? <a href="{% url 'accounts:mfa_setup' %}">Set up your authenticator app</a> to get a code.
+    </p>
+  {% endif %}
+
+  <input name="code" maxlength="6" required inputmode="numeric" pattern="[0-9]{6}"
+        placeholder="123456" autocomplete="one-time-code">
+  <button type="submit">
+    {% if request.user.mfa and request.user.mfa.mfa_enabled %}Disable MFA{% else %}Enable MFA{% endif %}
+  </button>
+</form>
+
+<script>
+function confirmToggle() {
+  // Optional extra safety
+  return confirm('Are you sure? This action requires a valid 6-digit code.');
+}
+</script>
+
 {% endblock content %}

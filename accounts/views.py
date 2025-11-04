@@ -24,7 +24,6 @@ from urllib.parse import quote
 from django.templatetags.static import static
 from django.utils.timezone import now
 from django.utils.timezone import localtime
-from django.shortcuts import redirect
 from urllib3 import request
 
 from .forms import RegistrationForm  
@@ -77,6 +76,13 @@ from django.views.decorators.http import require_POST
 from django.contrib.admin.views.decorators import staff_member_required
 
 from .models import LoginActivity, PointChangeLog, PasswordChangeLog, DriverApplicationLog
+
+import io
+import base64
+import pyotp
+import qrcode
+from django.contrib.auth import login as auth_login
+from django.views.decorators.csrf import csrf_protect
 
 User = get_user_model()
 
@@ -708,9 +714,23 @@ class FrontLoginView(LoginView):
         return self.request.META.get('REMOTE_ADDR')
 
     def form_valid(self, form):
-        # Let Django log them in first
-        response = super().form_valid(form)
+        # Let Django log them in first 
+        # Exception: If TOTP MFA is enabled, we intercept here to require TOTP verification
         # Then override the redirect to be role-aware
+        user = form.get_user()
+
+        #pull or create MFA record for this user
+        from .models import UserMFA
+        mfa_record = UserMFA.for_user(user)
+
+        #if MFA is enabled, redirect to TOTP verification page
+        if mfa_record.mfa_enabled and mfa_record.mfa_totp_secret:
+            self.request.session["pending_user_id"] = user.id
+            self.request.session.set_expiry(300)
+
+            return redirect("accounts:mfa_challenge")
+        
+        response = super().form_valid(form) #logs user in normally
         return HttpResponseRedirect(landing_url_for(self.request.user))
 
 
@@ -1639,3 +1659,149 @@ def download_error_log(request):
 
     # Default: send full log
     return FileResponse(open(log_path, "rb"), as_attachment=True, filename="error.log")
+
+#Multifactor Authentication (MFA) Views
+@login_required
+@csrf_protect
+def mfa_setup(request):
+    """ 
+    Set up MFA:
+    - generate & store a TOTP secret if missing
+    - render QR code for scanning
+    - confirm 6 digit code from authenticator app
+    """
+    from .models import UserMFA
+
+    mfa_record = UserMFA.for_user(request.user)
+
+    #ensuring secret exists
+    if not mfa_record.mfa_totp_secret:
+        mfa_record.mfa_totp_secret = pyotp.random_base32()
+        mfa_record.save()
+
+    totp = pyotp.TOTP(mfa_record.mfa_totp_secret)
+
+    #generate provisioning URI for QR code
+    provisioning_uri = totp.provisioning_uri(
+        name=request.user.username,
+        issuer_name="TruckIncentive"
+    )
+
+    #generate QR code from pro. URI and base64
+    qr_img = qrcode.make(provisioning_uri)
+    buf = io.BytesIO()
+    qr_img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    #POST a code, verify it & enable MFA
+    if request.method == "POST":
+        submitted_code = request.POST.get("code", "").strip()
+        if totp.verify(submitted_code):
+            mfa_record.mfa_enabled = True
+            mfa_record.save()
+            messages.success(request, "Multi-factor authentication is now enabled.")
+            return redirect("accounts:profile")
+        else:
+            messages.error(request, "That code was not valid. Try again.")
+
+    return render(
+        request,
+        "accounts/mfa_setup.html",
+        {
+            "qr_b64": qr_b64,
+            "already_enabled": mfa_record.mfa_enabled,
+        }
+    )
+
+@csrf_protect
+def mfa_challenge_view(request):
+    from .models import UserMFA  # local import
+
+    pending_user_id = request.session.get("pending_user_id")
+    if not pending_user_id:
+        messages.error(request, "Your login session expired. Please sign in again.")
+        return redirect("accounts:login")
+
+    # get the user we staged
+    try:
+        staged_user = User.objects.get(id=pending_user_id)
+    except User.DoesNotExist:
+        messages.error(request, "User not found. Please sign in again.")
+        return redirect("accounts:login")
+
+    # get or create their MFA record
+    mfa_record = UserMFA.for_user(staged_user)
+
+    # safety: if MFA isn't actually enabled anymore, just log them in and redirect
+    if not mfa_record.mfa_enabled or not mfa_record.mfa_totp_secret:
+        auth_login(request, staged_user, backend='django.contrib.auth.backends.ModelBackend')
+        request.session.pop("pending_user_id", None)
+        return redirect(landing_url_for(staged_user))  # uses your existing role logic
+
+    if request.method == "GET":
+        return render(request, "accounts/mfa_challenge.html")
+
+    # POST: verify code
+    submitted_code = request.POST.get("code", "").strip()
+    totp = pyotp.TOTP(mfa_record.mfa_totp_secret)
+
+    if totp.verify(submitted_code):
+        # success -> finalize login
+        auth_login(request, staged_user, backend='django.contrib.auth.backends.ModelBackend')
+        request.session.pop("pending_user_id", None)
+        return redirect(landing_url_for(staged_user))
+    else:
+        messages.error(request, "Invalid or expired code. Try again.")
+        return render(request, "accounts/mfa_challenge.html")
+    
+@login_required
+@require_POST
+@csrf_protect
+def mfa_toggle(request):
+    """Enable or disable MFA for the logged-in user."""
+    from .models import UserMFA
+    action = request.POST.get("action")  # "enable" or "disable"
+    code   = (request.POST.get("code") or "").strip()
+
+    mfa = UserMFA.for_user(request.user)
+
+    # Enabling: if no secret yet → must complete setup (QR scan) first
+    if action == "enable" and not mfa.mfa_totp_secret:
+        messages.info(request, "Please set up your authenticator app first.")
+        return redirect("accounts:mfa_setup")
+
+    # Must have a code to proceed
+    if not code or len(code) < 6:
+        messages.error(request, "Enter the 6-digit code from your authenticator app.")
+        return redirect("accounts:profile")
+    
+    # Verify code against the user's secret
+    totp = mfa.get_totp()
+    if not totp:
+        # Can't disable if not configured
+        messages.error(request, "MFA is not configured yet. Set it up first.")
+        return redirect("accounts:mfa_setup")
+
+    # Time Window for clock drift
+    if not totp.verify(code, valid_window=1):
+        messages.error(request, "Invalid or expired code. Try again.")
+        return redirect("accounts:profile")
+    
+    # Flips the switch
+    if action == "enable":
+        if mfa.mfa_enabled:
+            messages.info(request, "MFA is already enabled.")
+        else:
+            mfa.mfa_enabled = True
+            mfa.save(update_fields=["mfa_enabled"])
+            messages.success(request, "MFA has been enabled on your account.")
+    elif action == "disable":
+        if not mfa.mfa_enabled:
+            messages.info(request, "MFA is already disabled.")
+        else:
+            mfa.mfa_enabled = False
+            mfa.save(update_fields=["mfa_enabled"])
+            messages.success(request, "MFA has been disabled on your account.")
+    else:
+        messages.error(request, "Unknown action.")
+    return redirect("accounts:profile")
