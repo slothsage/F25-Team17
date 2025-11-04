@@ -3,11 +3,22 @@
 
 {% block content %}
 <h1>My Profile</h1>
-{% if request.user.driver_profile and request.user.driver_profile.image %}
+<div class="profile-picture-section">
+  {% if request.user.driver_profile and request.user.driver_profile.image %}
+    <p>
+      <img src="{{ request.user.driver_profile.image.url }}" alt="Profile photo" style="width:120px;height:120px;object-fit:cover;border-radius:60px;border:1px solid #ddd;">
+    </p>
+  {% else %}
+    <p>
+      <div style="width:120px;height:120px;background-color:#f0f0f0;border-radius:60px;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;">
+        <span style="color:#999;font-size:12px;">No photo</span>
+      </div>
+    </p>
+  {% endif %}
   <p>
-    <img src="{{ request.user.driver_profile.image.url }}" alt="Profile photo" style="width:120px;height:120px;object-fit:cover;border-radius:60px;border:1px solid #ddd;">
+    <a class="btn btn-sm btn-info" href="{% url 'accounts:profile_picture_edit' %}">Edit Profile Picture</a>
   </p>
-{% endif %}
+</div>
 <p><b>Username:</b> {{ request.user.username }}</p>
 <p><b>Email:</b> {{ request.user.email }}</p>
 

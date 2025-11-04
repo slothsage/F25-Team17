@@ -9,6 +9,7 @@ from django.contrib.auth.password_validation import password_validators_help_tex
 User = get_user_model()
 
 class ProfileForm(forms.ModelForm):
+    """Basic profile form without image field to avoid upload issues."""
     email = forms.EmailField(required=True, label="Email")
 
     class Meta:
@@ -22,7 +23,6 @@ class ProfileForm(forms.ModelForm):
             "state",
             "zip_code",
             "description",
-            "image",
         ]
         widgets = {
             "description": forms.Textarea(
@@ -43,13 +43,34 @@ class ProfileForm(forms.ModelForm):
             profile.user = self.user
             profile.save()
         return profile
-    
+
+
+class ProfilePictureForm(forms.ModelForm):
+    """Separate form for profile picture uploads."""
+    class Meta:
+        model = DriverProfile
+        fields = ["image"]
+        widgets = {
+            "image": forms.FileInput(attrs={
+                "accept": "image/*",
+                "class": "form-control"
+            })
+        }
+
     def clean_image(self):
         img = self.cleaned_data.get("image")
         if not img:
             return img
-        if img.size > 5 * 1024 * 1024:
+        
+        # Check file size
+        if img.size > 5 * 1024 * 1024:  # 5MB limit
             raise forms.ValidationError("File size is too large ( > 5MB ).")
+        
+        # Check file type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if hasattr(img, 'content_type') and img.content_type not in allowed_types:
+            raise forms.ValidationError("Please upload a valid image file (JPEG, PNG, GIF, or WebP).")
+        
         return img
 
 

@@ -99,7 +99,9 @@ urlpatterns = [
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience
     path("profile/edit/", views.profile_edit, name="profile_edit"),
+    path("profile/picture/", views.profile_picture_edit, name="profile_picture_edit"),
     path("admin/users/<int:user_id>/edit-profile/", views.admin_profile_edit, name="admin_profile_edit"),
+    path("admin/users/<int:user_id>/detail/", views.admin_detail, name="admin_detail"),
     path("account/delete/", views.delete_account, name="delete_account"),
     path("profile/preview/", views.profile_preview, name="profile_preview"),
 
@@ -130,6 +132,7 @@ urlpatterns = [
     
     # Admin impersonation
     path("admin/users/<int:user_id>/view-as/", views.view_as_driver, name="view_as_driver"),
+    path("admin/users/<int:user_id>/view-as-sponsor/", views.view_as_sponsor, name="view_as_sponsor"),
     path("admin/stop-impersonation/", views.stop_impersonation, name="stop_impersonation"),
 
     path("audit/", views.audit_report, name="audit_report"),
