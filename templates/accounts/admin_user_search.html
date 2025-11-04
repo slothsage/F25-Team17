@@ -23,6 +23,35 @@
                         Bulk Upload CSV
                       </a>
                     </div>
+
+                    <!-- Label Filter -->
+                    <div class="toolbar mt-3" style="display:flex; justify-content:flex-end; gap:10px;">
+                      <form method="get" class="d-flex align-items-center">
+                        <label for="label-filter" class="me-2 fw-semibold">Filter by Label:</label>
+                        <select id="label-filter" name="label" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+                          <option value="">-- All --</option>
+                          {% for label in labels %}
+                            <option value="{{ label.name }}" {% if label.name == selected_label %}selected{% endif %}>
+                              {{ label.name }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                        {% if selected_label %}
+                          <a href="?" class="btn btn-sm btn-link text-danger ms-2">Clear</a>
+                        {% endif %}
+                      </form>
+                    </div>
+
+                    <!-- Label Management -->
+                    <div class="toolbar mt-3" style="display: flex; justify-content: flex-end; gap: 10px;">
+                      <a href="{% url 'accounts:manage_labels' %}" class="btn btn-outline-primary">
+                          Manage Labels
+                      </a>
+                      <a href="{% url 'accounts:assign_labels' %}" class="btn btn-outline-success">
+                          Assign Labels
+                      </a>
+                    </div>
+
                   </header>
 
                   <!-- Search Cards -->
@@ -135,6 +164,7 @@
                               <th>Email</th>
                               <th>Phone</th>
                               <th>Address</th>
+                              <th>Labels</th>
                               <th>Last Login</th>
                               <th class="col-actions">Actions</th>
                             </tr>
@@ -155,6 +185,15 @@
                               <td class="wrap">{{ u.email }}</td>
                               <td class="wrap">{{ u.driver_profile.phone }}</td>
                               <td class="wrap">{{ u.driver_profile.address }}</td>
+                              <td>
+                                {% for label in u.driver_profile.labels.all %}
+                                  <span class="badge" style="background-color: {{ label.color }}; color: #fff;">
+                                    {{ label.name }}
+                                  </span>
+                                {% empty %}
+                                  <span class="text-muted">—</span>
+                                {% endfor %}
+                              </td>
                               <td class="nowrap">
                                 {% if u.last_login %}
                                   {{ u.last_login|date:"Y-m-d H:i" }}<br>
