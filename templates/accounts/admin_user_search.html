@@ -6,8 +6,8 @@
                 <div class="container-main">
                   <header class="toolbar">
                     <div class="toolbar-left">
-                      <h1 class="page-title">Admin: User &amp; Sponsor Search</h1>
-                      <p class="page-subtitle">Find drivers and sponsors, manage accounts, and export CSVs.</p>
+                      <h1 class="page-title">Admin: User, Sponsor &amp; Admin Search</h1>
+                      <p class="page-subtitle">Find drivers, sponsors, and admin users, manage accounts, and export CSVs.</p>
                     </div>
                     <div class="toolbar-right">
                       <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
@@ -68,6 +68,26 @@
                           </div>
                           <div class="row-actions">
                             <button class="btn btn-primary">Search Sponsors</button>
+                          </div>
+                        </form>
+                      </div>
+                    </article>
+
+                    <!-- ADMIN SEARCH -->
+                    <article class="card">
+                      <div class="card-header"><h2 class="card-title">Admin search</h2></div>
+                      <div class="card-body">
+                        <form method="get" class="stack gap-sm">
+                          <input
+                            name="admin"
+                            value="{{ admin_q }}"
+                            class="input"
+                            placeholder="admin username, email, first name, last name"
+                            autocomplete="off"
+                            aria-label="Search admin users"
+                          />
+                          <div class="row-actions">
+                            <button class="btn btn-primary">Search Admins</button>
                           </div>
                         </form>
                       </div>
@@ -312,6 +332,14 @@
                                 {% endif %}
                               </td>
                               <td class="actions">
+                                <!-- View As Sponsor (Impersonation) -->
+                                <form method="post" action="{% url 'accounts:view_as_sponsor' s.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as sponsor {{ s.username }}? You will be able to see exactly what they see.');">
+                                    🔍 View As Sponsor
+                                  </button>
+                                </form>
+
                                 <!-- Edit Profile -->
                                 <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' s.id %}">Edit Profile</a>
 
@@ -344,6 +372,70 @@
                                   {% csrf_token %}
                                   <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
                                 </form>
+                              </td>
+                            </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </section>
+                  {% endif %}
+
+                  {% if admin_users %}
+                  <section class="card mt-lg">
+                    <div class="card-header">
+                      <div class="card-title-row">
+                        <h2 class="card-title">Admin Users</h2>
+                        <div class="pill muted">Showing {{ admin_users_matching_count }} / {{ total_admin_users_count }}</div>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div class="table-wrap">
+                        <table class="table table-admin">
+                          <thead>
+                            <tr>
+                              <th>ID</th>
+                              <th>Username</th>
+                              <th>Email</th>
+                              <th>Name</th>
+                              <th>Last Login</th>
+                              <th>Status</th>
+                              <th class="col-actions">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {% for admin in admin_users %}
+                            <tr class="{% if not admin.is_active %}row-inactive{% endif %}">
+                              <td class="mono">{{ admin.id }}</td>
+                              <td class="wrap">{{ admin.username }}</td>
+                              <td class="wrap">{{ admin.email }}</td>
+                              <td class="wrap">{{ admin.get_full_name|default:"-" }}</td>
+                              <td class="nowrap">
+                                {% if admin.last_login %}
+                                  {{ admin.last_login|date:"Y-m-d H:i" }}<br>
+                                  <small class="subtle">{{ admin.last_login|timesince }} ago</small>
+                                {% else %}
+                                  <span class="badge danger">Never</span>
+                                {% endif %}
+                              </td>
+                              <td>
+                                {% if admin.is_superuser %}
+                                  <span class="badge success">Superuser</span>
+                                {% elif admin.is_staff %}
+                                  <span class="badge info">Staff</span>
+                                {% endif %}
+                                {% if admin.is_active %}
+                                  <span class="badge success">Active</span>
+                                {% else %}
+                                  <span class="badge danger">Inactive</span>
+                                {% endif %}
+                              </td>
+                              <td class="actions">
+                                <!-- View Details -->
+                                <a class="btn btn-info" href="{% url 'accounts:admin_detail' admin.id %}">
+                                  📋 View Details
+                                </a>
                               </td>
                             </tr>
                             {% endfor %}

@@ -36,7 +36,7 @@ from .models import FailedLoginAttempt
 from .forms import MessageComposeForm
 from .forms import NotificationPreferenceForm
 
-from .forms import ProfileForm, AdminProfileForm, DeleteAccountForm
+from .forms import ProfileForm, AdminProfileForm, DeleteAccountForm, ProfilePictureForm
 from .models import DriverNotificationPreference
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
@@ -293,7 +293,7 @@ def profile(request):
 def profile_edit(request):
     profile, _ = DriverProfile.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        form = ProfileForm(request.POST, request.FILES,instance=profile, user=request.user)
+        form = ProfileForm(request.POST, instance=profile, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, "Profile updated.")
@@ -301,6 +301,31 @@ def profile_edit(request):
     else:
         form = ProfileForm(instance=profile, user=request.user)
     return render(request, "accounts/profile_edit.html", {"form": form})
+
+
+@login_required
+def profile_picture_edit(request):
+    """Separate view for profile picture uploads."""
+    profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        # Handle picture removal
+        if request.POST.get('remove_picture'):
+            if profile.image:
+                profile.image.delete()
+                profile.image = None
+                profile.save()
+                messages.success(request, "Profile picture removed successfully!")
+                return redirect("accounts:profile")
+        else:
+            # Handle picture upload
+            form = ProfilePictureForm(request.POST, request.FILES, instance=profile)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Profile picture updated successfully!")
+                return redirect("accounts:profile")
+    else:
+        form = ProfilePictureForm(instance=profile)
+    return render(request, "accounts/profile_picture_edit.html", {"form": form, "profile": profile})
 
 @staff_member_required
 def admin_profile_edit(request, user_id):
@@ -562,6 +587,20 @@ def admin_user_search(request):
             Q(email__icontains=sponsor_q)
         )
     sponsor_users_qs = sponsor_users_qs.order_by("username")
+
+    # Admin users search (staff members)
+    admin_q = request.GET.get("admin", "").strip()
+    admin_users_qs = User.objects.filter(is_staff=True)
+    if admin_q:
+        admin_users_qs = admin_users_qs.filter(
+            Q(username__icontains=admin_q) |
+            Q(email__icontains=admin_q) |
+            Q(first_name__icontains=admin_q) |
+            Q(last_name__icontains=admin_q)
+        )
+    admin_users_qs = admin_users_qs.order_by("username")
+    admin_users_matching_count = admin_users_qs.count()
+    total_admin_users_count = User.objects.filter(is_staff=True).count()
     
     # simple pagination for drivers
     page_number = request.GET.get("page", 1)
@@ -630,15 +669,64 @@ def admin_user_search(request):
             "drivers": drivers_page,
             "sponsors": sponsors,
             "sponsor_users": sponsor_users_qs,
+            "admin_users": admin_users_qs,
             "q": q,
             "sponsor_q": sponsor_q,
+            "admin_q": admin_q,
             "total_drivers_count": total_drivers_count,
             "drivers_matching_count": drivers_matching_count,
             "total_sponsors_count": total_sponsors_count,
             "sponsors_matching_count": sponsors_matching_count,
+            "total_admin_users_count": total_admin_users_count,
+            "admin_users_matching_count": admin_users_matching_count,
             "failed_logins": failed_logins,  
         },
     )
+
+
+@staff_member_required
+def admin_detail(request, user_id):
+    """Display detailed information about an admin user."""
+    User = get_user_model()
+    admin_user = get_object_or_404(User, pk=user_id, is_staff=True)
+    
+    # Get login activity for this admin user
+    login_activities = LoginActivity.objects.filter(user=admin_user).order_by('-created_at')[:10]
+    
+    # Get notifications sent to this admin user
+    notifications = Notification.objects.filter(user=admin_user).order_by('-created_at')[:10]
+    
+    # Get messages for this admin user
+    try:
+        messages_received = MessageRecipient.objects.filter(user=admin_user).order_by('-message__created_at')[:10]
+    except:
+        messages_received = []
+    
+    # Get basic stats
+    total_logins = LoginActivity.objects.filter(user=admin_user).count()
+    recent_logins = LoginActivity.objects.filter(
+        user=admin_user,
+        created_at__gte=timezone.now() - timedelta(days=30)
+    ).count()
+    
+    # Get groups this admin belongs to
+    user_groups = admin_user.groups.all()
+    
+    # Check if admin has special permissions
+    is_superuser = admin_user.is_superuser
+    
+    context = {
+        "admin_user": admin_user,
+        "login_activities": login_activities,
+        "notifications": notifications,
+        "messages_received": messages_received,
+        "total_logins": total_logins,
+        "recent_logins": recent_logins,
+        "user_groups": user_groups,
+        "is_superuser": is_superuser,
+    }
+    
+    return render(request, "accounts/admin_detail.html", context)
 
 
 @login_required
@@ -1575,6 +1663,58 @@ def view_as_driver(request, user_id):
     
     messages.info(request, f"You are now viewing as {target_user.username}. Click 'Exit View As' to return to your admin account.")
     return redirect("accounts:profile")
+
+
+@staff_member_required
+def view_as_sponsor(request, user_id):
+    """
+    Admin impersonation feature - allows staff to view the site as a specific sponsor.
+    Stores the original admin user ID in session for troubleshooting and audit purposes.
+    """
+    User = get_user_model()
+    target_user = get_object_or_404(User, pk=user_id)
+    
+    # Prevent impersonating other staff members
+    if target_user.is_staff or target_user.is_superuser:
+        messages.error(request, "Cannot impersonate staff or admin users.")
+        return redirect("admin_user_search")
+    
+    # Verify the target user is actually a sponsor
+    if not target_user.groups.filter(name="sponsor").exists():
+        messages.error(request, "Cannot impersonate non-sponsor users with this function.")
+        return redirect("admin_user_search")
+    
+    # Save original admin info BEFORE switching users (session will be cleared on login)
+    original_admin_id = request.user.id
+    original_admin_username = request.user.username
+    impersonate_started = timezone.now().isoformat()
+    
+    # Log the impersonation action (for the admin user)
+    from .models import Notification
+    Notification.objects.create(
+        user=request.user,
+        kind="system",
+        title="Sponsor Impersonation Started",
+        body=f"You are now viewing as sponsor {target_user.username} ({target_user.get_full_name() or 'No name'})",
+        url=""
+    )
+    
+    # Switch to the target user
+    from django.contrib.auth import login
+    login(request, target_user, backend='django.contrib.auth.backends.ModelBackend')
+    
+    # NOW set the impersonation session data (after login creates new session)
+    request.session['impersonate_id'] = original_admin_id
+    request.session['impersonate_username'] = original_admin_username
+    request.session['impersonate_started'] = impersonate_started
+    
+    messages.info(request, f"You are now viewing as sponsor {target_user.username}. Click 'Exit View As' to return to your admin account.")
+    
+    # Redirect to sponsor driver search page (or profile if they don't have access)
+    try:
+        return redirect("accounts:sponsor_driver_search")
+    except:
+        return redirect("accounts:profile")
 
 
 @login_required

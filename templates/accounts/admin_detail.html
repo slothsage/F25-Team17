@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-main">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <h1 class="page-title">Admin User Details: {{ admin_user.username }}</h1>
+      <p class="page-subtitle">Detailed information about this admin user</p>
+    </div>
+    <div class="toolbar-right">
+      <a class="btn btn-muted" href="{% url 'admin_user_search' %}">← Back to Search</a>
+      <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' admin_user.id %}">Edit Profile</a>
+    </div>
+  </header>
+
+  <!-- Admin User Info -->
+  <section class="grid center-narrow">
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Basic Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="label">User ID</label>
+            <div class="form-display">{{ admin_user.id }}</div>
+          </div>
+          <div class="form-group">
+            <label class="label">Username</label>
+            <div class="form-display">{{ admin_user.username }}</div>
+          </div>
+          <div class="form-group">
+            <label class="label">Email</label>
+            <div class="form-display">{{ admin_user.email|default:"-" }}</div>
+          </div>
+          <div class="form-group">
+            <label class="label">Full Name</label>
+            <div class="form-display">{{ admin_user.get_full_name|default:"-" }}</div>
+          </div>
+          <div class="form-group">
+            <label class="label">Status</label>
+            <div class="form-display">
+              {% if admin_user.is_superuser %}
+                <span class="badge success">Superuser</span>
+              {% elif admin_user.is_staff %}
+                <span class="badge info">Staff</span>
+              {% endif %}
+              {% if admin_user.is_active %}
+                <span class="badge success">Active</span>
+              {% else %}
+                <span class="badge danger">Inactive</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="label">Date Joined</label>
+            <div class="form-display">{{ admin_user.date_joined|date:"Y-m-d H:i" }}</div>
+          </div>
+          <div class="form-group">
+            <label class="label">Last Login</label>
+            <div class="form-display">
+              {% if admin_user.last_login %}
+                {{ admin_user.last_login|date:"Y-m-d H:i" }} 
+                <small class="subtle">({{ admin_user.last_login|timesince }} ago)</small>
+              {% else %}
+                <span class="badge danger">Never</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Groups and Permissions -->
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Permissions</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="label">Permission Level</label>
+          <div class="form-display">
+            {% if is_superuser %}
+              <span class="badge danger">Full Access (Superuser)</span>
+              <small class="subtle">Has all permissions without explicitly assigning them</small>
+            {% else %}
+              <span class="badge warning">Staff Access</span>
+              <small class="subtle">Can access admin interface with assigned permissions</small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- Statistics -->
+  <section class="grid center-narrow mt-lg">
+    <article class="card">
+      <div class="card-header">
+        <h2 class="card-title">Activity Statistics</h2>
+      </div>
+      <div class="card-body">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value">{{ total_logins|intcomma }}</div>
+            <div class="stat-label">Total Logins</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ recent_logins|intcomma }}</div>
+            <div class="stat-label">Logins (30 days)</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ notifications|length }}</div>
+            <div class="stat-label">Recent Notifications</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">{{ messages_received|length }}</div>
+            <div class="stat-label">Recent Messages</div>
+          </div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <!-- Recent Login Activity -->
+  {% if login_activities %}
+  <section class="card mt-lg">
+    <div class="card-header">
+      <h2 class="card-title">Recent Login Activity</h2>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date & Time</th>
+              <th>IP Address</th>
+              <th>User Agent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for activity in login_activities %}
+            <tr>
+              <td class="nowrap">{{ activity.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td class="mono">{{ activity.ip_address|default:"-" }}</td>
+              <td class="wrap">{{ activity.user_agent|default:"-"|truncatechars:80 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Recent Notifications -->
+  {% if notifications %}
+  <section class="card mt-lg">
+    <div class="card-header">
+      <h2 class="card-title">Recent Notifications</h2>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Title</th>
+              <th>Body</th>
+              <th>Read</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for notification in notifications %}
+            <tr>
+              <td class="nowrap">{{ notification.created_at|date:"Y-m-d H:i" }}</td>
+              <td class="wrap">{{ notification.title }}</td>
+              <td class="wrap">{{ notification.body|truncatechars:100 }}</td>
+              <td>
+                {% if notification.read %}
+                  <span class="badge success">Read</span>
+                {% else %}
+                  <span class="badge warning">Unread</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Recent Messages -->
+  {% if messages_received %}
+  <section class="card mt-lg">
+    <div class="card-header">
+      <h2 class="card-title">Recent Messages</h2>
+    </div>
+    <div class="card-body">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>From</th>
+              <th>Subject</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for msg_recipient in messages_received %}
+            <tr>
+              <td class="nowrap">{{ msg_recipient.message.created_at|date:"Y-m-d H:i" }}</td>
+              <td class="wrap">{{ msg_recipient.message.sender.username }}</td>
+              <td class="wrap">{{ msg_recipient.message.subject|truncatechars:80 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+
+<style>
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 1rem;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--color-primary);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--color-text-subtle);
+  margin-top: 0.25rem;
+}
+
+.form-display {
+  padding: 0.5rem;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius);
+  min-height: 1.5rem;
+}
+
+.chip {
+  display: inline-block;
+  background: var(--color-primary);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  margin-right: 0.5rem;
+}
+</style>
+{% endblock content %}
