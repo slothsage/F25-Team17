@@ -7,6 +7,8 @@ from django.contrib import messages
 from django.db import transaction
 from django.template.loader import render_to_string
 from django.http import HttpResponse
+from django.db.models import Sum
+from accounts.models import PointsLedger
 from .models import PointsConfig
 from .forms import PointsConfigForm
 from .models import Order, OrderItem, CartItem
@@ -402,6 +404,9 @@ def add_to_cart_from_catalog(request):
         if not ebay_item_id or not product_name:
             return JsonResponse({'error': 'Missing required fields'}, status=400)
         
+        #current user pts balance
+        user_points = _current_points_balance(request.user)
+
         # Add directly to cart without checking eBay availability
         cart_item, created = CartItem.objects.get_or_create(
             driver=request.user,
@@ -420,6 +425,18 @@ def add_to_cart_from_catalog(request):
         # Calculate cart total
         total_points = sum(
             item.points_each * item.quantity 
+            for item in CartItem.objects.filter(driver=request.user)
+        )
+        
+        #Cost of items being added
+        incoming_cost = max(1, quantity) * max(0, points)
+        new_total = total_points + incoming_cost
+                
+        if new_total > user_points:
+            return JsonResponse({'error': 'Insufficient points.'}, status=400)
+        
+        total_points = sum(
+            item.points_each * item.quantity
             for item in CartItem.objects.filter(driver=request.user)
         )
         
@@ -504,3 +521,13 @@ def order_receipt_pdf(request, order_id: int):
     resp = HttpResponse(pdf, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+def _current_points_balance(user):
+    """
+    Returns the user's current pts balance
+    """
+    last = PointsLedger.objects.filter(user=user).order_by("-created_at").only("balance_after").first()
+    if last is not None:
+        return int(last.balance_after or 0)
+    total = PointsLedger.objects.filter(user=user).aggregate(s=Sum("delta"))["s"]
+    return int(total or 0)
