@@ -4,6 +4,7 @@ from django.conf.urls import static
 from django.conf import settings
 from . import views
 from .forms import PolicyPasswordChangeForm
+from .views import PasswordChangeNotifyView, PasswordResetConfirmNotifyView
 
 app_name = "accounts"
 
@@ -28,24 +29,42 @@ urlpatterns = [
     path("messages/sent/delete/<int:pk>/", views.message_sent_delete, name="messages_sent_delete"),
     
     # Password change (while logged in)
-    path("password/change/", auth_views.PasswordChangeView.as_view(
+    path(
+    "password/change/",
+    PasswordChangeNotifyView.as_view(
         form_class=PolicyPasswordChangeForm,
         template_name="registration/password_change_form.html",
         success_url=reverse_lazy("accounts:password_change_done"),
-    ), name="password_change"),
-    path("password/change/done/", auth_views.PasswordChangeDoneView.as_view(
-        template_name="registration/password_change_done.html"), name="password_change_done"),
+    ),
+    name="password_change",
+    ),
+    path(
+    "password/change/done/", 
+    auth_views.PasswordChangeDoneView.as_view(
+        template_name="registration/password_change_done.html"), 
+        name="password_change_done"
+    ),
 
     # Password reset (forgot password)
     path("password/reset/", auth_views.PasswordResetView.as_view(
         template_name="registration/password_reset_form.html",
+        email_template_name="registration/password_reset_email.txt", #use actual path
+        subject_template_name="registration/password_reset_subject.txt", #use actual path
         success_url=reverse_lazy("accounts:password_reset_done")), name="password_reset"),
     path("password/reset/done/", auth_views.PasswordResetDoneView.as_view(
-        template_name="registration/password_reset_done.html"), name="password_reset_done"),
-    path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
-        template_name="registration/password_reset_confirm.html"), name="password_reset_confirm"),
+        template_name="registration/password_reset_done.html"), 
+        name="password_reset_done"),
+    path(
+    "password/reset/confirm/<uidb64>/<token>/",
+    PasswordResetConfirmNotifyView.as_view(
+        template_name="registration/password_reset_confirm.html",
+        success_url=reverse_lazy("accounts:password_reset_complete"),
+    ),
+    name="password_reset_confirm",
+    ),
     path("reset/done/", auth_views.PasswordResetCompleteView.as_view(
-        template_name="registration/password_reset_complete.html"), name="password_reset_complete"),
+        template_name="registration/password_reset_complete.html"), 
+        name="password_reset_complete"),
 
     # Admin-only password policy page 
     path("policy/", views.edit_policy, name="edit_policy"),

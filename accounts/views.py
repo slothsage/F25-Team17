@@ -77,12 +77,13 @@ from django.contrib.admin.views.decorators import staff_member_required
 
 from .models import LoginActivity, PointChangeLog, PasswordChangeLog, DriverApplicationLog
 
-import io
-import base64
-import pyotp
-import qrcode
+import io, base64, pyotp, qrcode
 from django.contrib.auth import login as auth_login
 from django.views.decorators.csrf import csrf_protect
+
+from django.contrib.auth.views import PasswordChangeView, PasswordResetConfirmView
+from django.contrib import messages
+from .services import notify_password_change
 
 User = get_user_model()
 
@@ -1805,3 +1806,20 @@ def mfa_toggle(request):
     else:
         messages.error(request, "Unknown action.")
     return redirect("accounts:profile")
+
+class PasswordChangeNotifyView(PasswordChangeView):
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        notify_password_change(self.request.user)
+        messages.success(self.request, "Password updated. A security notification was sent to your email.")
+        return response
+    
+class PasswordResetConfirmNotifyView(PasswordResetConfirmView):
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        user = getattr(form, "get_user", None)
+        user = user() if callable(user) else getattr(form, "user", None)
+        if user:
+            notify_password_change(user)
+        messages.success(self.request, "Password reset successful. A security notification was sent to your email.")
+        return response

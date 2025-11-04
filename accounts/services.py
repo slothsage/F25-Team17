@@ -1,7 +1,12 @@
 from django.db import transaction
 from django.db.models import Sum
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils import timezone
 from .models import PointsLedger
 from .notifications import on_points_updated
+import logging
+log = logging.getLogger(__name__)
 
 @transaction.atomic
 def adjust_points(user, delta: int, reason: str = "") -> PointsLedger:
@@ -21,3 +26,27 @@ def adjust_points(user, delta: int, reason: str = "") -> PointsLedger:
     on_points_updated(user, delta, reason or "Adjustment", new_balance)
 
     return entry
+
+def notify_password_change(user):
+    """
+    Security notifcation of when a password changes
+    """
+    when = timezone.localtime(timezone.now()).strftime("%Y-%m-%d %H:%M:%S %Z")
+    subject = "Your password was reset"
+    body = (
+        f"Hello {user.get_username()},\n\n"
+        f"This is a security notification to alert you of a password change on {when}.\n"
+        f"If this was not you, please reset your password immediately and contact support.\n\n"
+        f"— {getattr(settings, 'PROJECT_NAME', 'Support Team')}"
+    )
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com")
+    recipient_list = [user.email] if user.email else []
+
+    if recipient_list:
+        try:
+            send_mail(subject, body, from_email, recipient_list, fail_silently=False)  # turn off silence while debugging
+            log.info("Password-change email sent to %s", recipient_list[0])
+        except Exception as e:
+            log.exception("Failed to send password-change email: %s", e)
+    else:
+        log.warning("No email on user %r; skipping password-change notification", user)
