@@ -5,6 +5,7 @@ from django.db.models import Sum
 from django.contrib.auth.models import User
 from django.core.validators import validate_email
 from django.core.validators import FileExtensionValidator # for validating uploaded file types
+from django.contrib.auth.hashers import make_password, check_password
 import os
 import pyotp
 
@@ -67,6 +68,42 @@ class PasswordPolicy(models.Model):
     class Meta:
         verbose_name = "Password policy"
         verbose_name_plural = "Password policies"
+
+# --- Security Questions --- 
+class SecurityQuestion(models.Model):
+    """Predefined set of security questions."""
+    code = models.CharField(max_length=32, unique=True)
+    text = models.CharField(max_length=255)
+
+    class Meta:
+        verbose_name = "Security Question"
+        verbose_name_plural = "Security Questions"
+
+    def __str__(self):
+        return self.text
+
+class UserSecurityAnswer(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="security_answers")
+    question = models.ForeignKey(SecurityQuestion, on_delete=models.CASCADE)
+    # store hashed answer (never plaintext)
+    answer_hash = models.CharField(max_length=255)
+    updated_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ("user", "question")
+
+    def set_answer(self, raw_answer: str):
+        # normalize for case/whitespace; you can tune this policy
+        normalized = " ".join((raw_answer or "").strip().lower().split())
+        self.answer_hash = make_password(normalized)
+        self.updated_at = timezone.now()
+
+    def check_answer(self, raw_answer: str) -> bool:
+        normalized = " ".join((raw_answer or "").strip().lower().split())
+        return check_password(normalized, self.answer_hash)
+
+    def __str__(self):
+        return f"{self.user} - {self.question.code}"
 
 # --- Alert Preferences --- 
 class DriverNotificationPreference(models.Model):

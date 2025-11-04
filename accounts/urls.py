@@ -28,6 +28,9 @@ urlpatterns = [
     path("messages/bulk-delete/", views.messages_bulk_delete, name="messages_bulk_delete"),
     path("messages/sent/delete/<int:pk>/", views.message_sent_delete, name="messages_sent_delete"),
     
+    # Security Measures
+    path("security-questions/", views.security_questions_configure, name="security_questions_configure"),
+
     # Password change (while logged in)
     path(
     "password/change/",

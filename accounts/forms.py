@@ -2,6 +2,7 @@ from django import forms
 from .models import DriverProfile
 from .models import Message
 from .models import DriverNotificationPreference
+from .models import SecurityQuestion, UserSecurityAnswer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import password_validators_help_text_html
@@ -174,6 +175,31 @@ class RegistrationForm(UserCreationForm):
         # Surface rules coming from AUTH_PASSWORD_VALIDATORS (incl. your custom one)
         self.fields["password1"].help_text = password_validators_help_text_html()
 
+class SecurityQuestionsForm(forms.Form):
+    """Three sec. questiosns & collecting answers"""
+    q_pet = forms.CharField(
+        label="What was the name of your childhood pet?", 
+        max_length=255, 
+        widget=forms.PasswordInput(render_value=True))
+    q_color = forms.CharField(label="What is your favorite color?", 
+        max_length=255, 
+        widget=forms.PasswordInput(render_value=True))
+    q_school = forms.CharField(label="Where did you attend high school?", 
+        max_length=255, 
+        widget=forms.PasswordInput(render_value=True))
+    
+    def save(self, user):
+        mapping = {
+            "q_pet": "pet_name",
+            "q_color": "favorite_color",
+            "q_school": "high_school",
+        }
+        for field, code in mapping.items():
+            question = SecurityQuestion.objects.get(code=code)
+            ans, _ = UserSecurityAnswer.objects.get_or_create(user=user, question=question)
+            ans.set_answer(self.cleaned_data[field])
+            ans.save()
+        return True
 
 class PolicyPasswordChangeForm(PasswordChangeForm):
     def __init__(self, *args, **kwargs):

@@ -33,8 +33,10 @@ from .models import Notification
 from .models import PointsLedger
 from .models import Message, MessageRecipient
 from .models import FailedLoginAttempt
+from .models import SecurityQuestion, UserSecurityAnswer
 from .forms import MessageComposeForm
 from .forms import NotificationPreferenceForm
+from .forms import SecurityQuestionsForm
 
 from .forms import ProfileForm, AdminProfileForm, DeleteAccountForm, ProfilePictureForm
 from .models import DriverNotificationPreference
@@ -478,6 +480,29 @@ class AdminSetTimeoutForm(forms.Form):
     # allow blank to unset and use default
     session_timeout_seconds = forms.IntegerField(label="Session timeout (seconds)", required=False, min_value=30, help_text="Blank = use system default")
 
+@login_required
+def security_questions_configure(request):
+    """Signed-in users can configure set/update the 3 questions"""
+    initial = {}
+    if request.method == "GET":
+        mapping = {
+            "q_pet": "pet_name",
+            "q_color": "favorite_color",
+            "q_school": "high_school",
+        }
+        for field, code in mapping.items():
+            if UserSecurityAnswer.objects.filter(user=request.user, question__code=code).exists():
+                initial[field] = "*****"
+        form = SecurityQuestionsForm(initial=initial)
+        return render(request, "accounts/security_questions.html", {"form": form})
+
+    #POST
+    form = SecurityQuestionsForm(request.POST)
+    if form.is_valid():
+        form.save(request.user)
+        messages.success(request, "Your security questions were updated.")
+        return redirect("accounts:security_questions_configure")
+    return render(request, "accounts/security_questions.html", {"form": form})
 
 @staff_member_required
 def admin_set_timeout(request, user_id):

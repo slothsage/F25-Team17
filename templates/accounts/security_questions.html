@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+    <h1>Security Questions</h1>
+
+    {% if messages %}
+    {% for m in messages %}
+        <div class="alert {{ m.tags }}">{{ m }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="field">{{ form.q_pet.label_tag }} {{ form.q_pet }}</div>
+        <div class="field">{{ form.q_color.label_tag }} {{ form.q_color }}</div>
+        <div class="field">{{ form.q_school.label_tag }} {{ form.q_school }}</div>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+    
+{% endblock %}

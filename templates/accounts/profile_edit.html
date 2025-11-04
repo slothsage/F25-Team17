@@ -27,8 +27,17 @@
     {% endif %}
   {% endfor %}
 
+
+
+
   {# Single image uploader + current/placeholder preview (only for non-admin edits) #}
   {% if not is_admin_edit %}
+  <div style="margin-bottom:.5rem">
+    <a href="{% url 'accounts:security_questions_configure' %}" class="btn btn-secondary">
+      Edit Security Questions
+    </a>
+  </div>
+
   <p>
     <label for="{{ form.image.id_for_label }}">Profile photo</label><br>
     {{ form.image }}
