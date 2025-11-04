@@ -329,7 +329,7 @@ def catalog_search(request):
                 query,
                 limit=limit,
                 offset=offset,
-                category_id=category_id or None, 
+                category_ids=category_id or None, 
             )
 
             products = [
@@ -364,7 +364,7 @@ def catalog_search_ajax(request):
         return JsonResponse({'error': 'Search query required'}, status=400)
     
     try:
-        results = ebay_service.search_products(query, limit=limit, offset=offset)
+        results = ebay_service.search_products(query, limit=limit, offset=offset, category_ids=category_id or None)
         
         products = [
             ebay_service.format_product(item)
