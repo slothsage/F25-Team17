@@ -94,6 +94,8 @@ urlpatterns = [
     path("admin/user/<int:user_id>/toggle-lock/", views.toggle_lock_user, name="toggle_lock_user"),
     # Suspend
     path("admin/user/<int:user_id>/toggle-suspend/", views.toggle_suspend_user, name="toggle_suspend_user"),
+    # Transfer user sponors
+    path("admin/users/<int:user_id>/transfer-sponsor/", views.transfer_driver_sponsor, name="transfer_driver_sponsor"),
     # Error logs
     path("admin/download-error-log/", views.download_error_log, name="download_error_log"),
     # Bulk user upload
