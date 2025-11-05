@@ -96,3 +96,25 @@ class WishListItem(models.Model):
 
     def line_points(self):
         return self.points_each * max(1, self.quantity)
+    
+
+class Favorite(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites"
+    )
+
+    # external/catalog fields 
+    product_id = models.CharField(max_length=130)         
+    name_snapshot = models.CharField(max_length=255)
+    points_each = models.IntegerField(default=0)
+    product_url = models.URLField(blank=True)
+    thumb_url = models.URLField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = (("user", "product_id"),)  # prevent dupes per user
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} ❤️ {self.name_snapshot or self.product_id}"

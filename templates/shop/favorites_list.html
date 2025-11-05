@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>My Favorites</h2>
+
+  {% if favorites %}
+    <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem;">
+      {% for f in favorites %}
+        <div class="card" style="border:1px solid #e5e7eb;border-radius:.5rem;padding:1rem;">
+          <div style="display:flex;gap:.75rem;">
+            {% if f.thumb_url %}
+              <img src="{{ f.thumb_url }}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:.375rem;">
+            {% endif %}
+            <div>
+              <div style="font-weight:600">{{ f.name_snapshot }}</div>
+              <div class="muted" style="font-size:.9rem;color:#6b7280;">
+                {{ f.points_each }} pts • {{ f.product_id }}
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:.5rem; margin-top:.75rem;">
+            {% if f.product_url %}
+              <a class="btn" href="{{ f.product_url }}" target="_blank" rel="noopener">View</a>
+            {% endif %}
+            <form method="post" action="{% url 'shop:remove_favorite' f.product_id %}" style="margin-left:auto;">
+              {% csrf_token %}
+              <button class="btn" type="submit">Remove</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-muted">You haven’t added any favorites yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

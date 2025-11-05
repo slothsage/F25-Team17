@@ -138,6 +138,30 @@
                             >
                                 <i class="fas fa-heart"></i> Wishlist
                             </button>
+                            <form method="post"
+                                action="{% if product.ebay_item_id in user_favorites %}{% url 'shop:remove_favorite' product.ebay_item_id %}{% else %}{% url 'shop:add_favorite' %}{% endif %}"
+                                class="mt-2 w-100">
+                                {% csrf_token %}
+
+                                <!-- Only include hidden fields when adding a favorite -->
+                                {% if product.ebay_item_id not in user_favorites %}
+                                    <input type="hidden" name="product_id"  value="{{ product.ebay_item_id }}">
+                                    <input type="hidden" name="name"        value="{{ product.name }}">
+                                    <input type="hidden" name="points_each" value="{{ product.price_points }}">
+                                    <input type="hidden" name="product_url" value="{{ product.view_url|default:'' }}">
+                                    <input type="hidden" name="thumb_url"   value="{{ product.image_url|default:'' }}">
+                                {% endif %}
+
+                                {% if product.ebay_item_id in user_favorites %}
+                                    <button class="btn btn-sm btn-warning w-100" type="submit" title="Unfavorite">
+                                        <i class="fas fa-star"></i> Unfavorite
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-warning w-100" type="submit" title="Add to favorites">
+                                        <i class="far fa-star"></i> Favorite
+                                    </button>
+                                {% endif %}
+                            </form>
                         </div>
                     </div>
                 </div>

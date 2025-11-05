@@ -6,17 +6,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
 from django.template.loader import render_to_string
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest 
 from django.db.models import Sum
 from accounts.models import PointsLedger
 from .models import PointsConfig
 from .forms import PointsConfigForm
-from .models import Order, OrderItem, CartItem
+from .models import Order, OrderItem, CartItem, Favorite
 from django.urls import reverse
 from .models import Wishlist, WishListItem
 from django.core.paginator import Paginator
 from .ebay_service import ebay_service
 from django.utils.dateparse import parse_date
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from xhtml2pdf import pisa
 import json
@@ -315,6 +316,10 @@ def catalog_search(request):
     limit = 20
     offset = (page_num - 1) * limit
 
+    user_favorites = set(
+        Favorite.objects.filter(user=request.user).values_list("product_id", flat=True)
+    )
+
     context = {
         "query": query,
         "category_id": category_id,                 
@@ -322,6 +327,7 @@ def catalog_search(request):
         "page": page_num,
         "results": None,
         "error": None,
+        "user_favorites": user_favorites
     }
 
     if query:
@@ -531,3 +537,71 @@ def _current_points_balance(user):
         return int(last.balance_after or 0)
     total = PointsLedger.objects.filter(user=user).aggregate(s=Sum("delta"))["s"]
     return int(total or 0)
+
+@login_required
+def favorites_list(request):
+    """List current user's favorites."""
+    favorites = Favorite.objects.filter(user=request.user).order_by("-created_at")
+    return render(request, "shop/favorites_list.html", {"favorites": favorites})
+
+
+@login_required
+def add_favorite(request):
+    """
+    Toggle: If product already in favorites → remove it.
+    Else → add it as a new favorite (Option A schema).
+    """
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST required")
+
+    product_id  = (request.POST.get("product_id") or "").strip()
+    name        = (request.POST.get("name") or "").strip()
+    product_url = (request.POST.get("product_url") or "").strip()
+    thumb_url   = (request.POST.get("thumb_url") or "").strip()
+    points_each = request.POST.get("points_each")
+
+    if not product_id:
+        messages.error(request, "Missing product ID.")
+        return redirect("shop:favorites_list")
+
+    # Try to remove/untoggle if it exists already (favorite → unfavorite)
+    existing = Favorite.objects.filter(user=request.user, product_id=product_id).first()
+    if existing:
+        existing.delete()
+        messages.info(request, "Removed from favorites.")
+    else:
+        try:
+            points_each = int(points_each or 0)
+        except ValueError:
+            points_each = 0
+
+        Favorite.objects.create(
+            user=request.user,
+            product_id=product_id,
+            name_snapshot=name,
+            product_url=product_url,
+            thumb_url=thumb_url,
+            points_each=points_each,
+        )
+        messages.success(request, "Added to favorites.")
+
+    # Redirect back to where the user came from
+    ref = request.META.get("HTTP_REFERER", "")
+    if ref and url_has_allowed_host_and_scheme(ref, allowed_hosts={request.get_host()}):
+        return redirect(ref)
+    return redirect("shop:favorites_list")
+
+
+@login_required
+def remove_favorite(request, product_id: str):
+    """(Still okay to keep this) Explicit removal of favorite if needed."""
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST required")
+
+    Favorite.objects.filter(user=request.user, product_id=product_id).delete()
+    messages.info(request, "Removed from favorites.")
+
+    ref = request.META.get("HTTP_REFERER", "")
+    if ref and url_has_allowed_host_and_scheme(ref, allowed_hosts={request.get_host()}):
+        return redirect(ref)
+    return redirect("shop:favorites_list")
