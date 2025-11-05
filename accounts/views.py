@@ -112,7 +112,7 @@ def audit_report(request):
     """
     Reporting – Audit Log
     Roles: Admin or Sponsor
-    Filters: sponsor (admin only can pick 'All' or one sponsor), date range, category
+    Filters: sponsor (admin only can pick 'All' or one sponsor), date range, category, user_id
     Categories: login_attempts, point_changes, password_changes, driver_applications
     CSV export: add ?format=csv
     Sponsor users ONLY see data for their own sponsor organization.
@@ -121,14 +121,22 @@ def audit_report(request):
     is_admin = user.is_staff
 
     # --- Inputs ---
-    category = request.GET.get("category", "login_attempts").strip() or "login_attempts"
+    category = (request.GET.get("category", "login_attempts") or "").strip() or "login_attempts"
     start_str = (request.GET.get("start") or "").strip()
     end_str = (request.GET.get("end") or "").strip()
     sponsor_param = (request.GET.get("sponsor") or "").strip()
+    user_id_str = (request.GET.get("user_id") or "").strip()
     want_csv = (request.GET.get("format") or "").lower() == "csv"
 
+    # Parse user_id (empty/invalid -> None)
+    user_id = None
+    if user_id_str.isdigit():
+        try:
+            user_id = int(user_id_str)
+        except ValueError:
+            user_id = None
+
     # --- Sponsor scoping & sponsor options list ---
-    # Distinct sponsor names from DriverProfile 
     sponsor_names = (
         DriverProfile.objects.exclude(sponsor_name="")
         .values_list("sponsor_name", flat=True)
@@ -139,9 +147,8 @@ def audit_report(request):
     if is_admin:
         sponsor_scope = sponsor_param  # '' means all sponsors
     else:
-        # Non-admin: fix scope to their own sponsor (or blank if not set)
         sponsor_scope = getattr(getattr(user, "driver_profile", None), "sponsor_name", "") or ""
-        sponsor_param = sponsor_scope 
+        sponsor_param = sponsor_scope
 
     # --- Date range (defaults: last 30 days) ---
     today = timezone.localdate()
@@ -152,12 +159,10 @@ def audit_report(request):
     start_dt = timezone.make_aware(datetime.datetime.combine(start_date, datetime.time.min))
     end_dt   = timezone.make_aware(datetime.datetime.combine(end_date,   datetime.time.max))
 
-    columns = []
-    rows = []
+    columns, rows = [], []
 
     # Helper to selectively sponsor-filter a queryset by driver’s sponsor name
     def filter_by_sponsor_via_driver(qs, driver_field="user"):
-        """Filter qs by related driver_field's driver_profile.sponsor_name == sponsor_scope."""
         if not sponsor_scope:
             return qs
         return qs.filter(**{f"{driver_field}__driver_profile__sponsor_name": sponsor_scope})
@@ -166,20 +171,26 @@ def audit_report(request):
     if category == "login_attempts":
         qs = LoginActivity.objects.filter(created_at__range=(start_dt, end_dt))
 
+        # Sponsor scoping
         if sponsor_scope:
-            # usernames for users that belong to that sponsor
             sponsor_usernames = list(
                 DriverProfile.objects.filter(sponsor_name=sponsor_scope, user__isnull=False)
                 .values_list("user__username", flat=True)
             )
-            # Either matched user belongs to sponsor OR attempted username in that set
             qs = qs.filter(
                 Q(user__driver_profile__sponsor_name=sponsor_scope) |
                 Q(username__in=sponsor_usernames)
             )
 
-        qs = qs.select_related("user").order_by("-created_at")
+        # User ID filter: match either the resolved user FK or the attempted username
+        if user_id:
+            try:
+                target_user = User.objects.get(id=user_id)
+                qs = qs.filter(Q(user_id=user_id) | Q(username=target_user.username))
+            except User.DoesNotExist:
+                qs = qs.none()
 
+        qs = qs.select_related("user").order_by("-created_at")
         columns = ["Date", "Username", "Success", "IP"]
         for rec in qs:
             rows.append([
@@ -192,15 +203,18 @@ def audit_report(request):
     elif category == "point_changes":
         qs = PointChangeLog.objects.filter(created_at__range=(start_dt, end_dt))
 
-        # Prefer direct sponsor_name filter if that field exists; otherwise via driver profile
+        # Sponsor scoping
         if sponsor_scope:
             if _field_exists(PointChangeLog, "sponsor_name"):
                 qs = qs.filter(sponsor_name=sponsor_scope)
             else:
                 qs = filter_by_sponsor_via_driver(qs, driver_field="driver")
 
-        qs = qs.select_related("driver").order_by("-created_at")
+        # User ID filter (driver)
+        if user_id:
+            qs = qs.filter(driver_id=user_id)
 
+        qs = qs.select_related("driver").order_by("-created_at")
         columns = ["Date", "Sponsor", "Driver", "Points", "Reason"]
         for rec in qs:
             sponsor_name = getattr(rec, "sponsor_name", "") or getattr(
@@ -217,8 +231,12 @@ def audit_report(request):
     elif category == "password_changes":
         qs = PasswordChangeLog.objects.filter(created_at__range=(start_dt, end_dt))
         qs = filter_by_sponsor_via_driver(qs, driver_field="user")
-        qs = qs.select_related("user").order_by("-created_at")
 
+        # User ID filter (user)
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+
+        qs = qs.select_related("user").order_by("-created_at")
         columns = ["Date", "User", "Type"]
         for rec in qs:
             rows.append([
@@ -229,16 +247,19 @@ def audit_report(request):
 
     elif category == "driver_applications":
         qs = DriverApplicationLog.objects.filter(created_at__range=(start_dt, end_dt))
-        # Prefer direct sponsor_name if present, else via driver profile
+
+        # Sponsor scoping
         if sponsor_scope:
             if _field_exists(DriverApplicationLog, "sponsor_name"):
                 qs = qs.filter(sponsor_name=sponsor_scope)
             else:
                 qs = filter_by_sponsor_via_driver(qs, driver_field="driver")
 
-        qs = qs.select_related("driver").order_by("-created_at")
+        # User ID filter (driver)
+        if user_id:
+            qs = qs.filter(driver_id=user_id)
 
-        # Handle both schemas (with sponsor_name or without)
+        qs = qs.select_related("driver").order_by("-created_at")
         has_sponsor_name = _field_exists(DriverApplicationLog, "sponsor_name")
         columns = ["Date", "Sponsor", "Driver", "Status", "Reason"]
         for rec in qs:
@@ -263,29 +284,23 @@ def audit_report(request):
         "end": end_date.isoformat(),
         "sponsor": sponsor_param,
         "sponsor_names": sponsor_names,
+        "user_id": user_id_str,
         "columns": columns,
         "rows": rows,
     }
 
-    # --- CSV export ---
+    # CSV export
     if want_csv:
         buf = StringIO()
         writer = csv.writer(buf)
-
-        
         writer.writerow(columns)
-
-        
         for r in rows:
             writer.writerow([str(c) if c is not None else "" for c in r])
-
-        
         filename = f"audit_{category}_{start_date.isoformat()}_{end_date.isoformat()}.csv"
         response = HttpResponse(buf.getvalue(), content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
-    
     return render(request, "accounts/audit_report.html", context)
 
 
