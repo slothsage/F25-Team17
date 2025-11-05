@@ -1,0 +1,4 @@
+{% extends "reports/base_report.html" %}
+{% block filters %}
+  {% include "reports/_filters_common.html" with sponsor_names=sponsor_names driver_names=driver_names detail=detail %}
+{% endblock %}

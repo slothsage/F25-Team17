@@ -1,17 +1,19 @@
-from datetime import timedelta, timezone
+from datetime import date, datetime, time, timedelta
+from django.utils import timezone
 from io import BytesIO
 from django.contrib.admin.views.decorators import staff_member_required
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
+from django.conf import settings
 from django.template.loader import render_to_string
 from django.http import HttpResponse, HttpResponseBadRequest 
-from django.db.models import Sum
-from accounts.models import PointsLedger
+from django.db.models import Sum, Count, Q
+from accounts.models import PointsLedger, DriverProfile
 from .models import PointsConfig
 from .forms import PointsConfigForm
-from .models import Order, OrderItem, CartItem, Favorite
+from .models import Order, OrderItem, CartItem, Favorite, PointsConfig
 from django.urls import reverse
 from .models import Wishlist, WishListItem
 from django.core.paginator import Paginator
@@ -21,9 +23,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from xhtml2pdf import pisa
 import json
+import csv
 
 
-# A tiny, editable set of eBay category IDs (Browse API uses numeric IDs)
+# A tiny editable set of eBay category IDs (Browse API uses numeric IDs)
 EBAY_CATEGORY_CHOICES = [
     ("", "All Categories"),
     ("9355", "Cell Phones & Smartphones"),
@@ -605,3 +608,291 @@ def remove_favorite(request, product_id: str):
     if ref and url_has_allowed_host_and_scheme(ref, allowed_hosts={request.get_host()}):
         return redirect(ref)
     return redirect("shop:favorites_list")
+
+
+def _parse_yyyy_mm_dd(s):
+    """Parse 'YYYY-MM-DD' string to date, or None."""
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+def _daterange_from_request(request, default_days=30):
+    """
+    Extracts start/end from ?start=YYYY-MM-DD & ?end=YYYY-MM-DD,
+    or defaults to last X days.
+    Returns (start_date, end_date, start_dt, end_dt).
+    """
+    today = timezone.localdate()
+    start = _parse_yyyy_mm_dd(request.GET.get("start", "")) or (today - timedelta(days=default_days))
+    end = _parse_yyyy_mm_dd(request.GET.get("end", "")) or today
+
+    start_dt = timezone.make_aware(datetime.combine(start, time.min))
+    end_dt = timezone.make_aware(datetime.combine(end, time.max))
+    return start, end, start_dt, end_dt
+
+def _csv_or_render(request, filename_base, columns, rows, template_name, context):
+    """
+    If ?format=csv → return CSV file.
+    Otherwise render HTML template and pass columns + rows.
+    """
+    want_csv = (request.GET.get("format") or "").lower() == "csv"
+    if want_csv:
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{filename_base}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(columns)
+        for r in rows:
+            writer.writerow([("" if c is None else c) for c in r])
+        return response
+
+    # For HTML
+    context.update({"columns": columns, "rows": rows})
+    from django.shortcuts import render
+    return render(request, template_name, context)
+
+
+# ------------------------------
+# REPORT: DRIVER POINT TRACKING
+# ------------------------------
+from django.contrib.auth.decorators import login_required
+from accounts.models import PointsLedger, DriverProfile
+from django.contrib.auth.models import User
+
+@login_required
+def report_driver_points(request):
+    """
+    Driver Point Tracking Report
+    - Admin or Sponsor
+    - Filter by sponsor, driver, date range
+    - CSV or HTML
+    """
+    user = request.user
+    is_admin = user.is_staff
+
+    # --- Input filters ---
+    driver_username = (request.GET.get("driver") or "").strip()
+    start, end, start_dt, end_dt = _daterange_from_request(request)
+
+    # Sponsor scoping:
+    if is_admin:
+        sponsor_scope = (request.GET.get("sponsor") or "").strip()
+    else:
+        sponsor_scope = getattr(getattr(user, "driver_profile", None), "sponsor_name", "") or ""
+
+    # --- Build QuerySet ---
+    qs = PointsLedger.objects.filter(created_at__range=(start_dt, end_dt))
+
+    if driver_username:
+        qs = qs.filter(user__username=driver_username)
+
+    if sponsor_scope:
+        qs = qs.filter(user__driver_profile__sponsor_name=sponsor_scope)
+
+    qs = qs.select_related("user", "user__driver_profile").order_by("-created_at")
+
+    # --- Build Data Table ---
+    columns = ["Date", "Driver", "Sponsor", "Δ Points", "Reason"]
+    rows = []
+    for rec in qs:
+        sponsor_name = getattr(getattr(rec.user, "driver_profile", None), "sponsor_name", "") or ""
+        rows.append([
+            timezone.localtime(rec.created_at).strftime("%Y-%m-%d %H:%M"),
+            rec.user.username,
+            sponsor_name,
+            rec.delta,
+            rec.reason or "",
+        ])
+
+    # Sponsor dropdown options
+    sponsor_names = (
+        DriverProfile.objects.exclude(sponsor_name="")
+        .values_list("sponsor_name", flat=True)
+        .distinct()
+        .order_by("sponsor_name")
+    )
+
+    context = {
+        "title": "Driver Point Tracking",
+        "is_admin": is_admin,
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "sponsor": sponsor_scope,
+        "sponsor_names": sponsor_names,
+        "driver": driver_username,
+    }
+
+    return _csv_or_render(
+        request,
+        f"driver_points_{start}_{end}",
+        columns,
+        rows,
+        "reports/report_driver_points.html",
+        context,
+    )
+
+def _staff_only(u):
+    return u.is_staff or u.is_superuser
+
+@login_required
+@user_passes_test(_staff_only)
+def report_sales_by_sponsor(request):
+    start, end, start_dt, end_dt = _daterange_from_request(request, default_days=30)
+    sponsor = (request.GET.get("sponsor") or "").strip()
+    detail  = (request.GET.get("detail") or "summary") == "detail"
+
+    # orders in window 
+    qs = Order.objects.filter(
+        placed_at__range=(start_dt, end_dt)
+    ).exclude(status="cancelled")
+
+    if sponsor:
+        qs = qs.filter(sponsor_name=sponsor)
+
+    # summary: group by sponsor
+    if not detail:
+        grouped = (qs.values("sponsor_name")
+                     .annotate(total_points=Sum("points_spent"),
+                               orders=Count("id"))
+                     .order_by("sponsor_name"))
+        columns = ["Sponsor", "Orders", "Total Points"]
+        rows = [[g["sponsor_name"] or "(none)", g["orders"], g["total_points"] or 0] for g in grouped]
+        filename = f"sales_by_sponsor_summary_{start}_{end}"
+        template = "reports/report_sales_by_sponsor.html"
+    else:
+        qs = qs.select_related("driver").order_by("sponsor_name", "-placed_at", "id")
+        columns = ["Date", "Sponsor", "Driver", "Order ID", "Status", "Points"]
+        rows = [[
+            timezone.localtime(o.placed_at).strftime("%Y-%m-%d"),
+            o.sponsor_name or "",
+            o.driver.username,
+            o.id,
+            o.status,
+            o.points_spent,
+        ] for o in qs]
+        filename = f"sales_by_sponsor_detail_{start}_{end}"
+        template = "reports/report_sales_by_sponsor.html"
+
+    sponsor_names = (Order.objects.exclude(sponsor_name="")
+                     .values_list("sponsor_name", flat=True)
+                     .distinct().order_by("sponsor_name"))
+
+    ctx = {
+        "title": "Sales by Sponsor",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "sponsor": sponsor,
+        "sponsor_names": sponsor_names,
+        "detail": "detail" if detail else "summary",
+    }
+    return _csv_or_render(request, filename, columns, rows, template, ctx)
+
+@login_required
+@user_passes_test(_staff_only)
+def report_sales_by_driver(request):
+    start, end, start_dt, end_dt = _daterange_from_request(request, default_days=30)
+    sponsor  = (request.GET.get("sponsor") or "").strip()
+    driver   = (request.GET.get("driver")  or "").strip()
+    detail   = (request.GET.get("detail")  or "summary") == "detail"
+
+    qs = Order.objects.filter(placed_at__range=(start_dt, end_dt)).exclude(status="cancelled")
+    if sponsor:
+        qs = qs.filter(sponsor_name=sponsor)
+    if driver:
+        qs = qs.filter(driver__username=driver)
+
+    if not detail:
+        grouped = (qs.values("driver__username", "sponsor_name")
+                     .annotate(total_points=Sum("points_spent"),
+                               orders=Count("id"))
+                     .order_by("sponsor_name", "driver__username"))
+        columns = ["Sponsor", "Driver", "Orders", "Total Points"]
+        rows = [[g["sponsor_name"] or "", g["driver__username"] or "", g["orders"], g["total_points"] or 0] for g in grouped]
+        filename = f"sales_by_driver_summary_{start}_{end}"
+    else:
+        qs = qs.select_related("driver").order_by("sponsor_name", "driver__username", "-placed_at")
+        columns = ["Date", "Sponsor", "Driver", "Order ID", "Status", "Points"]
+        rows = [[
+            timezone.localtime(o.placed_at).strftime("%Y-%m-%d"),
+            o.sponsor_name or "",
+            o.driver.username,
+            o.id,
+            o.status,
+            o.points_spent,
+        ] for o in qs]
+        filename = f"sales_by_driver_detail_{start}_{end}"
+
+    sponsor_names = (Order.objects.exclude(sponsor_name="")
+                     .values_list("sponsor_name", flat=True)
+                     .distinct().order_by("sponsor_name"))
+
+    driver_names = (Order.objects.values_list("driver__username", flat=True)
+                    .distinct().order_by("driver__username"))
+
+    ctx = {
+        "title": "Sales by Driver",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "sponsor": sponsor,
+        "driver": driver,
+        "sponsor_names": sponsor_names,
+        "driver_names": driver_names,
+        "detail": "detail" if detail else "summary",
+    }
+    return _csv_or_render(request, filename, columns, rows, "reports/report_sales_by_driver.html", ctx)
+
+@login_required
+@user_passes_test(_staff_only)
+def report_invoices(request):
+    # Month/year inputs (default = current month)
+    month = int((request.GET.get("month") or timezone.localdate().month))
+    year  = int((request.GET.get("year")  or timezone.localdate().year))
+
+    start = date(year, month, 1)
+    # naive end-of-month
+    if month == 12:
+        end = date(year+1, 1, 1) - timedelta(days=1)
+    else:
+        end = date(year, month+1, 1) - timedelta(days=1)
+
+    start_dt = timezone.make_aware(datetime.combine(start, time.min))
+    end_dt   = timezone.make_aware(datetime.combine(end,   time.max))
+
+    # fee per driver
+    fee = getattr(settings, "REPORT_FEE_PER_DRIVER", 5.00)
+
+    # active drivers per sponsor in range (any order in period)
+    orders = (Order.objects
+              .filter(placed_at__range=(start_dt, end_dt))
+              .exclude(status="cancelled")
+              .values("sponsor_name", "driver")
+              .distinct())
+
+    # count drivers per sponsor
+    per_sponsor_driver_counts = {}
+    for row in orders:
+        s = row["sponsor_name"] or ""
+        per_sponsor_driver_counts.setdefault(s, set()).add(row["driver"])
+
+    # build rows per sponsor
+    invoices = []
+    for sponsor_name, driver_set in per_sponsor_driver_counts.items():
+        driver_count = len(driver_set)
+        total_due = round(driver_count * fee, 2)
+        invoices.append({
+            "sponsor": sponsor_name,
+            "driver_count": driver_count,
+            "fee": f"${fee:,.2f}",
+            "total": f"${total_due:,.2f}",
+            "period": start.strftime("%b %Y"),
+        })
+
+    columns = ["Sponsor", "Period", "# Drivers", "Fee/Driver", "Total Due"]
+    rows = [[inv["sponsor"], inv["period"], inv["driver_count"], inv["fee"], inv["total"]] for inv in invoices]
+    ctx = {
+        "title": "Invoices",
+        "month": month,
+        "year": year,
+        "invoices": invoices,
+    }
+    return _csv_or_render(request, f"invoices_{year}_{month:02d}", columns, rows, "reports/report_invoices.html", ctx)

@@ -167,3 +167,5 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+REPORT_FEE_PER_DRIVER = 5.00  # Fee in dollars for each driver report generated

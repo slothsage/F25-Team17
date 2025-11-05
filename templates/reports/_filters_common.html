@@ -1,0 +1,52 @@
+<div class="row gy-2 gx-2 align-items-end mb-3">
+  {% if start and end %}
+    <div class="col-md-2">
+      <label class="form-label">Start</label>
+      <input type="date" name="start" class="form-control" value="{{ start }}">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">End</label>
+      <input type="date" name="end" class="form-control" value="{{ end }}">
+    </div>
+  {% endif %}
+
+  {% if sponsor_names is not None %}
+    <div class="col-md-3">
+      <label class="form-label">Sponsor</label>
+      <select name="sponsor" class="form-select">
+        <option value="">All sponsors</option>
+        {% for s in sponsor_names %}
+          <option value="{{ s }}" {% if sponsor == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+
+  {% if driver_names is not None %}
+    <div class="col-md-3">
+      <label class="form-label">Driver</label>
+      <select name="driver" class="form-select">
+        <option value="">All drivers</option>
+        {% for d in driver_names %}
+          <option value="{{ d }}" {% if driver == d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  {% endif %}
+
+  {% if detail is not None %}
+    <div class="col-md-2">
+      <label class="form-label">Mode</label>
+      <select name="detail" class="form-select">
+        <option value="summary" {% if detail != "detail" %}selected{% endif %}>Summary</option>
+        <option value="detail"  {% if detail == "detail" %}selected{% endif %}>Detail</option>
+      </select>
+    </div>
+  {% endif %}
+
+  <div class="col-md-2 d-flex gap-2">
+    <button class="btn btn-primary w-100" type="submit">Run</button>
+    <a class="btn btn-outline-secondary"
+       href="?{{ request.GET.urlencode }}&format=csv">CSV</a>
+  </div>
+</div>
