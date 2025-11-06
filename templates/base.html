@@ -262,11 +262,29 @@
               <li><a class="dropdown-item" href="{% url 'accounts:message_compose' %}">Send Messages</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:admin_tickets' %}">Support Tickets</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:admin_complaints' %}">Complaints</a></li>
+            </ul>
+          </li>
+          {% endif %}
+          <!-- Reports Dropdown (Admin + Sponsor) -->
+          {% if user.is_staff or user|has_group:"sponsor" %}
+          <li class="nav-item dropdown">
+            <button class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+              Reports
+            </button>
+            <ul class="dropdown-menu">
+
+              <!-- Available to Admin + Sponsor -->
               <li><a class="dropdown-item" href="{% url 'accounts:audit_report' %}">Audit Logs</a></li>
-              <li><a class="dropdown-item" href="{% url 'shop:report_driver_points' %}">Report: Driver Point Tracking</a></li>
-              <li><a class="dropdown-item" href="{% url 'shop:report_sales_by_sponsor' %}">Report: Sales by Sponsor</a></li>
-              <li><a class="dropdown-item" href="{% url 'shop:report_sales_by_driver' %}">Report: Sales by Driver</a></li>
-              <li><a class="dropdown-item" href="{% url 'shop:report_invoices' %}">Report: Invoices</a></li>
+              <li><a class="dropdown-item" href="{% url 'shop:report_driver_points' %}">Driver Point Tracking</a></li>
+
+              <li class="dropdown-divider"></li>
+
+              <!-- Admin-only -->
+              {% if user.is_staff %}
+                <li><a class="dropdown-item" href="{% url 'shop:report_sales_by_sponsor' %}">Sales by Sponsor</a></li>
+                <li><a class="dropdown-item" href="{% url 'shop:report_sales_by_driver' %}">Sales by Driver</a></li>
+                <li><a class="dropdown-item" href="{% url 'shop:report_invoices' %}">Invoices</a></li>
+              {% endif %}
             </ul>
           </li>
           {% endif %}
