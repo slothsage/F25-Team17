@@ -305,58 +305,84 @@ def wishlist_list(request):
 @login_required
 def catalog_search(request):
     """
-    Main catalog search page - shows search form and results
+    Main catalog search page - shows search form and results.
     """
-    query = request.GET.get("q", "").strip()
-    category_id = request.GET.get("cat", "").strip()  
-    page_num = request.GET.get("page", "1")
+    query       = (request.GET.get("q") or "").strip()
+    category_id = (request.GET.get("cat") or "").strip()
+    page_num    = request.GET.get("page", "1")
+
+    # --- point-range filters ---
+    def _to_int(val):
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return None
+    min_points = _to_int(request.GET.get("min_points"))
+    max_points = _to_int(request.GET.get("max_points"))
 
     try:
         page_num = int(page_num)
     except ValueError:
         page_num = 1
 
-    limit = 20
+    limit  = 20
     offset = (page_num - 1) * limit
 
+    # favorites for star toggle
     user_favorites = set(
         Favorite.objects.filter(user=request.user).values_list("product_id", flat=True)
     )
 
     context = {
         "query": query,
-        "category_id": category_id,                 
-        "category_choices": EBAY_CATEGORY_CHOICES,  
+        "category_id": category_id,
+        "category_choices": EBAY_CATEGORY_CHOICES,
         "page": page_num,
         "results": None,
         "error": None,
-        "user_favorites": user_favorites
+        "user_favorites": user_favorites,   
+        "min_points": "" if min_points is None else min_points,
+        "max_points": "" if max_points is None else max_points,
     }
 
-    if query:
-        try:
-            # pass category if selected
-            results = ebay_service.search_products(
-                query,
-                limit=limit,
-                offset=offset,
-                category_ids=category_id or None, 
-            )
+    if not query:
+        return render(request, "shop/catalog_search.html", context)
 
-            products = [
-                ebay_service.format_product(item)
-                for item in results.get("itemSummaries", [])
-            ]
+    try:
+        results = ebay_service.search_products(
+            query,
+            limit=limit,
+            offset=offset,
+            category_ids=category_id or None,
+        )
 
-            context["results"] = {
-                "products": products,
-                "total": results.get("total", 0),
-                "has_next": results.get("next") is not None,
-                "has_prev": page_num > 1,
-            }
+        products = [
+            ebay_service.format_product(item)
+            for item in results.get("itemSummaries", [])
+        ]
 
-        except Exception as e:
-            context["error"] = str(e)
+        # --- apply point-range filter on formatted products ---
+        def _eligible(p):
+            pts = p.get("price_points")
+            if pts is None:
+                return False
+            if min_points is not None and pts < min_points:
+                return False
+            if max_points is not None and pts > max_points:
+                return False
+            return True
+
+        filtered = [p for p in products if _eligible(p)]
+
+        context["results"] = {
+            "products": filtered,
+            "total": results.get("total", 0),
+            "has_next": results.get("next") is not None,
+            "has_prev": page_num > 1,
+        }
+
+    except Exception as e:
+        context["error"] = str(e)
 
     return render(request, "shop/catalog_search.html", context)
 

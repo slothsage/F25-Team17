@@ -46,6 +46,30 @@
             {% endfor %}
           </select>
         </div>
+        
+        <!-- Min Points -->
+        <div class="col-6 col-lg-2">
+          <input 
+            type="number" 
+            min="0"
+            name="min_points" 
+            class="form-control form-control-lg" 
+            placeholder="Min pts"
+            value="{{ min_points }}"
+          >
+        </div>
+
+        <!-- Max Points -->
+        <div class="col-6 col-lg-2">
+          <input 
+            type="number" 
+            min="0"
+            name="max_points" 
+            class="form-control form-control-lg" 
+            placeholder="Max pts"
+            value="{{ max_points }}"
+          >
+        </div>
 
         <!-- Submit Button -->
         <div class="col-lg-3 d-grid">
