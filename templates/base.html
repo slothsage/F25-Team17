@@ -252,14 +252,6 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:messages_inbox' %}">Messages</a>
           </li>
-          
-
-          <!-- Drivers-only: ***-->
-          {% if request.user.is_authenticated and request.user|has_group:"driver" %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'accounts:driver_sponsors' %}">Sponsors</a>
-          </li>
-          {% endif %}
 
           <!-- Team Chats (for drivers and sponsors) -->
           {% if user.driver_profile or user|has_group:"sponsor" %}

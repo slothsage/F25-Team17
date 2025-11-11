@@ -279,7 +279,7 @@ class AssignLabelForm(forms.Form):
         label="Assign labels",
     )
 
-
+"""
 class SponsorApplicationForm(forms.Form):
     sponsor = forms.ModelChoiceField(
         queryset=User.objects.filter(groups__name="sponsor").order_by("username"),
@@ -295,3 +295,4 @@ class SponsorApplicationForm(forms.Form):
             self.fields["sponsor"].queryset = self.fields["sponsor"].queryset.exclude(
                 driver_applications__driver=self.driver
             )
+"""

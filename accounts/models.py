@@ -255,6 +255,54 @@ class PointsLedger(models.Model):
         sign = "+" if self.delta >= 0 else ""
         return f"{self.user} {sign}{self.delta} ({self.reason}) → {self.balance_after}"
     
+# --- x Sponsor points ---
+# --- Per-sponsor points ---
+class SponsorPointsAccount(models.Model):
+    driver  = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="points_accounts")
+    sponsor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="issued_points_accounts")
+    balance = models.IntegerField(default=0)
+    is_primary = models.BooleanField(default=False)  # only true for one at a time
+
+    class Meta:
+        unique_together = (("driver", "sponsor"),)
+        indexes = [
+            models.Index(fields=["driver"]),
+            models.Index(fields=["sponsor"]),
+        ]
+
+    def __str__(self):
+        return f"{self.driver.username} ↔ {self.sponsor.username} : {self.balance} pts"
+
+    def set_primary(self):
+        # ensure uniqueness across this driver
+        SponsorPointsAccount.objects.filter(driver=self.driver, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
+        if not self.is_primary:
+            self.is_primary = True
+            self.save(update_fields=["is_primary"])
+
+    def apply_points(self, delta: int, *, reason: str = "", awarded_by=None):
+        """Add (or subtract) points and log the transaction."""
+        self.balance = (self.balance or 0) + int(delta)
+        self.save(update_fields=["balance"])
+        SponsorPointsTransaction.objects.create(
+            account=self, delta=int(delta), reason=reason or "", awarded_by=awarded_by
+        )
+
+class SponsorPointsTransaction(models.Model):
+    account = models.ForeignKey(SponsorPointsAccount, on_delete=models.CASCADE, related_name="transactions")
+    delta = models.IntegerField()  # + or -
+    reason = models.CharField(max_length=255, blank=True)
+    awarded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="points_awards")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        sign = "+" if self.delta >= 0 else ""
+        return f"{self.account.driver} {sign}{self.delta} ({self.reason}) by {self.awarded_by or 'system'}"
+
+
 # --- Announcement/Targeted Messaging ---
 class Message(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="messages_authored")
@@ -553,6 +601,7 @@ class MessageReadStatus(models.Model):
     
 
 # --- Sponsor applications / adoptions ---
+"""
 class SponsorApplication(models.Model):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
@@ -588,7 +637,7 @@ class SponsorApplication(models.Model):
 
     def __str__(self):
         return f"{self.driver} → {self.sponsor} ({self.status})"
-
+"""
 class SponsorshipRequest(models.Model):
     REQUEST_TYPES = [
         ("driver_to_sponsor", "Driver → Sponsor"),
