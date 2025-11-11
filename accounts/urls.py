@@ -14,6 +14,17 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("register/", views.register, name="register"),
 
+    # Driver-only page(s)
+    path("sponsors/", views.driver_sponsors, name="driver_sponsors"),
+    path("sponsors/apply/", views.apply_to_sponsor, name="apply_to_sponsor"),
+    path("sponsors/cancel/<int:pk>/", views.cancel_application, name="cancel_application"),
+
+    # Sponsors-only page(s)
+    path("driver-management/", views.sponsor_driver_management, name="sponsor_driver_management"),
+    path("applications/<int:pk>/approve/", views.approve_application, name="approve_application"),
+    path("applications/<int:pk>/reject/", views.reject_application, name="reject_application"),
+    path("applications/<int:pk>/end/",    views.end_adoption,      name="end_adoption"),
+    
     # Multi-factor authentication (MFA)
     path("mfa/setup/", views.mfa_setup, name="mfa_setup"),
     path("mfa/", views.mfa_challenge_view, name="mfa_challenge"),
@@ -82,6 +93,19 @@ urlpatterns = [
     path("admin/sponsors/archived/", views.archived_sponsors, name="archived_sponsors"),
     path("admin/sponsors/<int:user_id>/archive/", views.archive_sponsor, name="archive_sponsor"),
     path("admin/sponsors/<int:user_id>/unarchive/", views.unarchive_sponsor, name="unarchive_sponsor"),
+
+    # Sponsorship requests
+    path("sponsor/requests/", views.sponsorship_requests, name="sponsorship_requests"),
+    path("sponsor/requests/<int:request_id>/approve/", views.approve_sponsorship, name="approve_sponsorship"),
+    path("sponsor/requests/<int:request_id>/deny/", views.deny_sponsorship, name="deny_sponsorship"),
+    path("sponsor/invite-driver/", views.invite_driver, name="invite_driver"),
+    # Sponsorship Center (shared for drivers & sponsors)
+    path("sponsorship-center/", views.sponsorship_center, name="sponsorship_center"),
+    path("sponsorships/<int:request_id>/end/", views.end_sponsorship, name="end_sponsorship"),
+    # Driver-facing: request sponsorship
+    path("driver/request-sponsor/", views.request_sponsor, name="request_sponsor"),
+    # Driver-facing sponsorship requests
+    path("driver/requests/", views.driver_sponsorship_requests, name="driver_sponsorship_requests"),
 
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),

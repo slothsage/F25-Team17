@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n group_filters %}
 <!doctype html>
 <html>
 <head>
@@ -212,6 +212,21 @@
               <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">View Profile</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:profile_edit' %}">Edit Profile</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}">Change Password</a></li>
+              
+              {% if is_driver %}
+                <li><a class="dropdown-item" href="{% url 'accounts:request_sponsor' %}">Request Sponsor</a></li>
+                <li><a class="dropdown-item" href="{% url 'accounts:driver_sponsorship_requests' %}">My Sponsorship Requests</a></li>
+              {% endif %}
+              {% if is_sponsor %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'accounts:invite_driver' %}">Invite Driver</a>
+                </li>
+              {% endif %}
+              {% if is_sponsor or is_driver %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'accounts:sponsorship_center' %}">Sponsorship Center</a>
+                </li>
+              {% endif %}
               <li><a class="dropdown-item" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a></li>
               <li class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="{% url 'accounts:delete_account' %}">Delete Account</a></li>
@@ -237,6 +252,14 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:messages_inbox' %}">Messages</a>
           </li>
+          
+
+          <!-- Drivers-only: ***-->
+          {% if request.user.is_authenticated and request.user|has_group:"driver" %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:driver_sponsors' %}">Sponsors</a>
+          </li>
+          {% endif %}
 
           <!-- Team Chats (for drivers and sponsors) -->
           {% if user.driver_profile or user|has_group:"sponsor" %}
@@ -251,9 +274,26 @@
             <a class="nav-link" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
           </li>
           {% endif %}
-          {% if user|has_group:"sponsor" %}
+          {% if is_sponsor %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'accounts:sponsorship_requests' %}">
+                Sponsorship Requests
+                {% if sponsor_pending_count %}
+                  <span class="badge" style="background-color:#facc15;color:#000;margin-left:4px;padding:2px 6px;border-radius:4px;">
+                    {{ sponsor_pending_count }}
+                  </span>
+                {% endif %}
+              </a>
+            </li>
+          {% endif %}
+          {% if is_sponsor %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:audit_report' %}">Audit Logs</a>
+          </li>
+          {% endif %}
+          {% if request.user.is_authenticated and request.user|has_group:"sponsor" %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:sponsor_driver_management' %}">Driver Management</a>
           </li>
           {% endif %}
 
@@ -273,7 +313,7 @@
           </li>
           {% endif %}
           <!-- Reports Dropdown (Admin + Sponsor) -->
-          {% if user.is_staff or user|has_group:"sponsor" %}
+          {% if is_admin or is_sponsor %}
           <li class="nav-item dropdown">
             <button class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
               Reports
@@ -331,7 +371,7 @@
             <option value="en" {% if LANGUAGE_CODE|slice:":2" == "en" %}selected{% endif %}>English</option>
             <option value="es" {% if LANGUAGE_CODE|slice:":2" == "es" %}selected{% endif %}>Español</option>
             <option value="fr" {% if LANGUAGE_CODE|slice:":2" == "fr" %}selected{% endif %}>Français</option>
-           </select>
+            </select>
           </form>
         </div>
       </div>

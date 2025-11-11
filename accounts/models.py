@@ -51,6 +51,7 @@ class DriverProfile(models.Model):
     )
     
         # quick-contact fields (set by admin or seed data)
+    sponsors = models.ManyToManyField(User, related_name="sponsored_drivers", blank=True)
     sponsor_name  = models.CharField(max_length=120, blank=True)
     sponsor_email = models.EmailField(blank=True)
 
@@ -448,7 +449,7 @@ class UserMFA(models.Model):
     def __str__(self):
         status = "ENABLED" if self.mfa_enabled else "DISABLED"
         return f"UserMFA<{self.user.username}> {status}"
-
+    
 
 class ChatRoom(models.Model):
     """
@@ -550,3 +551,126 @@ class MessageReadStatus(models.Model):
         status = "Read" if self.is_read else "Unread"
         return f"{self.user.username} - {status}"
     
+
+# --- Sponsor applications / adoptions ---
+class SponsorApplication(models.Model):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+    STATUS_CHOICES = [
+        (PENDING,  "Pending"),
+        (APPROVED, "Approved"),
+        (REJECTED, "Rejected"),
+    ]
+
+    driver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sponsor_applications",
+    )
+    sponsor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="driver_applications",
+    )
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=PENDING)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = (("driver", "sponsor"),)
+        indexes = [
+            models.Index(fields=["sponsor", "status"]),
+            models.Index(fields=["driver", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} → {self.sponsor} ({self.status})"
+
+class SponsorshipRequest(models.Model):
+    REQUEST_TYPES = [
+        ("driver_to_sponsor", "Driver → Sponsor"),
+        ("sponsor_to_driver", "Sponsor → Driver"),
+    ]
+    from_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="sent_sponsorship_requests"
+    )
+    to_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="received_sponsorship_requests"
+    )
+    request_type = models.CharField(
+        max_length=20,
+        choices=REQUEST_TYPES,
+        default="driver_to_sponsor",
+        help_text="Indicates who initiated the request"
+    )
+    message = models.TextField(blank=True, null=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Pending"),
+            ("approved", "Approved"),
+            ("denied", "Denied"),
+            ("ended", "Ended"),
+        ],
+    default="pending"
+)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def approve(self):
+        self.status = "approved"
+        self.reviewed_at = timezone.now()
+        self.save()
+        # Identify which side is the driver vs sponsor
+        driver = self.to_user if hasattr(self.to_user, "driver_profile") else self.from_user
+        sponsor = self.from_user if self.from_user.groups.filter(name="sponsor").exists() else self.to_user
+        # Add sponsor to the driver's profile
+        driver.driver_profile.sponsors.add(sponsor)
+        driver.driver_profile.save()
+
+    def deny(self):
+        self.status = "denied"
+        self.reviewed_at = timezone.now()
+        self.save()
+
+    def end(self, ended_by):
+        """End an approved sponsorship relationship (either side)."""
+        if self.status != "approved":
+            return  # only active sponsorships can be ended
+
+        # Mark as ended (new status type)
+        self.status = "ended"
+        self.reviewed_at = timezone.now()
+        self.save(update_fields=["status", "reviewed_at"])
+
+        # Remove sponsor from driver profile if exists
+        driver = self.to_user if hasattr(self.to_user, "driver_profile") else self.from_user
+        sponsor = self.from_user if self.from_user.groups.filter(name="sponsor").exists() else self.to_user
+        if hasattr(driver, "driver_profile"):
+            driver.driver_profile.sponsors.remove(sponsor)
+            driver.driver_profile.save()
+
+        # Notify both users
+        from .models import Notification  # local import to avoid circular dependency
+        Notification.objects.create(
+            user=driver,
+            kind="system",
+            title="Sponsorship Ended",
+            body=f"Your sponsorship with {sponsor.username} has been ended by {ended_by.username}.",
+            )
+        Notification.objects.create(
+            user=sponsor,
+            kind="system",
+            title="Sponsorship Ended",
+            body=f"Your sponsorship with {driver.username} has been ended by {ended_by.username}.",
+        )
+
+    def __str__(self):
+        return f"{self.from_user.username} → {self.to_user.username} ({self.status})"

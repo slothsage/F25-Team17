@@ -278,3 +278,20 @@ class AssignLabelForm(forms.Form):
         required=False,
         label="Assign labels",
     )
+
+
+class SponsorApplicationForm(forms.Form):
+    sponsor = forms.ModelChoiceField(
+        queryset=User.objects.filter(groups__name="sponsor").order_by("username"),
+        help_text="Choose a sponsor to apply to.",
+    )
+    note = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
+
+    def __init__(self, *args, **kwargs):
+        self.driver = kwargs.pop("driver", None)
+        super().__init__(*args, **kwargs)
+        # excludes sponsors if driver has an app w/:
+        if self.driver is not None:
+            self.fields["sponsor"].queryset = self.fields["sponsor"].queryset.exclude(
+                driver_applications__driver=self.driver
+            )

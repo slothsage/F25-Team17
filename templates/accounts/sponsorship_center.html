@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-main">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <h1 class="page-title">Sponsorship Center</h1>
+      <p class="page-subtitle">
+        Manage all sponsorship relationships and pending requests.
+      </p>
+    </div>
+  </header>
+
+    <!-- CURRENT RELATIONSHIPS -->
+    {% if is_sponsor %}
+        <h2>Current Drivers</h2>
+    {% else %}
+        <h2>Current Sponsors</h2>
+    {% endif %}
+
+    {% if current_relationships %}
+    <section class="card mt-md">
+    <div class="card-body">
+        <table class="table table-admin">
+        <thead>
+            <tr>
+            {% if is_sponsor %}
+                <th>Driver</th>
+            {% else %}
+                <th>Sponsor</th>
+            {% endif %}
+            <th>Since</th>
+            <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rel in current_relationships %}
+            <tr>
+            <td>
+                {% if is_sponsor %}
+                {{ rel.to_user.username }}
+                {% else %}
+                {% if rel.from_user.groups.all.0.name == "sponsor" %}
+                    {{ rel.from_user.username }}
+                {% else %}
+                    {{ rel.to_user.username }}
+                {% endif %}
+                {% endif %}
+            </td>
+            <td>{{ rel.reviewed_at|date:"Y-m-d H:i" }}</td>
+            <td>
+                <form method="post" action="{% url 'accounts:end_sponsorship' rel.id %}" class="inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Are you sure you want to end this sponsorship?');">
+                    End Sponsorship
+                </button>
+                </form>
+            </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+    </div>
+    </section>
+    {% else %}
+    <p class="muted">You have no active sponsorships yet.</p>
+    {% endif %}
+
+    <hr class="mt-lg mb-lg">
+
+    <!-- RECEIVED REQUESTS -->
+    <h2>
+    {% if is_sponsor %}
+        Incoming Requests from Drivers
+    {% else %}
+        Invitations from Sponsors
+    {% endif %}
+    </h2>
+
+{% if received_requests %}
+<section class="card mt-md">
+    <div class="card-body">
+        <table class="table table-admin">
+        <thead>
+            <tr>
+            <th>{% if is_sponsor %}Driver{% else %}Sponsor{% endif %}</th>
+            <th>Message</th>
+            <th>Status</th>
+            <th>Received On</th>
+            <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in received_requests %}
+            <tr>
+            <td>{{ r.from_user.username }}</td>
+            <td>{{ r.message|default:"—" }}</td>
+            <td>
+                {% if r.status == "pending" %}
+                <span class="badge warning">Pending</span>
+                {% elif r.status == "approved" %}
+                <span class="badge success">Approved</span>
+                {% else %}
+                <span class="badge danger">Denied</span>
+                {% endif %}
+            </td>
+            <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+            <td>
+                {% if r.status == "pending" and r.to_user == user %}
+                <form method="post" action="{% url 'accounts:approve_sponsorship' r.id %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                </form>
+                <form method="post" action="{% url 'accounts:deny_sponsorship' r.id %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Deny</button>
+                </form>
+                {% else %}
+                <em class="muted">—</em>
+                {% endif %}
+            </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+    </div>
+    </section>
+    {% else %}
+    <p class="muted">No {% if is_sponsor %}driver requests{% else %}sponsor invitations{% endif %} at this time.</p>
+    {% endif %}
+
+  <hr class="mt-lg mb-lg">
+
+  <!-- SENT REQUESTS -->
+  <h2>
+    {% if is_sponsor %}
+      Sent Invitations
+    {% else %}
+      Sent Requests
+    {% endif %}
+  </h2>
+
+  {% if sent_requests %}
+  <section class="card mt-md">
+    <div class="card-body">
+      <table class="table table-admin">
+        <thead>
+          <tr>
+            <th>{% if is_sponsor %}Driver{% else %}Sponsor{% endif %}</th>
+            <th>Message</th>
+            <th>Status</th>
+            <th>Sent On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in sent_requests %}
+          <tr>
+            <td>{{ r.to_user.username }}</td>
+            <td>{{ r.message|default:"—" }}</td>
+            <td>
+              {% if r.status == "pending" %}
+                <span class="badge warning">Pending</span>
+              {% elif r.status == "approved" %}
+                <span class="badge success">Approved</span>
+              {% else %}
+                <span class="badge danger">Denied</span>
+              {% endif %}
+            </td>
+            <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}
+    <p class="muted">No sent sponsorship activity.</p>
+  {% endif %}
+</div>
+{% endblock %}
