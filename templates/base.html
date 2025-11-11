@@ -283,13 +283,8 @@
             <a class="nav-link" href="{% url 'accounts:audit_report' %}">Audit Logs</a>
           </li>
           {% endif %}
-          {% if request.user.is_authenticated and request.user|has_group:"sponsor" %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'accounts:sponsor_driver_management' %}">Driver Management</a>
-          </li>
-          {% endif %}
 
-           <!-- Admin Dropdown (staff only) -->
+          <!-- Admin Dropdown (staff only) -->
           {% if user.is_staff or user.is_superuser %}
           <li class="nav-item dropdown">
             <button class="nav-link dropdown-toggle" aria-expanded="false">Admin</button>
