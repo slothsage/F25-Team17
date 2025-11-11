@@ -24,6 +24,10 @@
     {% csrf_token %}
     <button class="btn" onclick="return confirm('Clear all items?')">Clear Cart</button>
   </form>
+  <a href="{% url 'shop:checkout' %}" class="btn" style="background:#16a34a;color:#fff;">
+      Proceed to Checkout
+    </a>
+  </div>
 {% else %}
   <p>Your cart is empty.</p>
 {% endif %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+  <h2>Checkout</h2>
+  <p class="text-muted">Enter your shipping address to place the order.</p>
+
+  <form method="post" class="row g-3">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="col-md-6">
+      {{ form.ship_name.label_tag }} {{ form.ship_name }} {{ form.ship_name.errors }}
+    </div>
+    <div class="col-12">
+      {{ form.ship_line1.label_tag }} {{ form.ship_line1 }} {{ form.ship_line1.errors }}
+    </div>
+    <div class="col-12">
+      {{ form.ship_line2.label_tag }} {{ form.ship_line2 }} {{ form.ship_line2.errors }}
+    </div>
+    <div class="col-md-5">
+      {{ form.ship_city.label_tag }} {{ form.ship_city }} {{ form.ship_city.errors }}
+    </div>
+    <div class="col-md-3">
+      {{ form.ship_state.label_tag }} {{ form.ship_state }} {{ form.ship_state.errors }}
+    </div>
+    <div class="col-md-4">
+      {{ form.ship_postal.label_tag }} {{ form.ship_postal }} {{ form.ship_postal.errors }}
+    </div>
+
+    <div class="col-12">
+      <button class="btn btn-primary" type="submit">Place Order</button>
+      <a class="btn btn-outline-secondary" href="{% url 'shop:cart' %}">Back to Cart</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

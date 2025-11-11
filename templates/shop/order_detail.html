@@ -1,5 +1,7 @@
-{% extends "base.html" %}{% block content %}
+{% extends "base.html" %}
+{% block content %}
 <h1>Order #{{ order.id }}</h1>
+
 <p>Status: <strong>{{ order.status|title }}</strong>
   {% if is_delayed %}
     <span style="margin-left:.5rem;padding:.15rem .4rem;border:1px solid #f59e0b;border-radius:.35rem;background:#fff7ed;">
@@ -7,7 +9,64 @@
     </span>
   {% endif %}
 </p>
+
 <p>Points spent: {{ order.points_spent }}</p>
+
+<!-- Shipping / ETA Section -->
+<div style="border:1px solid #e5e7eb;border-radius:.5rem;padding:1rem;margin:.75rem 0;">
+  <h3 style="margin-top:0;">Shipping & ETA</h3>
+
+  <div style="display:flex;flex-wrap:wrap;gap:1rem;">
+    <div style="min-width:220px;">
+      <div><strong>Expected delivery:</strong>
+        {% if order.expected_delivery_date %}
+          {{ order.expected_delivery_date }}
+        {% else %}
+          <span class="text-muted">TBD</span>
+        {% endif %}
+        {% if is_delayed %}
+          <span style="margin-left:.4rem;padding:.1rem .35rem;border:1px solid #f59e0b;border-radius:.35rem;background:#fff7ed;">
+            Delayed
+          </span>
+        {% endif %}
+      </div>
+      <div><strong>Status:</strong>
+        <span style="padding:.1rem .4rem;border:1px solid #d1d5db;border-radius:.35rem;">
+          {{ order.status|title }}
+        </span>
+      </div>
+    </div>
+
+    <div style="flex:1;min-width:260px;">
+      <strong>Ship to:</strong>
+      <div style="margin-top:.25rem;line-height:1.35;">
+        {% if order.ship_name %}{{ order.ship_name }}<br>{% endif %}
+        {% if order.ship_line1 %}{{ order.ship_line1 }}<br>{% endif %}
+        {% if order.ship_line2 %}{{ order.ship_line2 }}<br>{% endif %}
+        {% if order.ship_city or order.ship_state or order.ship_postal %}
+          {{ order.ship_city }}{% if order.ship_city and order.ship_state %}, {% endif %}{{ order.ship_state }} {{ order.ship_postal }}<br>
+        {% endif %}
+        {% if order.ship_country %}{{ order.ship_country }}{% endif %}
+        {% if not order.ship_name and not order.ship_line1 and not order.ship_city and not order.ship_state and not order.ship_postal %}
+          <span class="text-muted">(no address on file)</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:.75rem;">
+    <div style="font-size:.9rem;color:#6b7280;">Order timeline</div>
+    <ul style="margin:.25rem 0 0;padding-left:1rem;">
+      <li>Placed: {{ order.placed_at|date:"Y-m-d H:i" }}</li>
+      {% if order.updated_at %}<li>Last update: {{ order.updated_at|date:"Y-m-d H:i" }}</li>{% endif %}
+      {% if order.status == "processing" %}<li>Processing at warehouse</li>{% endif %}
+      {% if order.status == "shipped" %}<li>Shipped — en route</li>{% endif %}
+      {% if order.status == "delivered" %}<li>Delivered</li>{% endif %}
+      {% if order.status == "cancelled" %}<li>Cancelled</li>{% endif %}
+    </ul>
+  </div>
+</div>
+<!-- End Shipping / ETA Section -->
 
 <h3>Items</h3>
 <ul>

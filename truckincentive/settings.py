@@ -158,9 +158,10 @@ LOGOUT_REDIRECT_URL = "accounts:login"       # after logout
 SESSION_COOKIE_AGE = 5 * 60   # 5 minutes in seconds
 SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 
-EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'
-EBAY_CLIENT_SECRET = 'SBX-df8ae938df8a-57b0-43e2-a63b-f447'
-EBAY_SANDBOX = True  # Set to False for production
+EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "JacobRob-F25Team1-SBX-2df8ae938-510a37dd")
+EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "SBX-df8ae938df8a-57b0-43e2-a63b-f447")
+EBAY_SANDBOX = os.getenv("EBAY_SANDBOX", "True").lower() == "true"
+EBAY_MARKETPLACE = os.getenv("EBAY_MARKETPLACE", "EBAY_US")
 
 CACHES = {
     'default': {

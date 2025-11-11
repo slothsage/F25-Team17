@@ -2,7 +2,7 @@ from pyclbr import Class
 from django.db import models
 from django.conf import settings
 from django.core.cache import cache
-# Create your models here.
+from datetime import date, timedelta
 
 POINTS_CACHE_KEY = "points_per_usd:v1"
 
@@ -34,15 +34,34 @@ class Order(models.Model):
         ("delivered", "Delivered"),
         ("cancelled", "Cancelled"),
     ]
-    sponsor_name = models.CharField(max_length=200, blank=True)  # demo-only
+    sponsor_name = models.CharField(max_length=200, blank=True)  
     driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     points_spent = models.IntegerField(default=0)
     placed_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # shipping + ETA
+    ship_name = models.CharField(max_length=200, blank=True)
+    ship_line1 = models.CharField(max_length=200, blank=True)
+    ship_line2 = models.CharField(max_length=200, blank=True)
+    ship_city = models.CharField(max_length=100, blank=True)
+    ship_state = models.CharField(max_length=100, blank=True)
+    ship_postal = models.CharField(max_length=20, blank=True)
+    ship_country = models.CharField(max_length=2, default="US")
+    expected_delivery_date = models.DateField(null=True, blank=True)
+
     def can_mark_received(self):
         return self.status in ("shipped", "delivered") and self.status != "cancelled"
+    
+    def estimate_delivery_date(self) -> date:
+        days = 0
+        d = date.today()
+        while days < 5:
+            d += timedelta(days=1)
+            if d.weekday() < 5:  
+                days += 1
+        return d
 
     def __str__(self):
         return f"Order#{self.id} ({self.status})"
