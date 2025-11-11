@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-main">
+  <h1>Request a Sponsor</h1>
+  <p>Select a sponsor and send a sponsorship request.</p>
+
+  <form method="post" class="stack gap-md">
+    {% csrf_token %}
+    <label for="sponsor_id">Sponsor:</label>
+    <select name="sponsor_id" id="sponsor_id" class="input" required>
+      <option value="">-- Select Sponsor --</option>
+      {% for s in sponsor_users %}
+        <option value="{{ s.id }}">{{ s.username }} ({{ s.email }})</option>
+      {% endfor %}
+    </select>
+
+    <label for="message">Message (optional):</label>
+    <textarea name="message" id="message" class="input" rows="3"></textarea>
+
+    <div class="row-actions">
+      <button type="submit" class="btn btn-primary">Send Request</button>
+      <a href="{% url 'accounts:profile' %}" class="btn btn-muted">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

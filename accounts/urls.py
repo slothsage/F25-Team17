@@ -91,7 +91,14 @@ urlpatterns = [
     path("sponsor/requests/", views.sponsorship_requests, name="sponsorship_requests"),
     path("sponsor/requests/<int:request_id>/approve/", views.approve_sponsorship, name="approve_sponsorship"),
     path("sponsor/requests/<int:request_id>/deny/", views.deny_sponsorship, name="deny_sponsorship"),
-
+    path("sponsor/invite-driver/", views.invite_driver, name="invite_driver"),
+    # Sponsorship Center (shared for drivers & sponsors)
+    path("sponsorship-center/", views.sponsorship_center, name="sponsorship_center"),
+    path("sponsorships/<int:request_id>/end/", views.end_sponsorship, name="end_sponsorship"),
+    # Driver-facing: request sponsorship
+    path("driver/request-sponsor/", views.request_sponsor, name="request_sponsor"),
+    # Driver-facing sponsorship requests
+    path("driver/requests/", views.driver_sponsorship_requests, name="driver_sponsorship_requests"),
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
     path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),

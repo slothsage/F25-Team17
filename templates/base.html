@@ -211,6 +211,21 @@
               <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">View Profile</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:profile_edit' %}">Edit Profile</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}">Change Password</a></li>
+              
+              {% if is_driver %}
+                <li><a class="dropdown-item" href="{% url 'accounts:request_sponsor' %}">Request Sponsor</a></li>
+                <li><a class="dropdown-item" href="{% url 'accounts:driver_sponsorship_requests' %}">My Sponsorship Requests</a></li>
+              {% endif %}
+              {% if is_sponsor %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'accounts:invite_driver' %}">Invite Driver</a>
+                </li>
+              {% endif %}
+              {% if is_sponsor or is_driver %}
+                <li class="nav-item">
+                  <a class="nav-link" href="{% url 'accounts:sponsorship_center' %}">Sponsorship Center</a>
+                </li>
+              {% endif %}
               <li><a class="dropdown-item" href="{% url 'accounts:contact_sponsor' %}">Contact Sponsor</a></li>
               <li class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="{% url 'accounts:delete_account' %}">Delete Account</a></li>
@@ -246,13 +261,13 @@
           {% endif %}
 
           <!-- Sponsor-only: Search Drivers -->
-          {% load group_filters %}
-          {% if user|has_group:"sponsor" %}
+
+          {% if is_sponsor %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>
           </li>
           {% endif %}
-          {% if user|has_group:"sponsor" %}
+          {% if is_sponsor %}
             <li class="nav-item">
               <a class="nav-link" href="{% url 'accounts:sponsorship_requests' %}">
                 Sponsorship Requests
@@ -264,7 +279,7 @@
               </a>
             </li>
           {% endif %}
-          {% if user|has_group:"sponsor" %}
+          {% if is_sponsor %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:audit_report' %}">Audit Logs</a>
           </li>
@@ -291,7 +306,7 @@
           </li>
           {% endif %}
           <!-- Reports Dropdown (Admin + Sponsor) -->
-          {% if user.is_staff or user|has_group:"sponsor" %}
+          {% if is_admin or is_sponsor %}
           <li class="nav-item dropdown">
             <button class="nav-link dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
               Reports

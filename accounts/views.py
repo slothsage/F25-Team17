@@ -2260,16 +2260,16 @@ def sponsorship_requests(request):
 
 @login_required
 def approve_sponsorship(request, request_id):
-    """Approve a pending sponsorship request."""
-    sr = get_object_or_404(SponsorshipRequest, pk=request_id, to_user=request.user)
+    sponsorship_request = get_object_or_404(SponsorshipRequest, id=request_id)
 
-    if sr.status != "pending":
-        messages.warning(request, "This sponsorship request has already been processed.")
-        return redirect("accounts:sponsorship_requests")
+    # Only the recipient of the request can approve
+    if request.user != sponsorship_request.to_user:
+        messages.error(request, "You are not authorized to approve this request.")
+        return redirect("accounts:sponsorship_center")
 
-    sr.approve()
-    messages.success(request, f"Sponsorship approved for driver {sr.from_user.username}.")
-    return redirect("accounts:sponsorship_requests")
+    sponsorship_request.approve()
+    messages.success(request, f"Sponsorship between {sponsorship_request.from_user.username} and {sponsorship_request.to_user.username} approved.")
+    return redirect("accounts:sponsorship_center")
 
 
 @login_required
@@ -2284,3 +2284,208 @@ def deny_sponsorship(request, request_id):
     sr.deny()
     messages.error(request, f"Sponsorship denied for driver {sr.from_user.username}.")
     return redirect("accounts:sponsorship_requests")
+
+@login_required
+@require_POST
+def end_sponsorship(request, request_id):
+    """Allow either driver or sponsor to end a sponsorship relationship."""
+    sponsorship = get_object_or_404(SponsorshipRequest, id=request_id, status="approved")
+
+    # Only involved users can end the sponsorship
+    if request.user not in [sponsorship.from_user, sponsorship.to_user]:
+        messages.error(request, "You are not authorized to modify this sponsorship.")
+        return redirect("accounts:sponsorship_center")
+
+    # Remove relationship in driver profile
+    driver = (
+        sponsorship.from_user.driver_profile
+        if hasattr(sponsorship.from_user, "driver_profile")
+        else sponsorship.to_user.driver_profile
+    )
+    sponsor = sponsorship.from_user if sponsorship.from_user.groups.filter(name="sponsor").exists() else sponsorship.to_user
+
+    driver.sponsors.remove(sponsor)
+
+    # Optionally mark request as ended or delete
+    sponsorship.delete()
+
+    messages.success(request, f"Sponsorship between {sponsorship.from_user.username} and {sponsorship.to_user.username} has ended.")
+    return redirect("accounts:sponsorship_center")
+
+
+@login_required
+def invite_driver(request):
+    """Allow sponsors to invite (request) drivers for sponsorship."""
+    if not request.user.groups.filter(name="sponsor").exists():
+        messages.error(request, "Only sponsors can invite drivers.")
+        return redirect("accounts:profile")
+
+    # Only actual drivers (not sponsors, admins, or superusers)
+    driver_users = (
+        User.objects.filter(
+            driver_profile__isnull=False,
+            is_staff=False,
+            is_superuser=False
+        )
+        .exclude(groups__name="sponsor")
+        .order_by("username")
+    )
+
+    if request.method == "POST":
+        driver_id = request.POST.get("driver_id")
+        message = request.POST.get("message", "").strip()
+
+        if not driver_id:
+            messages.error(request, "Please select a driver.")
+        else:
+            driver = get_object_or_404(User, id=driver_id)
+
+            # Prevent duplicate invitations
+            already_invited = SponsorshipRequest.objects.filter(
+                from_user=request.user,
+                to_user=driver,
+                status="pending"
+            ).exists()
+
+            if already_invited:
+                messages.warning(request, f"You already have a pending request to {driver.username}.")
+            else:
+                SponsorshipRequest.objects.create(
+                    from_user=request.user,
+                    to_user=driver,
+                    request_type="sponsor_to_driver",
+                    message=message
+                )
+                messages.success(request, f"Sponsorship invitation sent to {driver.username}.")
+            return redirect("accounts:sponsorship_requests")
+
+    return render(request, "accounts/invite_driver.html", {"driver_users": driver_users})
+
+@login_required
+def sponsorship_center(request):
+    """
+    Unified Sponsorship Center for drivers and sponsors.
+    Displays current sponsorships, pending requests, and invitations.
+    """
+    user = request.user
+    is_sponsor = user.groups.filter(name="sponsor").exists()
+    has_driver_profile = hasattr(user, "driver_profile")
+
+    # Default querysets
+    sent_requests = SponsorshipRequest.objects.none()
+    received_requests = SponsorshipRequest.objects.none()
+    current_relationships = []
+
+    # Sponsors: see incoming requests from drivers + drivers they already sponsor
+    if is_sponsor:
+        received_requests = (
+            SponsorshipRequest.objects.filter(to_user=user)
+            .select_related("from_user")
+            .order_by("-created_at")
+        )
+        sent_requests = (
+            SponsorshipRequest.objects.filter(from_user=user)
+            .select_related("to_user")
+            .order_by("-created_at")
+        )
+
+        # Current sponsored drivers (approved relationships)
+        current_relationships = (
+            SponsorshipRequest.objects.filter(
+                from_user=user, status="approved"
+            )
+            .select_related("to_user")
+            .distinct()
+        )
+
+    # Drivers: see requests they've sent and sponsors who have approved them
+    elif has_driver_profile:
+        sent_requests = (
+            SponsorshipRequest.objects.filter(from_user=user)
+            .select_related("to_user")
+            .order_by("-created_at")
+        )
+        received_requests = (
+            SponsorshipRequest.objects.filter(to_user=user)
+            .select_related("from_user")
+            .order_by("-created_at")
+        )
+
+        # Current sponsors (from approved requests in either direction)
+        current_relationships = (
+            SponsorshipRequest.objects.filter(
+                Q(from_user=user, status="approved") | Q(to_user=user, status="approved")
+            )
+            .select_related("from_user", "to_user")
+            .distinct()
+        )
+    else:
+        messages.error(request, "You do not have access to the Sponsorship Center.")
+        return redirect("accounts:profile")
+
+    context = {
+        "is_sponsor": is_sponsor,
+        "sent_requests": sent_requests,
+        "received_requests": received_requests,
+        "current_relationships": current_relationships,
+    }
+
+#     print(
+#     "[DEBUG current_relationships]",
+#     list(
+#         SponsorshipRequest.objects.filter(
+#             Q(from_user=request.user) | Q(to_user=request.user)
+#         ).values("id", "from_user__username", "to_user__username", "status")
+#     ),
+# )
+
+    return render(request, "accounts/sponsorship_center.html", context)
+
+@login_required
+def request_sponsor(request):
+    """Allow drivers to request sponsorship from an existing sponsor user."""
+    if not hasattr(request.user, "driver_profile"):
+        messages.error(request, "Only drivers can send sponsorship requests.")
+        return redirect("accounts:profile")
+
+    sponsor_users = User.objects.filter(groups__name="sponsor").order_by("username")
+
+    if request.method == "POST":
+        sponsor_id = request.POST.get("sponsor_id")
+        message = request.POST.get("message", "").strip()
+
+        if not sponsor_id:
+            messages.error(request, "Please select a sponsor.")
+        else:
+            sponsor = get_object_or_404(User, id=sponsor_id)
+            SponsorshipRequest.objects.create(
+                from_user=request.user,
+                to_user=sponsor,
+                request_type="driver_to_sponsor",
+                message=message
+            )
+            messages.success(request, f"Sponsorship request sent to {sponsor.username}.")
+            return redirect("accounts:profile")
+
+    return render(request, "accounts/request_sponsor.html", {"sponsor_users": sponsor_users})
+
+
+@login_required
+def driver_sponsorship_requests(request):
+    """Driver portal: view pending or reviewed sponsorship requests they have sent."""
+    if not hasattr(request.user, "driver_profile"):
+        messages.error(request, "Only drivers can view sponsorship requests.")
+        return redirect("accounts:profile")
+
+    requests_qs = (
+        SponsorshipRequest.objects
+        .filter(from_user=request.user)
+        .select_related("to_user")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "accounts/driver_sponsorship_requests.html",
+        {"requests": requests_qs},
+    )

@@ -79,3 +79,28 @@ def impersonation_status(request):
     
     return {"is_impersonating": False}
 
+
+def role_flags(request):
+    """Expose simple role booleans for templates."""
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return {
+            "is_sponsor": False,
+            "is_driver": False,
+            "is_admin": False,
+        }
+
+    is_sponsor = user.groups.filter(name="sponsor").exists()
+    is_driver = hasattr(user, "driver_profile")
+    is_admin = user.is_staff or user.is_superuser
+
+    print(f"[DEBUG role_flags] user={request.user.username if request.user.is_authenticated else 'anon'}, "
+        f"is_sponsor={request.user.groups.filter(name='sponsor').exists()}, "
+        f"is_driver={hasattr(request.user, 'driver_profile')}, "
+        f"is_admin={request.user.is_staff or request.user.is_superuser}")
+
+    return {
+        "is_sponsor": user.groups.filter(name="sponsor").exists(),
+        "is_driver": hasattr(user, "driver_profile"),
+        "is_admin": user.is_staff or user.is_superuser,
+    }

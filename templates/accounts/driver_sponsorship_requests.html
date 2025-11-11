@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-main">
+  <h1>Your Sponsorship Requests</h1>
+  <p>These are requests you’ve sent to sponsors.</p>
+
+  {% if requests %}
+  <section class="card mt-lg">
+    <div class="card-body">
+      <table class="table table-admin">
+        <thead>
+          <tr>
+            <th>Sponsor</th>
+            <th>Message</th>
+            <th>Status</th>
+            <th>Sent On</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in requests %}
+          <tr>
+            <td>{{ r.to_user.username }}</td>
+            <td>{{ r.message|default:"—" }}</td>
+            <td>
+              {% if r.status == "pending" %}
+                <span class="badge warning">Pending</span>
+              {% elif r.status == "approved" %}
+                <span class="badge success">Approved</span>
+              {% else %}
+                <span class="badge danger">Denied</span>
+              {% endif %}
+            </td>
+            <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}
+    <p class="muted">You haven’t sent any sponsorship requests yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
