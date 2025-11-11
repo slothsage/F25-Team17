@@ -122,6 +122,8 @@ urlpatterns = [
     path("admin/download-error-log/", views.download_error_log, name="download_error_log"),
     # Bulk user upload
     path("admin/bulk-upload/", views.bulk_upload_users, name="bulk_upload_users"),
+    # Bulk assign
+    path("admin/bulk-assign/", views.bulk_assign_sponsorship, name="bulk_assign_sponsorship"),
     # Admin label management
     path("admin/labels/", views.manage_labels, name="manage_labels"),
     path("admin/labels/assign/", views.assign_labels, name="assign_labels"),

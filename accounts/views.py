@@ -2746,3 +2746,42 @@ def driver_sponsorship_requests(request):
         "accounts/driver_sponsorship_requests.html",
         {"requests": requests_qs},
     )
+
+
+
+@login_required
+@user_passes_test(lambda u: u.is_staff or u.is_superuser)
+def bulk_assign_sponsorship(request):
+    """Admin: assign multiple sponsors to a driver or multiple drivers to a sponsor."""
+    sponsors = User.objects.filter(groups__name="sponsor").order_by("username")
+    drivers = User.objects.filter(driver_profile__isnull=False).order_by("username")
+
+    if request.method == "POST":
+        mode = request.POST.get("mode")  # 'sponsor_to_drivers' or 'drivers_to_sponsor'
+        sponsor_id = request.POST.get("sponsor")
+        driver_ids = request.POST.getlist("drivers")
+        sponsor_ids = request.POST.getlist("sponsors")
+        driver_id = request.POST.get("driver")
+
+        if mode == "sponsor_to_drivers" and sponsor_id and driver_ids:
+            sponsor = User.objects.get(id=sponsor_id)
+            for driver_id in driver_ids:
+                driver = User.objects.get(id=driver_id)
+                driver.driver_profile.sponsors.add(sponsor)
+            messages.success(request, f"Sponsor {sponsor.username} assigned to selected drivers.")
+
+        elif mode == "drivers_to_sponsor" and driver_id and sponsor_ids:
+            driver = User.objects.get(id=driver_id)
+            for sponsor_id in sponsor_ids:
+                sponsor = User.objects.get(id=sponsor_id)
+                driver.driver_profile.sponsors.add(sponsor)
+            messages.success(request, f"Selected sponsors assigned to driver {driver.username}.")
+
+        else:
+            messages.error(request, "Invalid selection or missing data.")
+        return redirect("accounts:bulk_assign_sponsorship")
+
+    return render(request, "accounts/admin_bulk_assign.html", {
+        "sponsors": sponsors,
+        "drivers": drivers,
+    })
