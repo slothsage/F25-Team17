@@ -12,7 +12,7 @@ from django.http import HttpResponse, HttpResponseBadRequest
 from django.db.models import Sum, Count, Q
 from accounts.models import PointsLedger, DriverProfile
 from .models import PointsConfig
-from .forms import PointsConfigForm
+from .forms import PointsConfigForm, CheckoutForm
 from .models import Order, OrderItem, CartItem, Favorite, PointsConfig
 from django.urls import reverse
 from .models import Wishlist, WishListItem
@@ -152,22 +152,77 @@ def order_list(request):
     }
     return render(request, "shop/order_list.html", context)
 
-# STORY: Order Status (detail) + base for "Mark as Received"
 @login_required
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, driver=request.user)
 
-    # consider delayed if still not fulfilled and older than 5 days
+    shipping = {
+        "name":        getattr(order, "shipping_name",        "") or request.user.get_full_name() or request.user.username,
+        "address1":    getattr(order, "shipping_address1",    "") or "",
+        "address2":    getattr(order, "shipping_address2",    "") or "",
+        "city":        getattr(order, "shipping_city",        "") or "",
+        "state":       getattr(order, "shipping_state",       "") or "",
+        "postal_code": getattr(order, "shipping_postal_code", "") or "",
+        "country":     getattr(order, "shipping_country",     "") or "US",
+    }
+
+    expected_delivery = getattr(order, "expected_delivery_date", None)
+
+    if not expected_delivery:
+        base = order.placed_at
+        by_status_days = {
+            "pending":    7,
+            "processing": 5,
+            "shipped":    3,
+            "delivered":  0,   
+            "cancelled":  0,
+        }
+        days = by_status_days.get(order.status, 7)
+        expected_delivery = (base + timedelta(days=days)).date()
+
+    # Consider delayed if not fulfilled and older than 5 days
     is_delayed = (
-        order.status in ["pending", "processing"]
-        and order.placed_at < timezone.now() - timedelta(days=5)  # use created/placed field your model has
+        order.status in ("pending", "processing")
+        and order.placed_at < timezone.now() - timedelta(days=5)
     )
 
-    return render(
-        request,
-        "shop/order_detail.html",
-        {"order": order, "is_delayed": is_delayed},
-    )
+    status_class = {
+        "pending":    "badge bg-secondary",
+        "processing": "badge bg-info",
+        "shipped":    "badge bg-primary",
+        "delivered":  "badge bg-success",
+        "cancelled":  "badge bg-danger",
+    }.get(order.status, "badge bg-light text-dark")
+
+    # Precompute line items safely
+    items = getattr(order, "items", None)
+    line_items = []
+    total_points = 0
+    if items:
+        for it in items.all():
+            qty = getattr(it, "quantity", 1) or 1
+            pts = getattr(it, "points_each", 0) or 0
+            name = getattr(it, "name_snapshot", "Item")
+            line_total = qty * pts
+            total_points += line_total
+            line_items.append({
+                "name": name,
+                "qty": qty,
+                "points_each": pts,
+                "points_line": line_total,
+            })
+
+    context = {
+        "order": order,
+        "status_class": status_class,
+        "expected_delivery": expected_delivery,
+        "shipping": shipping,
+        "is_delayed": is_delayed,
+        "line_items": line_items,
+        "total_points": total_points or getattr(order, "points_spent", 0),
+    }
+    return render(request, "shop/order_detail.html", context)
+
 
 # STORY: Mark Order as Received
 @login_required
@@ -922,3 +977,84 @@ def report_invoices(request):
         "invoices": invoices,
     }
     return _csv_or_render(request, f"invoices_{year}_{month:02d}", columns, rows, "reports/report_invoices.html", ctx)
+
+@login_required
+def checkout(request):
+    """
+    Show shipping form + cart summary.
+    On POST, create Order, move CartItems -> OrderItems, set ETA, deduct points, clear cart.
+    """
+    driver = request.user
+
+    # Gather cart
+    cart_qs = CartItem.objects.filter(driver=driver).order_by("added_at")
+    if not cart_qs.exists():
+        messages.info(request, "Your cart is empty.")
+        return redirect("shop:catalog_search")
+
+    # Compute total points
+    total_points = 0
+    for c in cart_qs:
+        qty = c.quantity if c.quantity and c.quantity > 0 else 1
+        total_points += (c.points_each or 0) * qty
+
+    if request.method == "POST":
+        form = CheckoutForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                sponsor_name = ""
+                try:
+                    sponsor_name = getattr(driver.driver_profile, "sponsor_name", "") or ""
+                except Exception:
+                    pass
+
+                order = Order.objects.create(
+                    driver=driver,
+                    sponsor_name=sponsor_name,
+                    status="pending",
+                    points_spent=total_points,
+                    ship_name=form.cleaned_data["ship_name"],
+                    ship_line1=form.cleaned_data["ship_line1"],
+                    ship_line2=form.cleaned_data["ship_line2"],
+                    ship_city=form.cleaned_data["ship_city"],
+                    ship_state=form.cleaned_data["ship_state"],
+                    ship_postal=form.cleaned_data["ship_postal"],
+                    ship_country=(form.cleaned_data["ship_country"] or "US").upper(),
+                    expected_delivery_date=None, 
+                )
+
+                # Move cart items → order items
+                bulk_items = []
+                for c in cart_qs:
+                    qty = c.quantity if c.quantity and c.quantity > 0 else 1
+                    bulk_items.append(OrderItem(
+                        order=order,
+                        name_snapshot=c.name_snapshot,
+                        points_each=c.points_each or 0,
+                        quantity=qty,
+                    ))
+                OrderItem.objects.bulk_create(bulk_items)
+
+                # Set ETA
+                order.expected_delivery_date = order.estimate_delivery_date()
+                order.save(update_fields=["expected_delivery_date"])
+
+                PointsLedger.objects.create(
+                    user=driver,
+                    delta=-total_points,
+                    reason=f"Checkout Order #{order.id}",
+                )
+
+                # Clear cart
+                cart_qs.delete()
+
+            messages.success(request, f"Order #{order.id} placed successfully.")
+            return redirect("shop:order_detail", pk=order.id)
+    else:
+        form = CheckoutForm()
+
+    return render(request, "shop/checkout.html", {
+        "form": form,
+        "cart_items": cart_qs,
+        "total_points": total_points,
+    })
