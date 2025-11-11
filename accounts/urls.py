@@ -78,6 +78,11 @@ urlpatterns = [
     # Sponsor-facing driver search
     path("sponsor/drivers/", views.sponsor_driver_search, name="sponsor_driver_search"),
 
+    # Sponsor archiving (admin only)
+    path("admin/sponsors/archived/", views.archived_sponsors, name="archived_sponsors"),
+    path("admin/sponsors/<int:user_id>/archive/", views.archive_sponsor, name="archive_sponsor"),
+    path("admin/sponsors/<int:user_id>/unarchive/", views.unarchive_sponsor, name="unarchive_sponsor"),
+
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),
     path("admin/users/<int:user_id>/temp-password/", views.set_temporary_password, name="admin_set_temp_password"),
@@ -124,6 +129,13 @@ urlpatterns = [
     
     path("points/", views.points_history, name="points_history"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
+    path("my-sponsor/", views.my_sponsor, name="my_sponsor"),
+
+    # Chat rooms
+    path("chat/", views.chat_rooms_list, name="chat_rooms_list"),
+    path("chat/<int:room_id>/", views.chat_room_detail, name="chat_room_detail"),
+    path("chat/<int:room_id>/messages/", views.get_chat_messages, name="get_chat_messages"),
+    path("chat/<int:room_id>/send/", views.send_chat_message, name="send_chat_message"),
 
     path("api/suggest/drivers/", views.api_driver_suggest, name="api_driver_suggest"),
     path("api/suggest/sponsors/", views.api_sponsor_suggest, name="api_sponsor_suggest"),

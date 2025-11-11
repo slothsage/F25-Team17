@@ -29,6 +29,7 @@ from urllib3 import request
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
 from .models import DriverProfile
+from .models import ChatRoom, ChatMessage, MessageReadStatus
 from .models import Notification
 from .models import PointsLedger
 from .models import Message, MessageRecipient
@@ -691,6 +692,10 @@ def admin_user_search(request):
         sponsors_matching_count = sponsor_rows.count()
 
     sponsor_users_qs = User.objects.filter(groups__name="sponsor")
+    # Exclude archived sponsors from regular search
+    sponsor_users_qs = sponsor_users_qs.exclude(
+        sponsor_profile__is_archived=True
+    )
     if sponsor_q:
         sponsor_users_qs = sponsor_users_qs.filter(
             Q(username__icontains=sponsor_q) |
@@ -844,6 +849,90 @@ def admin_detail(request, user_id):
     }
     
     return render(request, "accounts/admin_detail.html", context)
+
+
+@staff_member_required
+@require_POST
+def archive_sponsor(request, user_id):
+    """Archive a sponsor user."""
+    from .models import SponsorProfile
+    User = get_user_model()
+    sponsor_user = get_object_or_404(User, pk=user_id, groups__name="sponsor")
+    
+    # Get or create sponsor profile
+    sponsor_profile, created = SponsorProfile.objects.get_or_create(user=sponsor_user)
+    
+    if not sponsor_profile.is_archived:
+        sponsor_profile.is_archived = True
+        sponsor_profile.archived_at = timezone.now()
+        sponsor_profile.archived_by = request.user
+        sponsor_profile.save()
+        messages.success(request, f"Sponsor '{sponsor_user.username}' has been archived.")
+    else:
+        messages.info(request, f"Sponsor '{sponsor_user.username}' is already archived.")
+    
+    return redirect("admin_user_search")
+
+
+@staff_member_required
+@require_POST
+def unarchive_sponsor(request, user_id):
+    """Unarchive a sponsor user."""
+    from .models import SponsorProfile
+    User = get_user_model()
+    sponsor_user = get_object_or_404(User, pk=user_id, groups__name="sponsor")
+    
+    try:
+        sponsor_profile = sponsor_user.sponsor_profile
+        if sponsor_profile.is_archived:
+            sponsor_profile.is_archived = False
+            sponsor_profile.archived_at = None
+            sponsor_profile.archived_by = None
+            sponsor_profile.save()
+            messages.success(request, f"Sponsor '{sponsor_user.username}' has been unarchived.")
+        else:
+            messages.info(request, f"Sponsor '{sponsor_user.username}' is not archived.")
+    except SponsorProfile.DoesNotExist:
+        messages.error(request, f"Sponsor profile not found for '{sponsor_user.username}'.")
+    
+    return redirect("accounts:archived_sponsors")
+
+
+@staff_member_required
+def archived_sponsors(request):
+    """View all archived sponsors."""
+    from .models import SponsorProfile
+    User = get_user_model()
+    
+    # Get search query
+    q = request.GET.get("q", "").strip()
+    
+    # Get all archived sponsors
+    archived_sponsors_qs = User.objects.filter(
+        groups__name="sponsor",
+        sponsor_profile__is_archived=True
+    )
+    
+    if q:
+        archived_sponsors_qs = archived_sponsors_qs.filter(
+            Q(username__icontains=q) |
+            Q(email__icontains=q)
+        )
+    
+    archived_sponsors_qs = archived_sponsors_qs.order_by("-sponsor_profile__archived_at")
+    
+    # Pagination
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(archived_sponsors_qs, 25)
+    archived_sponsors_page = paginator.get_page(page_number)
+    
+    context = {
+        "archived_sponsors": archived_sponsors_page,
+        "q": q,
+        "total_archived": archived_sponsors_qs.count(),
+    }
+    
+    return render(request, "accounts/archived_sponsors.html", context)
 
 
 @login_required
@@ -1154,8 +1243,12 @@ def create_sponsor(request):
             user.save()
             # add to sponsor group (create group if missing)
             from django.contrib.auth.models import Group
+            from .models import SponsorProfile
             sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
             user.groups.add(sponsor_group)
+            
+            # Create sponsor profile
+            SponsorProfile.objects.get_or_create(user=user)
 
             messages.success(request, f"Sponsor '{username}' created.")
             return redirect("admin_user_search")
@@ -1450,15 +1543,55 @@ def contact_sponsor(request):
             "error": "No sponsor contact information available.",
         })
 
-    sponsor = profile.sponsor_name or "Your Sponsor"
+    sponsor_name = profile.sponsor_name or "Your Sponsor"
     email = profile.sponsor_email
 
     # Pass data to the template for display (not redirect)
     return render(request, "accounts/contact_sponsor.html", {
         "email": email,
-        "sponsor": sponsor,
+        "sponsor_name": sponsor_name,
     })
 
+
+@login_required
+def my_sponsor(request):
+    """Display sponsor contact information for drivers."""
+    # Check if user is a driver (has driver_profile and not in sponsor group)
+    profile = getattr(request.user, "driver_profile", None)
+    
+    if not profile:
+        messages.error(request, "This page is only available to drivers.")
+        return redirect("accounts:profile")
+    
+    # Check if user is a sponsor
+    if request.user.groups.filter(name="sponsor").exists():
+        messages.error(request, "This page is only available to drivers.")
+        return redirect("accounts:profile")
+    
+    # Get sponsor information from driver profile
+    sponsor_name = profile.sponsor_name or None
+    sponsor_email = profile.sponsor_email or None
+    
+    # Try to find the actual sponsor user if sponsor_name is set
+    sponsor_user = None
+    if sponsor_name:
+        try:
+            sponsor_user = User.objects.filter(
+                username=sponsor_name,
+                groups__name="sponsor"
+            ).first()
+        except User.DoesNotExist:
+            pass
+    
+    context = {
+        "driver_profile": profile,
+        "sponsor_name": sponsor_name,
+        "sponsor_email": sponsor_email,
+        "sponsor_user": sponsor_user,
+        "has_sponsor": bool(sponsor_name or sponsor_email),
+    }
+    
+    return render(request, "accounts/my_sponsor.html", context)
 
 
 @staff_member_required
@@ -2111,3 +2244,195 @@ class PasswordResetConfirmNotifyView(PasswordResetConfirmView):
             notify_password_change(user)
         messages.success(self.request, "Password reset successful. A security notification was sent to your email.")
         return response
+
+
+# ============================================================================
+# CHAT ROOM VIEWS
+# ============================================================================
+
+@login_required
+def chat_rooms_list(request):
+    """Display all chat rooms available to the user."""
+    user = request.user
+    chat_rooms = []
+    
+    # If user is a sponsor, show all chat rooms they own
+    if user.groups.filter(name="sponsor").exists():
+        chat_rooms = ChatRoom.objects.filter(sponsor=user)
+    
+    # If user is a driver, find chat rooms based on their sponsor
+    elif hasattr(user, "driver_profile"):
+        sponsor_name = user.driver_profile.sponsor_name
+        if sponsor_name:
+            try:
+                sponsor = User.objects.get(
+                    username=sponsor_name,
+                    groups__name="sponsor"
+                )
+                # Get or create chat room for this sponsor
+                chat_room, created = ChatRoom.objects.get_or_create(
+                    sponsor=sponsor,
+                    defaults={"name": f"{sponsor.username}'s Team Chat"}
+                )
+                chat_rooms = [chat_room]
+            except User.DoesNotExist:
+                pass
+    
+    # Annotate each chat room with latest message and unread count
+    for room in chat_rooms:
+        room.latest_message = room.get_latest_message()
+        room.unread_count = room.messages.exclude(sender=user).exclude(
+            read_by__user=user,
+            read_by__is_read=True
+        ).count()
+        room.participants_list = room.get_participants()
+    
+    context = {
+        "chat_rooms": chat_rooms,
+        "is_sponsor": user.groups.filter(name="sponsor").exists(),
+    }
+    
+    return render(request, "accounts/chat_rooms_list.html", context)
+
+
+@login_required
+def chat_room_detail(request, room_id):
+    """Display a specific chat room with messages."""
+    user = request.user
+    
+    try:
+        chat_room = ChatRoom.objects.get(id=room_id)
+    except ChatRoom.DoesNotExist:
+        messages.error(request, "Chat room not found.")
+        return redirect("accounts:chat_rooms_list")
+    
+    # Check if user has access to this chat room
+    participants = chat_room.get_participants()
+    if user not in participants:
+        messages.error(request, "You don't have access to this chat room.")
+        return redirect("accounts:chat_rooms_list")
+    
+    # Get all messages in the chat room
+    chat_messages = chat_room.messages.select_related("sender").all()
+    
+    # Mark all messages as read for this user
+    for message in chat_messages:
+        if message.sender != user:
+            message.mark_as_read(user)
+    
+    # Handle new message submission
+    if request.method == "POST":
+        message_text = request.POST.get("message", "").strip()
+        if message_text:
+            ChatMessage.objects.create(
+                chat_room=chat_room,
+                sender=user,
+                message=message_text
+            )
+            # Update the chat room's updated_at timestamp
+            chat_room.save()
+            messages.success(request, "Message sent!")
+            return redirect("accounts:chat_room_detail", room_id=room_id)
+        else:
+            messages.error(request, "Message cannot be empty.")
+    
+    context = {
+        "chat_room": chat_room,
+        "messages": chat_messages,
+        "participants": participants,
+        "is_sponsor": user.groups.filter(name="sponsor").exists(),
+    }
+    
+    return render(request, "accounts/chat_room_detail.html", context)
+
+
+@login_required
+def get_chat_messages(request, room_id):
+    """AJAX endpoint to get new messages for a chat room."""
+    from django.http import JsonResponse
+    
+    user = request.user
+    
+    try:
+        chat_room = ChatRoom.objects.get(id=room_id)
+    except ChatRoom.DoesNotExist:
+        return JsonResponse({"error": "Chat room not found"}, status=404)
+    
+    # Check if user has access
+    participants = chat_room.get_participants()
+    if user not in participants:
+        return JsonResponse({"error": "Access denied"}, status=403)
+    
+    # Get messages since a certain time (if provided)
+    since = request.GET.get("since")
+    messages_qs = chat_room.messages.select_related("sender")
+    
+    if since:
+        try:
+            since_dt = timezone.datetime.fromisoformat(since.replace('Z', '+00:00'))
+            messages_qs = messages_qs.filter(created_at__gt=since_dt)
+        except (ValueError, AttributeError):
+            pass
+    
+    # Mark new messages as read
+    for message in messages_qs:
+        if message.sender != user:
+            message.mark_as_read(user)
+    
+    messages_data = [{
+        "id": msg.id,
+        "sender": msg.sender.username,
+        "sender_name": msg.sender.get_full_name() or msg.sender.username,
+        "message": msg.message,
+        "created_at": msg.created_at.isoformat(),
+        "is_own": msg.sender == user,
+    } for msg in messages_qs]
+    
+    return JsonResponse({"messages": messages_data})
+
+
+@login_required
+def send_chat_message(request, room_id):
+    """AJAX endpoint to send a new message."""
+    from django.http import JsonResponse
+    
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+    
+    user = request.user
+    
+    try:
+        chat_room = ChatRoom.objects.get(id=room_id)
+    except ChatRoom.DoesNotExist:
+        return JsonResponse({"error": "Chat room not found"}, status=404)
+    
+    # Check if user has access
+    participants = chat_room.get_participants()
+    if user not in participants:
+        return JsonResponse({"error": "Access denied"}, status=403)
+    
+    message_text = request.POST.get("message", "").strip()
+    if not message_text:
+        return JsonResponse({"error": "Message cannot be empty"}, status=400)
+    
+    # Create the message
+    message = ChatMessage.objects.create(
+        chat_room=chat_room,
+        sender=user,
+        message=message_text
+    )
+    
+    # Update chat room timestamp
+    chat_room.save()
+    
+    return JsonResponse({
+        "success": True,
+        "message": {
+            "id": message.id,
+            "sender": user.username,
+            "sender_name": user.get_full_name() or user.username,
+            "message": message.message,
+            "created_at": message.created_at.isoformat(),
+            "is_own": True,
+        }
+    })

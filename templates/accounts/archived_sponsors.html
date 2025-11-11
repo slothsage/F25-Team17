@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-main">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <h1 class="page-title">Archived Sponsors</h1>
+      <p class="page-subtitle">View and manage archived sponsor accounts</p>
+    </div>
+    <div class="toolbar-right">
+      <a class="btn btn-muted" href="{% url 'admin_user_search' %}">← Back to Search</a>
+    </div>
+  </header>
+
+  <!-- Search Form -->
+  <section class="card">
+    <div class="card-header">
+      <h2 class="card-title">Search Archived Sponsors</h2>
+    </div>
+    <div class="card-body">
+      <form method="get" class="stack gap-sm">
+        <input
+          name="q"
+          value="{{ q }}"
+          class="input"
+          placeholder="Search by username or email"
+          autocomplete="off"
+          aria-label="Search archived sponsors"
+        />
+        <div class="row-actions">
+          <button class="btn btn-primary">Search</button>
+          {% if q %}
+            <a class="btn btn-muted" href="{% url 'accounts:archived_sponsors' %}">Clear Search</a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Archived Sponsors Table -->
+  <section class="card mt-lg">
+    <div class="card-header">
+      <div class="card-title-row">
+        <h2 class="card-title">Archived Sponsor Users</h2>
+        <div class="pill muted">Showing {{ total_archived }} archived sponsor(s)</div>
+      </div>
+    </div>
+    <div class="card-body">
+      {% if archived_sponsors %}
+        <div class="table-wrap">
+          <table class="table table-admin">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Archived At</th>
+                <th>Archived By</th>
+                <th>Status</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sponsor in archived_sponsors %}
+              <tr>
+                <td class="mono">{{ sponsor.id }}</td>
+                <td class="wrap">{{ sponsor.username }}</td>
+                <td class="wrap">{{ sponsor.email }}</td>
+                <td class="nowrap">
+                  {% if sponsor.sponsor_profile.archived_at %}
+                    {{ sponsor.sponsor_profile.archived_at|date:"Y-m-d H:i" }}<br>
+                    <small class="subtle">{{ sponsor.sponsor_profile.archived_at|timesince }} ago</small>
+                  {% else %}
+                    <span class="muted">-</span>
+                  {% endif %}
+                </td>
+                <td class="wrap">
+                  {% if sponsor.sponsor_profile.archived_by %}
+                    {{ sponsor.sponsor_profile.archived_by.username }}
+                  {% else %}
+                    <span class="muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge warning">Archived</span>
+                  {% if sponsor.is_active %}
+                    <span class="badge success">Active</span>
+                  {% else %}
+                    <span class="badge danger">Inactive</span>
+                  {% endif %}
+                </td>
+                <td class="actions">
+                  <!-- Unarchive -->
+                  <form method="post" action="{% url 'accounts:unarchive_sponsor' sponsor.id %}" class="inline">
+                    {% csrf_token %}
+                    <button class="btn btn-success" type="submit" onclick="return confirm('Unarchive sponsor {{ sponsor.username }}? They will appear in regular searches again.');">
+                      📂 Unarchive
+                    </button>
+                  </form>
+
+                  <!-- View As Sponsor -->
+                  <form method="post" action="{% url 'accounts:view_as_sponsor' sponsor.id %}" class="inline">
+                    {% csrf_token %}
+                    <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as sponsor {{ sponsor.username }}?');">
+                      🔍 View As Sponsor
+                    </button>
+                  </form>
+
+                  <!-- Edit Profile -->
+                  <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' sponsor.id %}">Edit Profile</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav class="pagination">
+          {% if archived_sponsors.has_previous %}
+            <a class="page-link" href="?q={{ q }}&page={{ archived_sponsors.previous_page_number }}">Previous</a>
+          {% endif %}
+          <span class="page-status">Page {{ archived_sponsors.number }} of {{ archived_sponsors.paginator.num_pages }}</span>
+          {% if archived_sponsors.has_next %}
+            <a class="page-link" href="?q={{ q }}&page={{ archived_sponsors.next_page_number }}">Next</a>
+          {% endif %}
+        </nav>
+      {% else %}
+        <div class="empty-state">
+          <p class="muted">No archived sponsors found{% if q %} for "{{ q }}"{% endif %}.</p>
+          {% if q %}
+            <a class="btn btn-primary" href="{% url 'accounts:archived_sponsors' %}">View All Archived Sponsors</a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<style>
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+}
+
+.empty-state p {
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.pill.muted {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-subtle);
+}
+</style>
+{% endblock content %}

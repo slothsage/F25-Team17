@@ -190,6 +190,7 @@
 
       <div id="nav-links" class="nav-center">
         <ul class="nav-list">
+        {% load group_filters %}
         {% if user.is_authenticated %}
           <!-- removed `Browse Catalog` solo option-->
 
@@ -237,8 +238,14 @@
             <a class="nav-link" href="{% url 'accounts:messages_inbox' %}">Messages</a>
           </li>
 
+          <!-- Team Chats (for drivers and sponsors) -->
+          {% if user.driver_profile or user|has_group:"sponsor" %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:chat_rooms_list' %}">Team Chats</a>
+          </li>
+          {% endif %}
+
           <!-- Sponsor-only: Search Drivers -->
-          {% load group_filters %}
           {% if user|has_group:"sponsor" %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:sponsor_driver_search' %}">Search Drivers</a>

@@ -5,9 +5,10 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import User
 from django.urls import reverse
 from django.utils.html import format_html
-from .models import DriverProfile, CustomLabel
+from .models import DriverProfile, CustomLabel, SponsorProfile
 from .models import FailedLoginAttempt
 from .models import PasswordPolicy
+from .models import ChatRoom, ChatMessage, MessageReadStatus
 
 
 # Register your models here.
@@ -61,6 +62,46 @@ class DriverProfileAdmin(admin.ModelAdmin):
     readonly_fields = ("is_locked",)
     list_filter = ("is_locked", "is_suspended", "labels")
     filter_horizontal = ("labels",)
+
+
+@admin.register(ChatRoom)
+class ChatRoomAdmin(admin.ModelAdmin):
+    list_display = ("name", "sponsor", "created_at", "updated_at", "participant_count")
+    search_fields = ("name", "sponsor__username")
+    list_filter = ("created_at",)
+    readonly_fields = ("created_at", "updated_at")
+    
+    @admin.display(description="Participants")
+    def participant_count(self, obj):
+        return len(obj.get_participants())
+
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("sender", "chat_room", "message_preview", "created_at")
+    search_fields = ("sender__username", "message", "chat_room__name")
+    list_filter = ("created_at", "chat_room")
+    readonly_fields = ("created_at", "edited_at")
+    
+    @admin.display(description="Message")
+    def message_preview(self, obj):
+        return obj.message[:50] + "..." if len(obj.message) > 50 else obj.message
+
+
+@admin.register(MessageReadStatus)
+class MessageReadStatusAdmin(admin.ModelAdmin):
+    list_display = ("message", "user", "is_read", "read_at")
+    search_fields = ("user__username", "message__message")
+    list_filter = ("is_read", "read_at")
+    readonly_fields = ("read_at",)
+
+
+@admin.register(SponsorProfile)
+class SponsorProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "is_archived", "archived_at", "archived_by")
+    search_fields = ("user__username", "user__email")
+    list_filter = ("is_archived",)
+    readonly_fields = ("archived_at", "archived_by")
 
 
 @admin.register(CustomLabel)

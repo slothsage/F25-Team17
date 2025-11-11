@@ -9,19 +9,18 @@
                       <h1 class="page-title">Admin: User, Sponsor &amp; Admin Search</h1>
                       <p class="page-subtitle">Find drivers, sponsors, and admin users, manage accounts, and export CSVs.</p>
                     </div>
-                    <div class="toolbar-right">
+                    <div class="toolbar-right" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
                       <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
                       <a class="btn btn-primary" href="{% url 'accounts:admin_active_sessions' %}">Active Sessions</a>
+                      <a class="btn btn-warning" href="{% url 'accounts:archived_sponsors' %}">Archived Sponsors</a>
                       <!-- Error Log Download (with Date Filter) -->
-                      <form method="get" action="{% url 'accounts:download_error_log' %}" style="display:inline-flex; align-items:center; gap:4px;">
-                        <input type="date" name="date" class="input" style="height: 32px; padding: 2px 6px;">
-                        <button class="btn btn-danger btn-sm" type="submit">Download Logs</button>
+                      <form method="get" action="{% url 'accounts:download_error_log' %}" style="display: flex; align-items: center; gap: 0.25rem; margin: 0;">
+                        <input type="date" name="date" class="input" style="height: 38px; padding: 0.4rem 0.8rem; border: 1px solid #888; border-radius: 0.5rem;">
+                        <button class="btn btn-danger" type="submit">Download Logs</button>
                       </form>
 
                       <!-- Bulk Upload CSV -->
-                      <a class="btn btn-success ms-2" href="{% url 'accounts:bulk_upload_users' %}">
-                        Bulk Upload CSV
-                      </a>
+                      <a class="btn btn-success" href="{% url 'accounts:bulk_upload_users' %}">Bulk Upload CSV</a>
                     </div>
 
                     <!-- Label Filter -->
@@ -232,7 +231,7 @@
                                 <form method="post" action="{% url 'accounts:view_as_driver' u.id %}" class="inline">
                                   {% csrf_token %}
                                   <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as {{ u.username }}? You will be able to see exactly what they see.');">
-                                    🔍 View As Driver
+                                    View As Driver
                                   </button>
                                 </form>
 
@@ -405,7 +404,7 @@
                                 <form method="post" action="{% url 'accounts:view_as_sponsor' s.id %}" class="inline">
                                   {% csrf_token %}
                                   <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as sponsor {{ s.username }}? You will be able to see exactly what they see.');">
-                                    🔍 View As Sponsor
+                                    View As Sponsor
                                   </button>
                                 </form>
 
@@ -435,6 +434,14 @@
                                 <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" class="inline">
                                   {% csrf_token %}
                                   <button class="btn btn-info" type="submit">Send Reset Link</button>
+                                </form>
+
+                                <!-- Archive Sponsor -->
+                                <form method="post" action="{% url 'accounts:archive_sponsor' s.id %}" class="inline">
+                                  {% csrf_token %}
+                                  <button class="btn btn-warning" type="submit" onclick="return confirm('Archive sponsor {{ s.username }}? They will be hidden from searches but can be unarchived later.');">
+                                    Archive
+                                  </button>
                                 </form>
 
                                 <form method="post" action="{% url 'accounts:admin_force_logout_user' s.id %}" class="inline">

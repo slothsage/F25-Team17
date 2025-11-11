@@ -78,6 +78,26 @@ class DriverProfile(models.Model):
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
 
+class SponsorProfile(models.Model):
+    """Profile for sponsor users to store sponsor-specific data."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="sponsor_profile")
+    is_archived = models.BooleanField(
+        default=False,
+        help_text="If checked, this sponsor is archived and won't appear in regular searches"
+    )
+    archived_at = models.DateTimeField(null=True, blank=True, help_text="When the sponsor was archived")
+    archived_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="archived_sponsors",
+        help_text="Admin who archived this sponsor"
+    )
+    
+    def __str__(self):
+        return f"SponsorProfile<{self.user.username}>"
+
 class PasswordPolicy(models.Model):
     min_length = models.PositiveIntegerField(default=12)
     require_upper = models.BooleanField(default=True)
@@ -428,4 +448,105 @@ class UserMFA(models.Model):
     def __str__(self):
         status = "ENABLED" if self.mfa_enabled else "DISABLED"
         return f"UserMFA<{self.user.username}> {status}"
+
+
+class ChatRoom(models.Model):
+    """
+    Chat room linking a sponsor with their drivers.
+    Each sponsor has one chat room that includes all their assigned drivers.
+    """
+    sponsor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="sponsor_chat_rooms",
+        limit_choices_to={"groups__name": "sponsor"}
+    )
+    name = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name = "Chat Room"
+        verbose_name_plural = "Chat Rooms"
+    
+    def __str__(self):
+        return self.name or f"Chat with {self.sponsor.username}"
+    
+    def get_participants(self):
+        """Get all participants in this chat room (sponsor + all drivers)"""
+        drivers = User.objects.filter(
+            driver_profile__sponsor_name=self.sponsor.username
+        )
+        return list(drivers) + [self.sponsor]
+    
+    def get_latest_message(self):
+        """Get the most recent message in this chat room"""
+        return self.messages.order_by("-created_at").first()
+    
+    def get_unread_count(self, user):
+        """Get count of unread messages for a specific user"""
+        return self.messages.exclude(sender=user).filter(read_by__user=user, read_by__is_read=False).count()
+
+
+class ChatMessage(models.Model):
+    """
+    Individual message in a chat room.
+    """
+    chat_room = models.ForeignKey(
+        ChatRoom,
+        on_delete=models.CASCADE,
+        related_name="messages"
+    )
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="sent_messages"
+    )
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Chat Message"
+        verbose_name_plural = "Chat Messages"
+    
+    def __str__(self):
+        return f"{self.sender.username}: {self.message[:50]}"
+    
+    def mark_as_read(self, user):
+        """Mark this message as read by a specific user"""
+        MessageReadStatus.objects.update_or_create(
+            message=self,
+            user=user,
+            defaults={"is_read": True, "read_at": timezone.now()}
+        )
+
+
+class MessageReadStatus(models.Model):
+    """
+    Track which users have read which messages.
+    """
+    message = models.ForeignKey(
+        ChatMessage,
+        on_delete=models.CASCADE,
+        related_name="read_by"
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="message_read_statuses"
+    )
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ["message", "user"]
+        verbose_name = "Message Read Status"
+        verbose_name_plural = "Message Read Statuses"
+    
+    def __str__(self):
+        status = "Read" if self.is_read else "Unread"
+        return f"{self.user.username} - {status}"
     

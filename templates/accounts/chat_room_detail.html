@@ -1,0 +1,561 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-main chat-container">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <a class="btn btn-muted btn-icon" href="{% url 'accounts:chat_rooms_list' %}" title="Back to all chats">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="page-title">{{ chat_room.name }}</h1>
+        <p class="page-subtitle">{{ participants|length }} participant{{ participants|length|pluralize }}</p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn btn-secondary" id="toggleParticipants">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7Zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.784 6A2.238 2.238 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.325 6.325 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1h4.216ZM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/>
+        </svg>
+        Participants
+      </button>
+    </div>
+  </header>
+
+  <div class="chat-layout">
+    <!-- Messages Area -->
+    <div class="chat-main">
+      <div class="messages-container" id="messagesContainer">
+        {% if messages %}
+          {% for msg in messages %}
+            <div class="message {% if msg.sender == request.user %}message-own{% else %}message-other{% endif %}" data-message-id="{{ msg.id }}">
+              <div class="message-avatar">
+                {% if msg.sender.driver_profile.image %}
+                  <img src="{{ msg.sender.driver_profile.image.url }}" alt="{{ msg.sender.username }}">
+                {% else %}
+                  <div class="avatar-placeholder">{{ msg.sender.username|first|upper }}</div>
+                {% endif %}
+              </div>
+              <div class="message-content">
+                <div class="message-header">
+                  <span class="message-sender">{{ msg.sender.get_full_name|default:msg.sender.username }}</span>
+                  <span class="message-time">{{ msg.created_at|date:"g:i A" }}</span>
+                </div>
+                <div class="message-text">{{ msg.message }}</div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-messages">
+            <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" fill="currentColor" viewBox="0 0 16 16" style="opacity: 0.3;">
+              <path d="M2.678 11.894a1 1 0 0 1 .287.801 10.97 10.97 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8.06 8.06 0 0 0 8 14c3.996 0 7-2.807 7-6 0-3.192-3.004-6-7-6S1 4.808 1 8c0 1.468.617 2.83 1.678 3.894zm-.493 3.905a21.682 21.682 0 0 1-.713.129c-.2.032-.352-.176-.273-.362a9.68 9.68 0 0 0 .244-.637l.003-.01c.248-.72.45-1.548.524-2.319C.743 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7-3.582 7-8 7a9.06 9.06 0 0 1-2.347-.306c-.52.263-1.639.742-3.468 1.105z"/>
+            </svg>
+            <p>No messages yet. Start the conversation!</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Message Input -->
+      <div class="message-input-container">
+        <form method="post" id="messageForm" class="message-form">
+          {% csrf_token %}
+          <textarea 
+            name="message" 
+            id="messageInput" 
+            class="message-textarea" 
+            placeholder="Type your message..."
+            rows="1"
+            required
+          ></textarea>
+          <button type="submit" class="btn btn-primary btn-send">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
+            </svg>
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Participants Sidebar -->
+    <aside class="participants-sidebar" id="participantsSidebar">
+      <div class="sidebar-header">
+        <h3>Participants ({{ participants|length }})</h3>
+        <button class="btn-icon" id="closeParticipants">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+          </svg>
+        </button>
+      </div>
+      <div class="participants-list">
+        {% for participant in participants %}
+          <div class="participant-item">
+            <div class="participant-avatar">
+              {% if participant.driver_profile.image %}
+                <img src="{{ participant.driver_profile.image.url }}" alt="{{ participant.username }}">
+              {% else %}
+                <div class="avatar-placeholder">{{ participant.username|first|upper }}</div>
+              {% endif %}
+            </div>
+            <div class="participant-info">
+              <p class="participant-name">{{ participant.get_full_name|default:participant.username }}</p>
+              <p class="participant-role">
+                {% if participant.groups.all.0.name == "sponsor" %}
+                  <span class="badge badge-sponsor">Sponsor</span>
+                {% else %}
+                  <span class="badge badge-driver">Driver</span>
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </aside>
+  </div>
+</div>
+
+<style>
+.chat-container {
+  height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.chat-container .toolbar {
+  flex-shrink: 0;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background: white;
+}
+
+.btn-icon {
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.btn-icon:hover {
+  background: var(--color-bg-subtle, #f0f0f0);
+}
+
+.chat-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f7fa;
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.message {
+  display: flex;
+  gap: 0.75rem;
+  max-width: 70%;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-own {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.message-other {
+  align-self: flex-start;
+}
+
+.message-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.message-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.message-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+
+.message-own .message-header {
+  flex-direction: row-reverse;
+}
+
+.message-sender {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.message-time {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+}
+
+.message-text {
+  background: white;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  border: 1px solid var(--color-border);
+}
+
+.message-own .message-text {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.empty-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--color-text-subtle);
+}
+
+.message-input-container {
+  flex-shrink: 0;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-top: 1px solid var(--color-border);
+}
+
+.message-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.message-textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 1rem;
+  resize: none;
+  transition: border-color 0.2s;
+}
+
+.message-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.btn-send {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  white-space: nowrap;
+}
+
+.participants-sidebar {
+  width: 300px;
+  background: white;
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
+.participants-sidebar.hidden {
+  transform: translateX(100%);
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
+
+.sidebar-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.participants-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.participant-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  transition: background 0.2s;
+}
+
+.participant-item:hover {
+  background: var(--color-bg-subtle, #f8f9fa);
+}
+
+.participant-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.participant-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.participant-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.participant-name {
+  margin: 0 0 0.25rem 0;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.participant-role {
+  margin: 0;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.badge-sponsor {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.badge-driver {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+@media (max-width: 768px) {
+  .message {
+    max-width: 85%;
+  }
+
+  .participants-sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 10;
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .participants-sidebar.hidden {
+    transform: translateX(100%);
+  }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const messagesContainer = document.getElementById('messagesContainer');
+  const messageForm = document.getElementById('messageForm');
+  const messageInput = document.getElementById('messageInput');
+  const participantsSidebar = document.getElementById('participantsSidebar');
+  const toggleBtn = document.getElementById('toggleParticipants');
+  const closeBtn = document.getElementById('closeParticipants');
+  
+  // Scroll to bottom of messages
+  function scrollToBottom() {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+  
+  scrollToBottom();
+  
+  // Auto-resize textarea
+  messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+  
+  // Toggle participants sidebar
+  toggleBtn.addEventListener('click', function() {
+    participantsSidebar.classList.toggle('hidden');
+  });
+  
+  closeBtn.addEventListener('click', function() {
+    participantsSidebar.classList.add('hidden');
+  });
+  
+  // Handle form submission with AJAX
+  messageForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const message = messageInput.value.trim();
+    if (!message) return;
+    
+    const formData = new FormData(messageForm);
+    
+    fetch('{% url "accounts:send_chat_message" chat_room.id %}', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Clear input
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        
+        // Add message to UI
+        addMessageToUI(data.message);
+        scrollToBottom();
+      }
+    })
+    .catch(error => {
+      console.error('Error sending message:', error);
+    });
+  });
+  
+  // Add message to UI
+  function addMessageToUI(msg) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = msg.is_own ? 'message message-own' : 'message message-other';
+    messageDiv.setAttribute('data-message-id', msg.id);
+    
+    const time = new Date(msg.created_at);
+    const timeStr = time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    
+    messageDiv.innerHTML = `
+      <div class="message-avatar">
+        <div class="avatar-placeholder">${msg.sender_name.charAt(0).toUpperCase()}</div>
+      </div>
+      <div class="message-content">
+        <div class="message-header">
+          <span class="message-sender">${msg.sender_name}</span>
+          <span class="message-time">${timeStr}</span>
+        </div>
+        <div class="message-text">${escapeHtml(msg.message)}</div>
+      </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+  }
+  
+  // Escape HTML to prevent XSS
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  // Poll for new messages every 3 seconds
+  let lastMessageTime = new Date().toISOString();
+  
+  setInterval(function() {
+    fetch(`{% url "accounts:get_chat_messages" chat_room.id %}?since=${encodeURIComponent(lastMessageTime)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.messages && data.messages.length > 0) {
+          data.messages.forEach(msg => {
+            // Check if message already exists
+            if (!document.querySelector(`[data-message-id="${msg.id}"]`)) {
+              addMessageToUI(msg);
+            }
+          });
+          
+          lastMessageTime = data.messages[data.messages.length - 1].created_at;
+          
+          // Scroll to bottom if user is near bottom
+          const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+          if (isNearBottom) {
+            scrollToBottom();
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching messages:', error);
+      });
+  }, 3000);
+});
+</script>
+{% endblock content %}

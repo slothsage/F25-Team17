@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<div class="container-main">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <h1 class="page-title">My Sponsor</h1>
+      <p class="page-subtitle">View your assigned sponsor's contact information</p>
+    </div>
+    <div class="toolbar-right">
+      <a class="btn btn-muted" href="{% url 'accounts:profile' %}">← Back to Profile</a>
+    </div>
+  </header>
+
+  {% if has_sponsor %}
+    <!-- Sponsor Contact Information Card -->
+    <section class="card center-narrow">
+      <div class="card-header">
+        <h2 class="card-title">Sponsor Contact Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="sponsor-info">
+          <!-- Sponsor Icon -->
+          <div class="sponsor-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+            </svg>
+          </div>
+
+          <!-- Sponsor Details -->
+          <div class="sponsor-details">
+            <div class="detail-row">
+              <span class="detail-label">Sponsor Name:</span>
+              <span class="detail-value">{{ sponsor_name|default:"Not assigned" }}</span>
+            </div>
+
+            {% if sponsor_email %}
+            <div class="detail-row">
+              <span class="detail-label">Email:</span>
+              <span class="detail-value">
+                <a href="mailto:{{ sponsor_email }}" class="email-link">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 5px;">
+                    <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/>
+                  </svg>
+                  {{ sponsor_email }}
+                </a>
+              </span>
+            </div>
+            {% endif %}
+
+            {% if sponsor_user %}
+            <div class="detail-row">
+              <span class="detail-label">Username:</span>
+              <span class="detail-value">{{ sponsor_user.username }}</span>
+            </div>
+
+            {% if sponsor_user.first_name or sponsor_user.last_name %}
+            <div class="detail-row">
+              <span class="detail-label">Full Name:</span>
+              <span class="detail-value">{{ sponsor_user.get_full_name }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Contact Button -->
+        {% if sponsor_email %}
+        <div class="contact-actions">
+          <a href="mailto:{{ sponsor_email }}" class="btn btn-primary btn-large">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 8px;">
+              <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/>
+            </svg>
+            Send Email to Sponsor
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- Additional Information -->
+    <section class="card center-narrow mt-lg">
+      <div class="card-header">
+        <h2 class="card-title">Need Help?</h2>
+      </div>
+      <div class="card-body">
+        <div class="help-content">
+          <p>If you need to update your sponsor information or have questions about your sponsor assignment, please contact your administrator.</p>
+          <div class="help-actions">
+            <a href="{% url 'accounts:submit_ticket' %}" class="btn btn-secondary">
+              Submit Support Ticket
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  {% else %}
+    <!-- No Sponsor Assigned -->
+    <section class="card center-narrow">
+      <div class="card-body">
+        <div class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" viewBox="0 0 16 16" style="opacity: 0.3; margin-bottom: 1rem;">
+            <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+          </svg>
+          <h3>No Sponsor Assigned</h3>
+          <p class="muted">You don't have a sponsor assigned yet. Please contact your administrator for assistance.</p>
+          <div class="empty-state-actions">
+            <a href="{% url 'accounts:submit_ticket' %}" class="btn btn-primary">
+              Contact Support
+            </a>
+            <a href="{% url 'accounts:profile' %}" class="btn btn-muted">
+              Back to Profile
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+</div>
+
+<style>
+.center-narrow {
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sponsor-info {
+  text-align: center;
+}
+
+.sponsor-icon {
+  margin-bottom: 2rem;
+  color: var(--color-primary);
+}
+
+.sponsor-details {
+  margin: 2rem 0;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: var(--color-text-subtle);
+  flex: 0 0 150px;
+  text-align: left;
+}
+
+.detail-value {
+  flex: 1;
+  text-align: left;
+  font-size: 1.125rem;
+}
+
+.email-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.email-link:hover {
+  text-decoration: underline;
+}
+
+.contact-actions {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.btn-large {
+  padding: 0.875rem 2rem;
+  font-size: 1.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.help-content {
+  text-align: center;
+  padding: 1rem;
+}
+
+.help-content p {
+  margin-bottom: 1.5rem;
+  color: var(--color-text-subtle);
+}
+
+.help-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.empty-state h3 {
+  margin: 1rem 0;
+  font-size: 1.5rem;
+}
+
+.empty-state p {
+  margin-bottom: 2rem;
+  font-size: 1.125rem;
+}
+
+.empty-state-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .detail-label {
+    flex: none;
+  }
+
+  .help-actions,
+  .empty-state-actions {
+    flex-direction: column;
+  }
+
+  .help-actions a,
+  .empty-state-actions a {
+    width: 100%;
+  }
+}
+</style>
+{% endblock content %}
