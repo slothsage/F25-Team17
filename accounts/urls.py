@@ -14,6 +14,10 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("register/", views.register, name="register"),
     
+    # Wallet
+    path("wallets/", views.wallets, name="wallets"),
+    path("wallets/award/", views.sponsor_award_points, name="sponsor_award_points"),
+
     # Multi-factor authentication (MFA)
     path("mfa/setup/", views.mfa_setup, name="mfa_setup"),
     path("mfa/", views.mfa_challenge_view, name="mfa_challenge"),

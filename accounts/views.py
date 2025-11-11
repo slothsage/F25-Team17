@@ -2,7 +2,7 @@ from multiprocessing import context
 from django.contrib import messages
 from django import forms
 from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import logout as auth_logout
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.admin.views.decorators import staff_member_required
@@ -89,6 +89,10 @@ from django.contrib import messages
 from .services import notify_password_change
 from .forms import LabelForm, AssignLabelForm
 from .models import CustomLabel, DriverProfile
+
+from django.db import transaction
+from .models import SponsorPointsAccount
+from .forms import SponsorAwardForm, SetPrimaryWalletForm
 
 User = get_user_model()
 
@@ -1034,6 +1038,43 @@ class FrontLoginView(LoginView):
         response = super().form_valid(form) #logs user in normally
         return HttpResponseRedirect(landing_url_for(self.request.user))
 
+def is_sponsor(user):
+    # TODO: replace with your real sponsor-role check
+    return getattr(user, "is_sponsor", False) or user.groups.filter(name="sponsor").exists()
+
+@login_required
+@user_passes_test(is_sponsor)
+@transaction.atomic
+def sponsor_award_points(request):
+    if request.method == "POST":
+        form = SponsorAwardForm(request.POST)
+        if form.is_valid():
+            driver = get_object_or_404(User, pk=form.cleaned_data["driver_id"])
+            amount = form.cleaned_data["amount"]
+            reason = form.cleaned_data.get("reason", "")
+            wallet, _ = SponsorPointsAccount.objects.select_for_update().get_or_create(
+                driver=driver, sponsor=request.user, defaults={"balance": 0}
+            )
+            wallet.apply_points(+amount, reason=reason or "Sponsor award", created_by=request.user)
+            messages.success(request, f"Awarded {amount} points to {driver.username}.")
+            return redirect(reverse("accounts:sponsor_award_points"))
+    else:
+        form = SponsorAwardForm()
+    return render(request, "accounts/sponsor_award_points.html", {"form": form})
+
+@login_required
+def wallets(request):
+    qs = SponsorPointsAccount.objects.filter(driver=request.user).select_related("sponsor")
+    if request.method == "POST":
+        form = SetPrimaryWalletForm(request.POST, driver=request.user)
+        if form.is_valid():
+            wallet = form.cleaned_data["wallet_id"]
+            wallet.set_primary()
+            messages.success(request, "Primary sponsor wallet updated.")
+            return redirect("accounts:wallets")
+    else:
+        form = SetPrimaryWalletForm(driver=request.user)
+    return render(request, "accounts/wallets.html", {"wallets": qs, "form": form})
 
 @staff_member_required
 def messages_compose(request):

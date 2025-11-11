@@ -24,6 +24,7 @@ from django.http import JsonResponse
 from xhtml2pdf import pisa
 import json
 import csv
+from accounts.models import SponsorPointsAccount
 
 
 # A tiny editable set of eBay category IDs (Browse API uses numeric IDs)
@@ -1002,54 +1003,64 @@ def checkout(request):
         form = CheckoutForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
-                sponsor_name = ""
-                try:
-                    sponsor_name = getattr(driver.driver_profile, "sponsor_name", "") or ""
-                except Exception:
-                    pass
+                wallet = (SponsorPointsAccount.objects
+                    .select_for_update()
+                    .filter(driver=driver, is_primary=True)
+                    .select_related("sponsor")
+                    .first())
 
-                order = Order.objects.create(
-                    driver=driver,
-                    sponsor_name=sponsor_name,
-                    status="pending",
-                    points_spent=total_points,
-                    ship_name=form.cleaned_data["ship_name"],
-                    ship_line1=form.cleaned_data["ship_line1"],
-                    ship_line2=form.cleaned_data["ship_line2"],
-                    ship_city=form.cleaned_data["ship_city"],
-                    ship_state=form.cleaned_data["ship_state"],
-                    ship_postal=form.cleaned_data["ship_postal"],
-                    ship_country=(form.cleaned_data["ship_country"] or "US").upper(),
-                    expected_delivery_date=None, 
-                )
+            if not wallet:
+                messages.error(request, "You must choose a primary sponsor wallet before checkout.")
+                return redirect("accounts:wallets")
 
-                # Move cart items → order items
-                bulk_items = []
-                for c in cart_qs:
-                    qty = c.quantity if c.quantity and c.quantity > 0 else 1
-                    bulk_items.append(OrderItem(
-                        order=order,
-                        name_snapshot=c.name_snapshot,
-                        points_each=c.points_each or 0,
-                        quantity=qty,
-                    ))
-                OrderItem.objects.bulk_create(bulk_items)
+            if wallet.balance < total_points:
+                messages.error(request, "Insufficient points in your primary sponsor wallet.")
+                return redirect("shop:cart")
 
-                # Set ETA
-                order.expected_delivery_date = order.estimate_delivery_date()
-                order.save(update_fields=["expected_delivery_date"])
+            sponsor_name = getattr(wallet.sponsor, "username", "") or ""
+            order = Order.objects.create(
+                driver=driver,
+                sponsor_name=sponsor_name,
+                status="pending",
+                points_spent=total_points,
+                ship_name=form.cleaned_data["ship_name"],
+                ship_line1=form.cleaned_data["ship_line1"],
+                ship_line2=form.cleaned_data["ship_line2"],
+                ship_city=form.cleaned_data["ship_city"],
+                ship_state=form.cleaned_data["ship_state"],
+                ship_postal=form.cleaned_data["ship_postal"],
+                ship_country=(form.cleaned_data["ship_country"] or "US").upper(),
+                expected_delivery_date=None, 
+            )
 
-                PointsLedger.objects.create(
-                    user=driver,
-                    delta=-total_points,
-                    reason=f"Checkout Order #{order.id}",
-                )
+            # Move cart items → order items
+            bulk_items = []
+            for c in cart_qs:
+                qty = c.quantity if c.quantity and c.quantity > 0 else 1
+                bulk_items.append(OrderItem(
+                    order=order,
+                    name_snapshot=c.name_snapshot,
+                    points_each=c.points_each or 0,
+                    quantity=qty,
+                ))
+            OrderItem.objects.bulk_create(bulk_items)
 
-                # Clear cart
-                cart_qs.delete()
+            # Set ETA
+            order.expected_delivery_date = order.estimate_delivery_date()
+            order.save(update_fields=["expected_delivery_date"])
 
-            messages.success(request, f"Order #{order.id} placed successfully.")
-            return redirect("shop:order_detail", pk=order.id)
+            wallet.apply_points(
+                -total_points,
+                reason=f"Checkout Order #{order.id}",
+                created_by=driver,
+                order=order,
+            )
+
+            # Clear cart
+            cart_qs.delete()
+
+        messages.success(request, f"Order #{order.id} placed successfully.")
+        return redirect("shop:order_detail", pk=order.id)
     else:
         form = CheckoutForm()
 

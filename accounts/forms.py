@@ -7,6 +7,7 @@ from .models import SecurityQuestion, UserSecurityAnswer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import password_validators_help_text_html
+from .models import SponsorPointsAccount
 
 User = get_user_model()
 
@@ -296,3 +297,16 @@ class SponsorApplicationForm(forms.Form):
                 driver_applications__driver=self.driver
             )
 """
+
+class SponsorAwardForm(forms.Form):
+    driver_id = forms.IntegerField()
+    amount = forms.IntegerField(min_value=1)
+    reason = forms.CharField(max_length=255, required=False)
+
+class SetPrimaryWalletForm(forms.Form):
+    wallet_id = forms.ModelChoiceField(queryset=SponsorPointsAccount.objects.none())
+
+    def __init__(self, *args, **kwargs):
+        driver = kwargs.pop("driver")
+        super().__init__(*args, **kwargs)
+        self.fields["wallet_id"].queryset = SponsorPointsAccount.objects.filter(driver=driver)

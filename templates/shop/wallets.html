@@ -1,0 +1,22 @@
+<h1>Your Sponsor Wallets</h1>
+<table class="table">
+  <thead><tr><th>Sponsor</th><th>Balance</th><th>Primary</th><th></th></tr></thead>
+  <tbody>
+  {% for w in wallets %}
+    <tr>
+      <td>{{ w.sponsor.username }}</td>
+      <td>{{ w.balance }} pts</td>
+      <td>{% if w.is_primary %}✅{% endif %}</td>
+      <td>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="wallet_id" value="{{ w.id }}">
+          <button class="btn btn-sm btn-primary" {% if w.is_primary %}disabled{% endif %}>Make Primary</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4"><em>No wallets yet.</em></td></tr>
+  {% endfor %}
+  </tbody>
+</table>

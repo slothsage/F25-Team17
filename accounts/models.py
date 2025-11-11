@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.utils import timezone
 from django.db.models import Sum
@@ -8,6 +8,8 @@ from django.core.validators import FileExtensionValidator # for validating uploa
 from django.contrib.auth.hashers import make_password, check_password
 import os
 import pyotp
+from django.core.exceptions import ValidationError
+
 
 def avatar_upload_path_to(instance, filename):
     base, ext = os.path.splitext(filename.lower())
@@ -723,3 +725,57 @@ class SponsorshipRequest(models.Model):
 
     def __str__(self):
         return f"{self.from_user.username} → {self.to_user.username} ({self.status})"
+
+
+class SponsorPointsAccount(models.Model):
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sponsor_wallets")
+    sponsor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="issued_wallets")  # your Sponsor user/account
+    balance = models.PositiveIntegerField(default=0)
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = (("driver", "sponsor"),)
+
+    def __str__(self):
+        return f"{self.driver} @ {self.sponsor} → {self.balance} pts{' (primary)' if self.is_primary else ''}"
+
+    @transaction.atomic
+    def set_primary(self):
+        SponsorPointsAccount.objects.filter(driver=self.driver, is_primary=True).update(is_primary=False)
+        self.is_primary = True
+        self.save(update_fields=["is_primary", "updated_at"])
+
+    @transaction.atomic
+    def apply_points(self, delta: int, *, reason: str = "", created_by=None, order=None):
+        # Negative deltas spend points; don’t allow negative balances.
+        new_bal = self.balance + delta
+        if new_bal < 0:
+            raise ValidationError("Insufficient points in this sponsor wallet.")
+        self.balance = new_bal
+        self.save(update_fields=["balance", "updated_at"])
+        SponsorPointsTransaction.objects.create(
+            wallet=self,
+            tx_type=("credit" if delta >= 0 else "debit"),
+            amount=abs(delta),
+            reason=reason or "",
+            created_by=created_by,
+            order=order,
+        )
+        return self.balance
+
+class SponsorPointsTransaction(models.Model):
+    wallet = models.ForeignKey(SponsorPointsAccount, on_delete=models.CASCADE, related_name="transactions")
+    tx_type = models.CharField(max_length=10, choices=[("credit","credit"),("debit","debit")])
+    amount = models.PositiveIntegerField()
+    reason = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    order = models.ForeignKey("shop.Order", null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.tx_type} {self.amount} to {self.wallet}"

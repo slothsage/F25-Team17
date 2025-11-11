@@ -9,6 +9,7 @@ from .models import DriverProfile, CustomLabel, SponsorProfile
 from .models import FailedLoginAttempt
 from .models import PasswordPolicy
 from .models import ChatRoom, ChatMessage, MessageReadStatus
+from .models import SponsorPointsAccount, SponsorPointsTransaction
 
 
 # Register your models here.
@@ -114,3 +115,16 @@ class FailedLoginAttemptAdmin(admin.ModelAdmin):
     list_display = ("username", "ip_address", "timestamp")
     ordering = ("-timestamp",)
     search_fields = ("username", "ip_address")
+
+@admin.register(SponsorPointsAccount)
+class SponsorPointsAccountAdmin(admin.ModelAdmin):
+    list_display = ("driver", "sponsor", "balance", "is_primary", "updated_at")
+    list_filter = ("is_primary",)
+    search_fields = ("driver__username", "sponsor__username")
+
+@admin.register(SponsorPointsTransaction)
+class SponsorPointsTransactionAdmin(admin.ModelAdmin):
+    list_display = ("wallet", "tx_type", "amount", "reason", "created_by", "order", "created_at")
+    list_filter = ("tx_type", "created_at")
+    search_fields = ("wallet__driver__username", "wallet__sponsor__username", "reason")
+    readonly_fields = ("created_at",)

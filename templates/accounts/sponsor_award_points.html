@@ -1,0 +1,8 @@
+<h1>Award Points</h1>
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3"><label>Driver ID</label>{{ form.driver_id }}</div>
+    <div class="mb-3"><label>Amount</label>{{ form.amount }}</div>
+    <div class="mb-3"><label>Reason</label>{{ form.reason }}</div>
+    <button class="btn btn-success">Award</button>
+</form>

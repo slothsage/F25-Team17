@@ -27,6 +27,29 @@
       {{ form.ship_postal.label_tag }} {{ form.ship_postal }} {{ form.ship_postal.errors }}
     </div>
 
+    {% comment %} Minimal wallet info; v2 can add a dropdown to choose a non-primary wallet {% endcomment %}
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="card-title">Payment with Points</h5>
+    {% if request.user.sponsor_wallets.all %}
+      {% with primary=request.user.sponsor_wallets.all|dictsortreversed:"is_primary"|first %}
+        <p>Primary wallet:
+          {% if primary.0 %} {{ primary.0.sponsor.username }} — Balance: {{ primary.0.balance }} pts
+          {% else %} <em>No primary wallet selected</em>
+          {% endif %}
+        </p>
+        <p>Order total: {{ total_points }} pts</p>
+        {% if primary.0 and primary.0.balance < total_points %}
+          <div class="alert alert-warning">Not enough points in your primary wallet.</div>
+        {% endif %}
+      {% endwith %}
+      <p><a class="btn btn-outline-secondary" href="{% url 'accounts:wallets' %}">Manage wallets</a></p>
+    {% else %}
+      <div class="alert alert-info">You don’t have any sponsor wallets yet.</div>
+    {% endif %}
+  </div>
+</div>
+
     <div class="col-12">
       <button class="btn btn-primary" type="submit">Place Order</button>
       <a class="btn btn-outline-secondary" href="{% url 'shop:cart' %}">Back to Cart</a>
