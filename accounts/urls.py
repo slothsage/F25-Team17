@@ -14,6 +14,17 @@ urlpatterns = [
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("register/", views.register, name="register"),
 
+    # Driver-only page(s)
+    path("sponsors/", views.driver_sponsors, name="driver_sponsors"),
+    path("sponsors/apply/", views.apply_to_sponsor, name="apply_to_sponsor"),
+    path("sponsors/cancel/<int:pk>/", views.cancel_application, name="cancel_application"),
+
+    # Sponsors-only page(s)
+    path("driver-management/", views.sponsor_driver_management, name="sponsor_driver_management"),
+    path("applications/<int:pk>/approve/", views.approve_application, name="approve_application"),
+    path("applications/<int:pk>/reject/", views.reject_application, name="reject_application"),
+    path("applications/<int:pk>/end/",    views.end_adoption,      name="end_adoption"),
+    
     # Multi-factor authentication (MFA)
     path("mfa/setup/", views.mfa_setup, name="mfa_setup"),
     path("mfa/", views.mfa_challenge_view, name="mfa_challenge"),

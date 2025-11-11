@@ -13,7 +13,7 @@ urlpatterns = [
     path("admin/user/<int:user_id>/toggle-lock/", accounts_views.toggle_lock_user, name="toggle_lock_user"),
     # real admin site moved to /admin/site/
     path("admin/site/", admin.site.urls),
-    path("", include("accounts.urls")),
+    path("", include(("accounts.urls", "accounts"), namespace="accounts")),    
     path("", include(("shop.urls", "shop"), namespace="shop")),
     path("about/", accounts_views.about, name="about"),
     path("faqs/", accounts_views.faqs, name="faqs"),

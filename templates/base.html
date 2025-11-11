@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n group_filters %}
 <!doctype html>
 <html>
 <head>
@@ -236,6 +236,14 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:messages_inbox' %}">Messages</a>
           </li>
+          
+
+          <!-- Drivers-only: ***-->
+          {% if request.user.is_authenticated and request.user|has_group:"driver" %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:driver_sponsors' %}">Sponsors</a>
+          </li>
+          {% endif %}
 
           <!-- Sponsor-only: Search Drivers -->
           {% load group_filters %}
@@ -247,6 +255,11 @@
           {% if user|has_group:"sponsor" %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:audit_report' %}">Audit Logs</a>
+          </li>
+          {% endif %}
+          {% if request.user.is_authenticated and request.user|has_group:"sponsor" %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:sponsor_driver_management' %}">Driver Management</a>
           </li>
           {% endif %}
 
@@ -324,7 +337,7 @@
             <option value="en" {% if LANGUAGE_CODE|slice:":2" == "en" %}selected{% endif %}>English</option>
             <option value="es" {% if LANGUAGE_CODE|slice:":2" == "es" %}selected{% endif %}>Español</option>
             <option value="fr" {% if LANGUAGE_CODE|slice:":2" == "fr" %}selected{% endif %}>Français</option>
-           </select>
+            </select>
           </form>
         </div>
       </div>

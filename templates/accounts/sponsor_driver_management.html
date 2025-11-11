@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Driver Management{% endblock %}
+
+{% block content %}
+<h1 class="h2">Driver Management</h1>
+
+<h3 class="h4 mt-3">Pending Applications</h3>
+{% if pending %}
+  <ul class="list-group mb-4">
+    {% for a in pending %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>{{ a.driver.get_full_name|default:a.driver.username }}</span>
+        <span class="btn-group">
+          <a class="btn btn-sm btn-success" href="{% url 'accounts:approve_application' a.id %}">Approve</a>
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'accounts:reject_application' a.id %}">Reject</a>
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}<p class="text-muted">No pending applications.</p>{% endif %}
+
+<h3 class="h4">Adopted Drivers</h3>
+{% if adopted %}
+  <ul class="list-group">
+    {% for a in adopted %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <span>{{ a.driver.get_full_name|default:a.driver.username }}</span>
+        <a class="btn btn-sm btn-outline-warning" href="{% url 'accounts:end_adoption' a.id %}">End Adoption</a>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}<p class="text-muted">You have not adopted any drivers.</p>{% endif %}
+{% endblock %}

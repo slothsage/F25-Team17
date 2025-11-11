@@ -37,6 +37,8 @@ from .models import SecurityQuestion, UserSecurityAnswer
 from .forms import MessageComposeForm
 from .forms import NotificationPreferenceForm
 from .forms import SecurityQuestionsForm
+from .forms import SponsorApplicationForm
+from .models import SponsorApplication
 
 from .forms import ProfileForm, AdminProfileForm, DeleteAccountForm, ProfilePictureForm
 from .models import DriverNotificationPreference
@@ -91,6 +93,12 @@ from .models import CustomLabel, DriverProfile
 
 User = get_user_model()
 
+def _user_in_group(user, group_name: str) -> bool:
+    return user.is_authenticated and user.groups.filter(name=group_name).exists()
+
+def _require_group(user, g):
+    return user.is_authenticated and user.groups.filter(name__iexact=g).exists()
+
 try:
     from shop.models import Sponsor
     HAS_SPONSOR_MODEL = True
@@ -103,7 +111,7 @@ def _field_exists(model, name: str) -> bool:
 
 def _parse_date_yyyy_mm_dd(s: str):
     try:
-        return datetime.strptime(s, "%Y-%m-%d").date()
+        return datetime.datetime.strptime(s, "%Y-%m-%d").date()
     except Exception:
         return None
 
@@ -582,6 +590,118 @@ def security_questions_configure(request):
         messages.success(request, "Your security questions were updated.")
         return redirect("accounts:security_questions_configure")
     return render(request, "accounts/security_questions.html", {"form": form})
+
+# --- Driver Page: "Sponsors"
+@login_required
+def driver_sponsors(request):
+    if not _require_group(request.user, "driver"):
+        messages.error(request, "Drivers only.")
+        return redirect("accounts:profile")  #CHANGE HERE ************************************************************
+
+    #curent state
+    pending  = SponsorApplication.objects.filter(driver=request.user, status=SponsorApplication.PENDING).select_related("sponsor")
+    adopted  = SponsorApplication.objects.filter(driver=request.user, status=SponsorApplication.APPROVED).select_related("sponsor")
+    rejected = SponsorApplication.objects.filter(driver=request.user, status=SponsorApplication.REJECTED).select_related("sponsor")
+
+    #app form (applying)
+    if request.method == "POST":
+        form = SponsorApplicationForm(request.POST, driver=request.user)
+        if form.is_valid():
+            sponsor = form.cleaned_data["sponsor"]
+            note    = form.cleaned_data.get("note", "")
+            obj, created = SponsorApplication.objects.get_or_create(
+                driver=request.user, sponsor=sponsor,
+                defaults={"status": SponsorApplication.PENDING, "note": note}
+            )
+            if created or obj.status in (SponsorApplication.REJECTED, SponsorApplication.ENDED):
+                obj.status = SponsorApplication.PENDING
+                obj.note = note
+                obj.decided_at = None
+                obj.save()
+                messages.success(request, f"Applied to {sponsor}.")
+            else:
+                messages.info(request, "You already have an active application or adoption with that sponsor.")
+            return redirect("accounts:driver_sponsors")
+    else:
+        form = SponsorApplicationForm(driver=request.user)
+
+    return render(request, "accounts/driver_sponsors.html", {
+        "form": form,
+        "pending": pending,
+        "adopted": adopted,
+        "rejected": rejected,
+    })
+
+@login_required
+def apply_to_sponsor(request):
+    return driver_sponsors(request)
+
+@login_required
+def cancel_application(request, pk: int):
+    if not _require_group(request.user, "driver"):
+        messages.error(request, "Drivers only.")
+        return redirect("accounts:profile")
+    app = get_object_or_404(SponsorApplication, pk=pk, driver=request.user, status=SponsorApplication.PENDING)
+    app.delete()
+    messages.success(request, "Application canceled.")
+    return redirect("accounts:driver_sponsors")
+
+
+# --- Sponsor Page: "Driver Management"
+@login_required
+def sponsor_driver_management(request):
+    if not _require_group(request.user, "sponsor"):
+        messages.error(request, "Sponsors only.")
+        return redirect("accounts:profile")
+
+    pending = SponsorApplication.objects.filter(
+        sponsor=request.user, status=SponsorApplication.PENDING
+    ).select_related("driver")
+    adopted = SponsorApplication.objects.filter(
+        sponsor=request.user, status=SponsorApplication.APPROVED
+    ).select_related("driver")
+
+    return render(request, "accounts/sponsor_driver_management.html", {
+        "pending": pending,
+        "adopted": adopted,
+    })
+
+@login_required
+def approve_application(request, pk: int):
+    if not _require_group(request.user, "sponsor"):
+        messages.error(request, "Sponsors only.")
+        return redirect("accounts:profile")
+    app = get_object_or_404(SponsorApplication, pk=pk, sponsor=request.user, status=SponsorApplication.PENDING)
+    app.status = SponsorApplication.APPROVED
+    app.decided_at = timezone.now()
+    app.save()
+    messages.success(request, f"Approved {app.driver}.")
+    return redirect("accounts:sponsor_driver_management")
+
+@login_required
+def reject_application(request, pk: int):
+    if not _require_group(request.user, "sponsor"):
+        messages.error(request, "Sponsors only.")
+        return redirect("accounts:profile")
+    app = get_object_or_404(SponsorApplication, pk=pk, sponsor=request.user, status=SponsorApplication.PENDING)
+    app.status = SponsorApplication.REJECTED
+    app.decided_at = timezone.now()
+    app.save()
+    messages.info(request, f"Rejected {app.driver}.")
+    return redirect("accounts:sponsor_driver_management")
+
+@login_required
+def end_adoption(request, pk: int):
+    if not _require_group(request.user, "sponsor"):
+        messages.error(request, "Sponsors only.")
+        return redirect("accounts:profile")
+    app = get_object_or_404(SponsorApplication, pk=pk, sponsor=request.user, status=SponsorApplication.APPROVED)
+    app.status = SponsorApplication.ENDED
+    app.decided_at = timezone.now()
+    app.save()
+    messages.warning(request, f"Ended adoption for {app.driver}.")
+    return redirect("accounts:sponsor_driver_management")
+
 
 @staff_member_required
 def admin_set_timeout(request, user_id):

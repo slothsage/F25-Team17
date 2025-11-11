@@ -429,3 +429,39 @@ class UserMFA(models.Model):
         status = "ENABLED" if self.mfa_enabled else "DISABLED"
         return f"UserMFA<{self.user.username}> {status}"
     
+# --- Sponsor applications / adoptions ---
+class SponsorApplication(models.Model):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+    STATUS_CHOICES = [
+        (PENDING,  "Pending"),
+        (APPROVED, "Approved"),
+        (REJECTED, "Rejected"),
+    ]
+
+    driver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sponsor_applications",
+    )
+    sponsor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="driver_applications",
+    )
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=PENDING)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = (("driver", "sponsor"),)
+        indexes = [
+            models.Index(fields=["sponsor", "status"]),
+            models.Index(fields=["driver", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.driver} → {self.sponsor} ({self.status})"

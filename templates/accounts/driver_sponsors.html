@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sponsors{% endblock %}
+
+{% block content %}
+<h1 class="h2">Sponsors</h1>
+
+<h3 class="h4 mt-3">Apply to a Sponsor</h3>
+<form method="post" class="mb-4">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Apply</button>
+</form>
+
+<h3 class="h4">Pending Applications</h3>
+{% if pending %}
+  <ul class="list-group mb-3">
+    {% for a in pending %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        {{ a.sponsor.get_full_name|default:a.sponsor.username }}
+        <span>
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'accounts:cancel_application' a.id %}">Cancel</a>
+        </span>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}<p class="text-muted">No pending applications.</p>{% endif %}
+
+<h3 class="h4">Your Sponsors (Adopted)</h3>
+{% if adopted %}
+  <ul class="list-group mb-3">
+    {% for a in adopted %}
+      <li class="list-group-item">{{ a.sponsor.get_full_name|default:a.sponsor.username }}</li>
+    {% endfor %}
+  </ul>
+{% else %}<p class="text-muted">You don’t have any sponsors yet.</p>{% endif %}
+
+<h3 class="h4">Rejected / Ended</h3>
+{% if rejected %}
+  <ul class="list-group">
+    {% for a in rejected %}
+      <li class="list-group-item">
+        {{ a.sponsor.get_full_name|default:a.sponsor.username }} — {{ a.get_status_display }} at {{ a.decided_at|date:"Y-m-d H:i" }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}<p class="text-muted">Nothing here.</p>{% endif %}
+{% endblock %}
