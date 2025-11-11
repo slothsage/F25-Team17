@@ -78,7 +78,7 @@ from django.views.decorators.http import require_POST
 from django.contrib.admin.views.decorators import staff_member_required
 
 from .models import LoginActivity, PointChangeLog, PasswordChangeLog, DriverApplicationLog
-
+from .models import SponsorshipRequest
 import io, base64, pyotp, qrcode
 from django.contrib.auth import login as auth_login
 from django.views.decorators.csrf import csrf_protect
@@ -2111,3 +2111,56 @@ class PasswordResetConfirmNotifyView(PasswordResetConfirmView):
             notify_password_change(user)
         messages.success(self.request, "Password reset successful. A security notification was sent to your email.")
         return response
+    
+
+@login_required
+def sponsorship_requests(request):
+    """Sponsor portal: view all pending driver sponsorship requests."""
+    if not request.user.groups.filter(name="sponsor").exists():
+        messages.error(request, "Access denied. Only sponsors can view this page.")
+        return redirect("accounts:profile")
+
+    requests_qs = (
+        SponsorshipRequest.objects
+        .filter(to_user=request.user, status="pending")
+        .select_related("from_user")
+        .order_by("-created_at")
+    )
+
+    # Define context dict
+    context = {
+        "requests": requests_qs,
+        "sponsor_pending_count": SponsorshipRequest.objects.filter(
+            to_user=request.user, status="pending"
+        ).count(),
+    }
+
+    return render(request, "accounts/sponsorship_requests.html", context)
+
+
+@login_required
+def approve_sponsorship(request, request_id):
+    """Approve a pending sponsorship request."""
+    sr = get_object_or_404(SponsorshipRequest, pk=request_id, to_user=request.user)
+
+    if sr.status != "pending":
+        messages.warning(request, "This sponsorship request has already been processed.")
+        return redirect("accounts:sponsorship_requests")
+
+    sr.approve()
+    messages.success(request, f"Sponsorship approved for driver {sr.from_user.username}.")
+    return redirect("accounts:sponsorship_requests")
+
+
+@login_required
+def deny_sponsorship(request, request_id):
+    """Deny a pending sponsorship request."""
+    sr = get_object_or_404(SponsorshipRequest, pk=request_id, to_user=request.user)
+
+    if sr.status != "pending":
+        messages.warning(request, "This sponsorship request has already been processed.")
+        return redirect("accounts:sponsorship_requests")
+
+    sr.deny()
+    messages.error(request, f"Sponsorship denied for driver {sr.from_user.username}.")
+    return redirect("accounts:sponsorship_requests")

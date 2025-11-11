@@ -245,6 +245,18 @@
           </li>
           {% endif %}
           {% if user|has_group:"sponsor" %}
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'accounts:sponsorship_requests' %}">
+                Sponsorship Requests
+                {% if sponsor_pending_count %}
+                  <span class="badge" style="background-color:#facc15;color:#000;margin-left:4px;padding:2px 6px;border-radius:4px;">
+                    {{ sponsor_pending_count }}
+                  </span>
+                {% endif %}
+              </a>
+            </li>
+          {% endif %}
+          {% if user|has_group:"sponsor" %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'accounts:audit_report' %}">Audit Logs</a>
           </li>

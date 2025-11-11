@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-main">
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <h1 class="page-title">Sponsorship Requests</h1>
+      <p class="page-subtitle">
+        Review incoming requests from drivers who wish to be sponsored by you.
+      </p>
+    </div>
+  </header>
+
+  {% if requests %}
+    <section class="card mt-lg">
+      <div class="card-body">
+        <table class="table table-admin">
+          <thead>
+            <tr>
+              <th>Driver</th>
+              <th>Message</th>
+              <th>Status</th>
+              <th>Requested On</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in requests %}
+              <tr>
+                <td>{{ r.from_user.username }}</td>
+                <td>{{ r.message|default:"—" }}</td>
+                <td>
+                  {% if r.status == "pending" %}
+                    <span class="badge warning">Pending</span>
+                  {% elif r.status == "approved" %}
+                    <span class="badge success">Approved</span>
+                  {% else %}
+                    <span class="badge danger">Denied</span>
+                  {% endif %}
+                </td>
+                <td>{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                <td>
+                  {% if r.status == "pending" %}
+                    <a href="{% url 'accounts:approve_sponsorship' r.id %}" class="btn btn-success btn-sm me-1">Approve</a>
+                    <a href="{% url 'accounts:deny_sponsorship' r.id %}" class="btn btn-danger btn-sm">Deny</a>
+                  {% else %}
+                    <em class="muted">No actions</em>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <p class="muted">You have no sponsorship requests at this time.</p>
+  {% endif %}
+</div>
+
+{% endblock %}
