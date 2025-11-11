@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-main">
+    <h1>Bulk Assign Sponsors & Drivers</h1>
+    <p class="muted">Select a mode and assign relationships in bulk.</p>
+    <hr>
+
+    <form method="post">
+    {% csrf_token %}
+
+    <label>
+        <input type="radio" name="mode" value="sponsor_to_drivers" checked> Assign a sponsor to multiple drivers
+    </label>
+    <label style="margin-left: 2em;">
+        <input type="radio" name="mode" value="drivers_to_sponsor"> Assign multiple sponsors to a driver
+    </label>
+
+    <div id="sponsor_to_drivers" class="mode-block mt-md">
+        <h3>Mode: Sponsor → Drivers</h3>
+        <label for="sponsor">Select Sponsor:</label>
+        <select name="sponsor" required>
+            {% for s in sponsors %}
+            <option value="{{ s.id }}">{{ s.username }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="drivers">Select Drivers:</label>
+        <select name="drivers" multiple size="10" required>
+            {% for d in drivers %}
+            <option value="{{ d.id }}">{{ d.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div id="drivers_to_sponsor" class="mode-block mt-md" style="display:none;">
+        <h3>Mode: Drivers → Sponsors</h3>
+        <label for="driver">Select Driver:</label>
+        <select name="driver" required>
+            {% for d in drivers %}
+            <option value="{{ d.id }}">{{ d.username }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="sponsors">Select Sponsors:</label>
+        <select name="sponsors" multiple size="10" required>
+            {% for s in sponsors %}
+            <option value="{{ s.id }}">{{ s.username }}</option>
+            {% endfor %}
+        </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-md">Assign</button>
+    </form>
+</div>
+
+<script>
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        document.getElementById('sponsor_to_drivers').style.display =
+        this.value === 'sponsor_to_drivers' ? 'block' : 'none';
+        document.getElementById('drivers_to_sponsor').style.display =
+        this.value === 'drivers_to_sponsor' ? 'block' : 'none';
+    });
+});
+</script>
+{% endblock %}
