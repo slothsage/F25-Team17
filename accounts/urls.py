@@ -88,6 +88,9 @@ urlpatterns = [
 
     # Sponsor-facing driver search
     path("sponsor/drivers/", views.sponsor_driver_search, name="sponsor_driver_search"),
+    path("sponsor/requests/", views.sponsorship_requests, name="sponsorship_requests"),
+    path("sponsor/requests/<int:request_id>/approve/", views.approve_sponsorship, name="approve_sponsorship"),
+    path("sponsor/requests/<int:request_id>/deny/", views.deny_sponsorship, name="deny_sponsorship"),
 
     # Admin-triggered password actions 
     path("admin/users/<int:user_id>/reset-link/", views.send_reset_link, name="admin_send_reset_link"),

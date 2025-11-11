@@ -465,3 +465,29 @@ class SponsorApplication(models.Model):
 
     def __str__(self):
         return f"{self.driver} → {self.sponsor} ({self.status})"
+
+class SponsorshipRequest(models.Model):
+    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_sponsorship_requests")
+    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_sponsorship_requests")
+    status = models.CharField(
+        max_length=20,
+        choices=[("pending", "Pending"), ("approved", "Approved"), ("denied", "Denied")],
+        default="pending"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    def approve(self):
+        self.status = "approved"
+        self.reviewed_at = timezone.now()
+        self.save()
+        # Add sponsor to driver
+        driver = self.to_user if hasattr(self.to_user, "driver_profile") else self.from_user
+        sponsor = self.from_user if self.from_user.groups.filter(name="sponsor").exists() else self.to_user
+        driver.driver_profile.sponsors.add(sponsor)
+        driver.driver_profile.save()
+
+    def deny(self):
+        self.status = "denied"
+        self.reviewed_at = timezone.now()
+        self.save()
