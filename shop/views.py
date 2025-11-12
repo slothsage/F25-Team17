@@ -25,6 +25,7 @@ from xhtml2pdf import pisa
 import json
 import csv
 from accounts.models import SponsorPointsAccount
+from django.db.models import Sum
 
 
 # A tiny editable set of eBay category IDs (Browse API uses numeric IDs)
@@ -491,12 +492,17 @@ def add_to_cart_from_catalog(request):
         product_name = data.get('product_name')  
         points = int(data.get('points', 0))
         quantity = int(data.get('quantity', 1))
-        
+
         if not ebay_item_id or not product_name:
             return JsonResponse({'error': 'Missing required fields'}, status=400)
         
         #current user pts balance
-        user_points = _current_points_balance(request.user)
+        user_points = (
+            SponsorPointsAccount.objects
+            .filter(driver=request.user)
+            .aggregate(total=Sum("balance"))
+            .get("total") or 0
+        )
 
         # Add directly to cart without checking eBay availability
         cart_item, created = CartItem.objects.get_or_create(
@@ -617,11 +623,12 @@ def _current_points_balance(user):
     """
     Returns the user's current pts balance
     """
-    last = PointsLedger.objects.filter(user=user).order_by("-created_at").only("balance_after").first()
-    if last is not None:
-        return int(last.balance_after or 0)
-    total = PointsLedger.objects.filter(user=user).aggregate(s=Sum("delta"))["s"]
-    return int(total or 0)
+    return (
+        SponsorPointsAccount.objects
+        .filter(driver=user)
+        .aggregate(total=Sum("balance"))
+        .get("total") or 0
+    )
 
 @login_required
 def favorites_list(request):
