@@ -603,43 +603,6 @@ class MessageReadStatus(models.Model):
     
 
 # --- Sponsor applications / adoptions ---
-"""
-class SponsorApplication(models.Model):
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
-
-    STATUS_CHOICES = [
-        (PENDING,  "Pending"),
-        (APPROVED, "Approved"),
-        (REJECTED, "Rejected"),
-    ]
-
-    driver = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="sponsor_applications",
-    )
-    sponsor = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="driver_applications",
-    )
-    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=PENDING)
-    note = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    decided_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        unique_together = (("driver", "sponsor"),)
-        indexes = [
-            models.Index(fields=["sponsor", "status"]),
-            models.Index(fields=["driver", "status"]),
-        ]
-
-    def __str__(self):
-        return f"{self.driver} → {self.sponsor} ({self.status})"
-"""
 class SponsorshipRequest(models.Model):
     REQUEST_TYPES = [
         ("driver_to_sponsor", "Driver → Sponsor"),
@@ -748,22 +711,25 @@ class SponsorPointsAccount(models.Model):
         self.save(update_fields=["is_primary", "updated_at"])
 
     @transaction.atomic
-    def apply_points(self, delta: int, *, reason: str = "", created_by=None, order=None):
+    def apply_points(self, delta, *, reason="", created_by=None, order=None):
         # Negative deltas spend points; don’t allow negative balances.
+        if delta == 0:
+            return
+        
         new_bal = self.balance + delta
         if new_bal < 0:
             raise ValidationError("Insufficient points in this sponsor wallet.")
-        self.balance = new_bal
-        self.save(update_fields=["balance", "updated_at"])
         SponsorPointsTransaction.objects.create(
             wallet=self,
-            tx_type=("credit" if delta >= 0 else "debit"),
+            tx_type="credit" if delta > 0 else "debit",
             amount=abs(delta),
-            reason=reason or "",
             created_by=created_by,
             order=order,
+            reason=reason[:255] if hasattr(SponsorPointsTransaction, "reason") else None,
         )
-        return self.balance
+        # update balance
+        self.balance = new_bal
+        self.save(update_fields=["balance", "updated_at"])
 
 class SponsorPointsTransaction(models.Model):
     wallet = models.ForeignKey(SponsorPointsAccount, on_delete=models.CASCADE, related_name="transactions")

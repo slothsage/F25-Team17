@@ -93,6 +93,7 @@ from .models import CustomLabel, DriverProfile
 from django.db import transaction
 from .models import SponsorPointsAccount
 from .forms import SponsorAwardForm, SetPrimaryWalletForm
+from django.db.models import OuterRef, Subquery, IntegerField
 
 User = get_user_model()
 
@@ -101,6 +102,17 @@ def _user_in_group(user, group_name: str) -> bool:
 
 def _require_group(user, g):
     return user.is_authenticated and user.groups.filter(name__iexact=g).exists()
+
+def _sponsor_required(user):
+    """
+    Returns True if the user is allowed to access sponsor-only pages.
+    Treats superusers as allowed as well.
+    """
+    return bool(
+        user.is_authenticated and (
+            user.is_superuser or user.groups.filter(name="sponsor").exists()
+        )
+    )
 
 try:
     from shop.models import Sponsor
@@ -947,38 +959,110 @@ def archived_sponsors(request):
 
 
 @login_required
+@transaction.atomic
 def sponsor_driver_search(request):
-    """Sponsor-facing search: allow sponsor users to search drivers (no admin actions)."""
-    # only sponsor group members may access
-    if not request.user.groups.filter(name="sponsor").exists():
-        messages.error(request, "Access denied")
+    """Sponsor page: list only THIS sponsor’s drivers and allow award/deduct per row."""
+    user = request.user
+    # gate: sponsors (or superusers) only
+    if not (user.is_superuser or user.groups.filter(name="sponsor").exists()):
+        messages.error(request, "Access denied.")
         return redirect("accounts:profile")
 
-    q = request.GET.get("q", "").strip()
-    drivers_qs = User.objects.filter(driver_profile__isnull=False, is_staff=False).exclude(groups__name="sponsor")
+    sponsor = user  # shorthand
+
+    # ---------- POST: award/deduct ----------
+    if request.method == "POST":
+        form = SponsorAwardForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Invalid input.")
+            return redirect("accounts:sponsor_driver_search")
+
+        driver_id = form.cleaned_data["driver_id"]
+        reason    = form.cleaned_data.get("reason", "")
+        delta     = form.delta()  # positive for Award, negative for Deduct
+
+        driver = get_object_or_404(User, id=driver_id)
+
+        # ensure the driver is under THIS sponsor (supports both M2M and legacy name field)
+        prof = getattr(driver, "driver_profile", None)
+        is_m2m = bool(prof and prof.sponsors.filter(id=sponsor.id).exists())
+        is_legacy = bool(prof and prof.sponsor_name == sponsor.username)
+        if not (is_m2m or is_legacy):
+            messages.error(request, "This driver is not under your sponsorship.")
+            return redirect("accounts:sponsor_driver_search")
+
+        # lock wallet row and create if missing
+        wallet, _ = SponsorPointsAccount.objects.select_for_update().get_or_create(
+            sponsor=sponsor, driver=driver, defaults={"balance": 0}
+        )
+
+        if delta < 0 and wallet.balance < abs(delta):
+            messages.error(request, "Insufficient points to deduct that amount.")
+            return redirect("accounts:sponsor_driver_search")
+
+        try:
+            wallet.apply_points(delta, reason=reason, created_by=user)
+        except Exception as e:
+            messages.error(request, f"Could not update points: {e}")
+        else:
+            messages.success(request, "Points updated successfully.")
+
+        return redirect("accounts:sponsor_driver_search")
+
+    # ---------- GET: list this sponsor’s drivers ----------
+    q = (request.GET.get("q") or "").strip()
+
+    drivers_qs = (
+        User.objects.filter(driver_profile__isnull=False, is_staff=False)
+        .exclude(groups__name="sponsor")
+        .filter(
+            Q(driver_profile__sponsors=sponsor) |
+            Q(driver_profile__sponsor_name=sponsor.username)
+        )
+        .distinct()
+    )
 
     if q:
         id_query = None
         if q.lower().startswith("id:"):
-            maybe = q.split(":", 1)[1].strip()
-            if maybe.isdigit():
-                id_query = int(maybe)
+            tok = q.split(":", 1)[1].strip()
+            if tok.isdigit():
+                id_query = int(tok)
         elif q.isdigit():
             id_query = int(q)
 
         if id_query is not None:
-            drivers_qs = drivers_qs.filter(Q(pk=id_query) | Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)).distinct()
+            drivers_qs = drivers_qs.filter(
+                Q(pk=id_query) |
+                Q(username__icontains=q) |
+                Q(email__icontains=q) |
+                Q(driver_profile__phone__icontains=q) |
+                Q(driver_profile__address__icontains=q)
+            )
         else:
             drivers_qs = drivers_qs.filter(
-                Q(username__icontains=q) | Q(email__icontains=q) | Q(driver_profile__phone__icontains=q) | Q(driver_profile__address__icontains=q)
-            ).distinct()
+                Q(username__icontains=q) |
+                Q(email__icontains=q) |
+                Q(driver_profile__phone__icontains=q) |
+                Q(driver_profile__address__icontains=q)
+            )
 
-    drivers_qs = drivers_qs.order_by("username")
-    paginator = Paginator(drivers_qs, 25)
-    page_number = request.GET.get("page", 1)
-    drivers_page = paginator.get_page(page_number)
+    # annotate balance from THIS sponsor's wallet
+    wallet_subq = SponsorPointsAccount.objects.filter(
+        driver=OuterRef("pk"), sponsor=sponsor
+    ).values("balance")[:1]
+    drivers_qs = drivers_qs.annotate(
+        sponsor_balance=Subquery(wallet_subq, output_field=IntegerField())
+    ).order_by("username")
 
-    return render(request, "accounts/sponsor_driver_search.html", {"drivers": drivers_page, "q": q})
+    page = request.GET.get("page", 1)
+    drivers_page = Paginator(drivers_qs, 25).get_page(page)
+
+    return render(
+        request,
+        "accounts/sponsor_driver_search.html",
+        {"drivers": drivers_page, "q": q, "sponsor": sponsor},
+    )
 
 @login_required
 def order_detail(request, order_id):
@@ -1055,7 +1139,12 @@ def sponsor_award_points(request):
             wallet, _ = SponsorPointsAccount.objects.select_for_update().get_or_create(
                 driver=driver, sponsor=request.user, defaults={"balance": 0}
             )
-            wallet.apply_points(+amount, reason=reason or "Sponsor award", created_by=request.user)
+            if delta < 0 and wallet.balance < abs(delta):
+                messages.error(request, "Insufficient points to deduct.")
+            else:
+                wallet.apply_points(delta, reason=reason, created_by=request.user)
+            delta = form.delta()
+            wallet.apply_points(delta, reason=form.cleaned_data.get("reason", ""), created_by=request.user)
             messages.success(request, f"Awarded {amount} points to {driver.username}.")
             return redirect(reverse("accounts:sponsor_award_points"))
     else:

@@ -299,10 +299,21 @@ class SponsorApplicationForm(forms.Form):
 """
 
 class SponsorAwardForm(forms.Form):
-    driver_id = forms.IntegerField()
+    driver_id = forms.IntegerField(widget=forms.HiddenInput)
+    action = forms.ChoiceField(choices=[("award", "Award"), ("deduct", "Deduct")])
     amount = forms.IntegerField(min_value=1)
-    reason = forms.CharField(max_length=255, required=False)
+    reason = forms.CharField(required=False, max_length=255)
 
+    def clean_amount(self):
+        amt = self.cleaned_data["amount"]
+        if amt <= 0:
+            raise forms.ValidationError("Amount must be a positive integer.")
+        return amt
+
+    def delta(self):
+        amt = self.cleaned_data["amount"]
+        return amt if self.cleaned_data["action"] == "award" else -amt
+    
 class SetPrimaryWalletForm(forms.Form):
     wallet_id = forms.ModelChoiceField(queryset=SponsorPointsAccount.objects.none())
 

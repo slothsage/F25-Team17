@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Driver Search</h1>
+<h1>My Drivers</h1>
 <form method="get" class="form-inline mb-3">
-  <label>Search drivers:</label>
+  <label>Search:</label>
   <input type="text" name="q" value="{{ q }}" placeholder="username, email, phone, address or id:123" />
   <button class="btn">Search</button>
 </form>
@@ -11,7 +11,11 @@
   <p>Showing {{ drivers.paginator.count }} drivers.</p>
   <table class="table">
     <thead>
-      <tr><th>ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Address</th><th>Last Login</th></tr>
+      <tr>
+        <th>ID</th><th>Username</th><th>Email</th><th>Phone</th><th>Address</th><th>Last Login</th>
+        <th>Wallet ({{ sponsor.username }})</th>
+        <th style="width:280px;">Award / Deduct</th>
+      </tr>
     </thead>
     <tbody>
       {% for u in drivers %}
@@ -21,8 +25,31 @@
         <td>{{ u.email }}</td>
         <td>{{ u.driver_profile.phone }}</td>
         <td>{{ u.driver_profile.address }}</td>
-        <td>{% if u.last_login %}{{ u.last_login|date:"Y-m-d H:i" }}{% else %}<span style="color:red;">Never</span>{% endif %}</td>
-      </tr>
+        <td>
+          {% if u.last_login %}
+            {{ u.last_login|date:"Y-m-d H:i" }}
+          {% else %}
+            <span style="color:red;">Never</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.sponsor_balance is not None %}
+            {{ u.sponsor_balance }} pts
+          {% else %}
+            0 pts
+          {% endif %}
+        </td>
+        <td>
+            <form method="post" style="display:flex; gap:.5rem; align-items:center;">
+              {% csrf_token %}
+              <input type="hidden" name="driver_id" value="{{ u.id }}">
+              <input type="number" name="amount" min="1" step="1" placeholder="points" required style="width:90px;">
+              <input type="text" name="reason" placeholder="reason (optional)" style="flex:1;">
+              <button class="btn btn-sm" name="action" value="award">Award</button>
+              <button class="btn btn-sm" name="action" value="deduct">Deduct</button>
+            </form>
+          </td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
@@ -37,7 +64,7 @@
     {% endif %}
   </div>
 {% else %}
-  <p>No drivers found.</p>
+  <p>No drivers found in your roster.</p>
 {% endif %}
 
 {% endblock content %}
