@@ -3,7 +3,7 @@ from django.db.models import Sum
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
-from .models import PointsLedger
+from .models import PointsLedger, SponsorPointsAccount
 from .notifications import on_points_updated
 import logging
 log = logging.getLogger(__name__)
@@ -26,6 +26,21 @@ def adjust_points(user, delta: int, reason: str = "") -> PointsLedger:
     on_points_updated(user, delta, reason or "Adjustment", new_balance)
 
     return entry
+
+
+def get_driver_points_balance(user):
+    """
+    Return the driver's aggregated balance across all sponsor wallets.
+    """
+    if not user:
+        return 0
+
+    return (
+        SponsorPointsAccount.objects
+        .filter(driver=user)
+        .aggregate(total=Sum("balance"))
+        .get("total") or 0
+    )
 
 def notify_password_change(user):
     """

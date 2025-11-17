@@ -86,7 +86,7 @@ from django.views.decorators.csrf import csrf_protect
 
 from django.contrib.auth.views import PasswordChangeView, PasswordResetConfirmView
 from django.contrib import messages
-from .services import notify_password_change
+from .services import notify_password_change, get_driver_points_balance
 from .forms import LabelForm, AssignLabelForm
 from .models import CustomLabel, DriverProfile
 
@@ -330,7 +330,8 @@ def audit_report(request):
 @login_required
 def profile(request):
     DriverProfile.objects.get_or_create(user=request.user)
-    return render(request, "accounts/profile.html")
+    total_points = get_driver_points_balance(request.user)
+    return render(request, "accounts/profile.html", {"total_points": total_points})
 
 @login_required
 def profile_edit(request):
@@ -1136,16 +1137,19 @@ def sponsor_award_points(request):
             driver = get_object_or_404(User, pk=form.cleaned_data["driver_id"])
             amount = form.cleaned_data["amount"]
             reason = form.cleaned_data.get("reason", "")
+            delta = form.delta()
             wallet, _ = SponsorPointsAccount.objects.select_for_update().get_or_create(
                 driver=driver, sponsor=request.user, defaults={"balance": 0}
             )
+
             if delta < 0 and wallet.balance < abs(delta):
                 messages.error(request, "Insufficient points to deduct.")
             else:
                 wallet.apply_points(delta, reason=reason, created_by=request.user)
-            delta = form.delta()
-            wallet.apply_points(delta, reason=form.cleaned_data.get("reason", ""), created_by=request.user)
-            messages.success(request, f"Awarded {amount} points to {driver.username}.")
+                if delta > 0:
+                    messages.success(request, f"Awarded {amount} points to {driver.username}.")
+                else:
+                    messages.success(request, f"Deducted {amount} points from {driver.username}.")
             return redirect(reverse("accounts:sponsor_award_points"))
     else:
         form = SponsorAwardForm()

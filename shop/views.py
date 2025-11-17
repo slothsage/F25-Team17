@@ -11,6 +11,7 @@ from django.template.loader import render_to_string
 from django.http import HttpResponse, HttpResponseBadRequest 
 from django.db.models import Sum, Count, Q
 from accounts.models import PointsLedger, DriverProfile
+from accounts.services import get_driver_points_balance
 from .models import PointsConfig
 from .forms import PointsConfigForm, CheckoutForm
 from .models import Order, OrderItem, CartItem, Favorite, PointsConfig
@@ -402,6 +403,8 @@ def catalog_search(request):
         "max_points": "" if max_points is None else max_points,
     }
 
+    context["points_balance"] = get_driver_points_balance(request.user)
+
     if not query:
         return render(request, "shop/catalog_search.html", context)
 
@@ -618,17 +621,6 @@ def order_receipt_pdf(request, order_id: int):
     resp = HttpResponse(pdf, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
-
-def _current_points_balance(user):
-    """
-    Returns the user's current pts balance
-    """
-    return (
-        SponsorPointsAccount.objects
-        .filter(driver=user)
-        .aggregate(total=Sum("balance"))
-        .get("total") or 0
-    )
 
 @login_required
 def favorites_list(request):

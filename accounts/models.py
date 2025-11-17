@@ -731,6 +731,22 @@ class SponsorPointsAccount(models.Model):
         self.balance = new_bal
         self.save(update_fields=["balance", "updated_at"])
 
+        # log to the consolidated ledger for driver history displays
+        prior_total = (
+            PointsLedger.objects.filter(user=self.driver)
+            .aggregate(total=Sum("delta"))
+            .get("total") or 0
+        )
+        ledger_reason = reason or (
+            f"{'Awarded' if delta > 0 else 'Spent'} via {self.sponsor.get_full_name() or self.sponsor.username}"
+        )
+        PointsLedger.objects.create(
+            user=self.driver,
+            delta=delta,
+            reason=ledger_reason[:255],
+            balance_after=prior_total + delta,
+        )
+
 class SponsorPointsTransaction(models.Model):
     wallet = models.ForeignKey(SponsorPointsAccount, on_delete=models.CASCADE, related_name="transactions")
     tx_type = models.CharField(max_length=10, choices=[("credit","credit"),("debit","debit")])

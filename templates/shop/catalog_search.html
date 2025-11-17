@@ -7,11 +7,21 @@
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-3">
                 <div>
                     <h2>Product Catalog</h2>
                     <p class="text-muted mb-0">Search for products to add to your wishlist or cart</p>
                 </div>
+                {% if points_balance is not None %}
+                <div class="points-balance ms-lg-auto">
+                    <div class="card points-card shadow-sm mb-0">
+                        <div class="card-body py-2 px-3 text-lg-end">
+                            <small class="text-muted text-uppercase d-block">Available Points</small>
+                            <div class="fs-4 fw-semibold mb-0">{{ points_balance|default:0 }} pts</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <div>
                     <a href="{% url 'shop:cart' %}" class="btn btn-primary">
                         <i class="fas fa-shopping-cart"></i> View Cart
@@ -289,6 +299,11 @@
 <style>
 .product-card {
     transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.points-card {
+    min-width: 220px;
+    border-left: 4px solid #0d6efd;
 }
 
 .product-card:hover {
