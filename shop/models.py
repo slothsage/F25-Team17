@@ -137,3 +137,75 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.user.username} ❤️ {self.name_snapshot or self.product_id}"
+
+
+class SponsorCatalogItem(models.Model):
+    """
+    Items in the sponsor-only catalog that drivers cannot see.
+    Sponsors can add these items to the driver catalog.
+    """
+    sponsor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="sponsor_catalog_items"
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    price_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    points_cost = models.PositiveIntegerField(default=0, help_text="Points required to purchase")
+    image_url = models.URLField(max_length=1000, blank=True)
+    product_url = models.URLField(max_length=1000, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True, help_text="Only active items are shown")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Sponsor Catalog Item"
+        verbose_name_plural = "Sponsor Catalog Items"
+
+    def __str__(self):
+        return f"{self.name} (by {self.sponsor.username})"
+
+
+class DriverCatalogItem(models.Model):
+    """
+    Items available in the driver catalog.
+    These can come from sponsor catalogs or be added directly.
+    """
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    price_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    points_cost = models.PositiveIntegerField(default=0, help_text="Points required to purchase")
+    image_url = models.URLField(max_length=1000, blank=True)
+    product_url = models.URLField(max_length=1000, blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    condition = models.CharField(max_length=50, blank=True, default="New")
+    is_active = models.BooleanField(default=True, help_text="Only active items are shown to drivers")
+    added_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="catalog_items_added",
+        help_text="Sponsor/admin who added this item"
+    )
+    source_sponsor_item = models.ForeignKey(
+        SponsorCatalogItem,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="driver_catalog_items",
+        help_text="Original sponsor catalog item if this was added from sponsor catalog"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Driver Catalog Item"
+        verbose_name_plural = "Driver Catalog Items"
+
+    def __str__(self):
+        return f"{self.name} ({self.points_cost} pts)"

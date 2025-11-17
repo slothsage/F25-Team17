@@ -13,8 +13,8 @@ from django.db.models import Sum, Count, Q
 from accounts.models import PointsLedger, DriverProfile
 from accounts.services import get_driver_points_balance
 from .models import PointsConfig
-from .forms import PointsConfigForm, CheckoutForm
-from .models import Order, OrderItem, CartItem, Favorite, PointsConfig
+from .forms import PointsConfigForm, CheckoutForm, SponsorCatalogItemForm
+from .models import Order, OrderItem, CartItem, Favorite, PointsConfig, SponsorCatalogItem, DriverCatalogItem
 from django.urls import reverse
 from .models import Wishlist, WishListItem
 from django.core.paginator import Paginator
@@ -504,9 +504,99 @@ def catalog_search(request):
 
     context["points_balance"] = get_driver_points_balance(request.user)
 
+    # Get driver catalog items (always include these)
+    driver_catalog_items = DriverCatalogItem.objects.filter(is_active=True)
+    
+    # Convert driver catalog items to product format
+    driver_products = []
+    for item in driver_catalog_items:
+        driver_products.append({
+            "ebay_item_id": f"CATALOG-{item.id}",
+            "name": item.name,
+            "price_usd": float(item.price_usd),
+            "price_points": item.points_cost,
+            "description": item.description,
+            "image_url": item.image_url or "",
+            "category": item.category or "Catalog",
+            "condition": item.condition or "New",
+            "is_available": True,
+            "view_url": item.product_url or "",
+            "is_catalog_item": True,  # Flag to identify catalog items
+        })
+    
+    # If no query, show random/default products + driver catalog items
     if not query:
+        # Use a default search term to show products
+        default_query = "electronics"
+        all_products = list(driver_products)  # Start with driver catalog items
+        
+        try:
+            results = ebay_service.search_products(
+                default_query,
+                limit=limit,
+                offset=offset,
+                category_ids=category_id or None,
+            )
+
+            ebay_products = [
+                ebay_service.format_product(item)
+                for item in results.get("itemSummaries", [])
+            ]
+
+            # Shuffle eBay products for randomness
+            import random
+            random.shuffle(ebay_products)
+            
+            # Combine driver catalog items with eBay products
+            all_products.extend(ebay_products)
+
+            # Shuffle combined list
+            random.shuffle(all_products)
+
+            # --- apply point-range filter on formatted products ---
+            def _eligible(p):
+                pts = p.get("price_points")
+                if pts is None:
+                    return False
+                if min_points is not None and pts < min_points:
+                    return False
+                if max_points is not None and pts > max_points:
+                    return False
+                return True
+
+            filtered = [p for p in all_products if _eligible(p)]
+
+            context["results"] = {
+                "products": filtered[:20],  # Limit to 20 for default view
+                "total": len(filtered),
+                "has_next": False,
+                "has_prev": False,
+            }
+            context["is_default_view"] = True
+        except Exception as e:
+            # If eBay fails, still show driver catalog items
+            filtered = [p for p in driver_products if p.get("price_points", 0) >= (min_points or 0) and (max_points is None or p.get("price_points", 0) <= max_points)]
+            context["results"] = {
+                "products": filtered[:20],
+                "total": len(filtered),
+                "has_next": False,
+                "has_prev": False,
+            }
+            context["is_default_view"] = True
+            if str(e):
+                context["error"] = str(e)
+        
         return render(request, "shop/catalog_search.html", context)
 
+    # User has entered a query - perform search
+    # Filter driver catalog items by query if provided
+    query_lower = query.lower()
+    matching_driver_items = [
+        p for p in driver_products
+        if query_lower in p["name"].lower() or query_lower in (p.get("description", "") or "").lower() or query_lower in (p.get("category", "") or "").lower()
+    ]
+    all_products = list(matching_driver_items)  # Start with matching driver catalog items
+    
     try:
         results = ebay_service.search_products(
             query,
@@ -515,10 +605,13 @@ def catalog_search(request):
             category_ids=category_id or None,
         )
 
-        products = [
+        ebay_products = [
             ebay_service.format_product(item)
             for item in results.get("itemSummaries", [])
         ]
+        
+        # Combine driver catalog items with eBay results
+        all_products.extend(ebay_products)
 
         # --- apply point-range filter on formatted products ---
         def _eligible(p):
@@ -531,16 +624,30 @@ def catalog_search(request):
                 return False
             return True
 
-        filtered = [p for p in products if _eligible(p)]
+        filtered = [p for p in all_products if _eligible(p)]
+        
+        # Calculate total (driver catalog items + eBay results)
+        total_count = len(matching_driver_items) if query else len(driver_products)
+        total_count += results.get("total", 0)
 
         context["results"] = {
             "products": filtered,
-            "total": results.get("total", 0),
+            "total": total_count,
             "has_next": results.get("next") is not None,
             "has_prev": page_num > 1,
         }
+        context["is_default_view"] = False
 
     except Exception as e:
+        # If eBay fails, still show matching driver catalog items
+        filtered = [p for p in all_products if p.get("price_points", 0) >= (min_points or 0) and (max_points is None or p.get("price_points", 0) <= max_points)]
+        context["results"] = {
+            "products": filtered,
+            "total": len(filtered),
+            "has_next": False,
+            "has_prev": False,
+        }
+        context["is_default_view"] = False
         context["error"] = str(e)
 
     return render(request, "shop/catalog_search.html", context)
@@ -597,6 +704,18 @@ def add_to_cart_from_catalog(request):
 
         if not ebay_item_id or not product_name:
             return JsonResponse({'error': 'Missing required fields'}, status=400)
+        
+        # Handle catalog items (items with CATALOG- prefix)
+        is_catalog_item = ebay_item_id.startswith("CATALOG-")
+        if is_catalog_item:
+            catalog_item_id = ebay_item_id.replace("CATALOG-", "")
+            try:
+                catalog_item = DriverCatalogItem.objects.get(id=catalog_item_id, is_active=True)
+                # Use catalog item data
+                product_name = catalog_item.name
+                points = catalog_item.points_cost
+            except DriverCatalogItem.DoesNotExist:
+                return JsonResponse({'error': 'Catalog item not found'}, status=404)
         
         #current user pts balance
         user_points = (
@@ -1210,4 +1329,109 @@ def checkout(request):
         "total_balance": total_balance,
         "points_needed": points_needed,
         "remaining_points": remaining_points,
+    })
+
+
+def _is_sponsor(user):
+    """Check if user is a sponsor."""
+    return user.groups.filter(name="sponsor").exists() or user.is_superuser
+
+
+@login_required
+@user_passes_test(_is_sponsor)
+def sponsor_catalog(request):
+    """Sponsor catalog management - view and manage sponsor-only items."""
+    sponsor = request.user
+    # Only show items that are NOT yet in the driver catalog
+    items = SponsorCatalogItem.objects.filter(
+        sponsor=sponsor
+    ).exclude(
+        driver_catalog_items__isnull=False
+    ).order_by("-created_at")
+    
+    # Handle form submission
+    if request.method == "POST":
+        action = request.POST.get("action")
+        
+        if action == "add":
+            form = SponsorCatalogItemForm(request.POST)
+            if form.is_valid():
+                item = form.save(commit=False)
+                item.sponsor = sponsor
+                item.save()
+                messages.success(request, f"Item '{item.name}' added to your catalog.")
+                return redirect("shop:sponsor_catalog")
+        elif action == "edit":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(SponsorCatalogItem, id=item_id, sponsor=sponsor)
+            form = SponsorCatalogItemForm(request.POST, instance=item)
+            if form.is_valid():
+                form.save()
+                messages.success(request, f"Item '{item.name}' updated.")
+                return redirect("shop:sponsor_catalog")
+        elif action == "delete":
+            item_id = request.POST.get("item_id")
+            item = get_object_or_404(SponsorCatalogItem, id=item_id, sponsor=sponsor)
+            item_name = item.name
+            item.delete()
+            messages.success(request, f"Item '{item_name}' deleted.")
+            return redirect("shop:sponsor_catalog")
+        elif action == "add_to_driver_catalog":
+            item_id = request.POST.get("item_id")
+            sponsor_item = get_object_or_404(SponsorCatalogItem, id=item_id, sponsor=sponsor)
+            
+            # Check if already in driver catalog
+            existing = DriverCatalogItem.objects.filter(
+                source_sponsor_item=sponsor_item
+            ).first()
+            
+            if existing:
+                messages.info(request, f"'{sponsor_item.name}' is already in the driver catalog.")
+            else:
+                # Add to driver catalog
+                driver_item = DriverCatalogItem.objects.create(
+                    name=sponsor_item.name,
+                    description=sponsor_item.description,
+                    price_usd=sponsor_item.price_usd,
+                    points_cost=sponsor_item.points_cost,
+                    image_url=sponsor_item.image_url,
+                    product_url=sponsor_item.product_url,
+                    category=sponsor_item.category,
+                    condition="New",
+                    is_active=True,
+                    added_by=sponsor,
+                    source_sponsor_item=sponsor_item,
+                )
+                messages.success(request, f"'{sponsor_item.name}' added to driver catalog!")
+            
+            return redirect("shop:sponsor_catalog")
+    else:
+        form = SponsorCatalogItemForm()
+    
+    context = {
+        "items": items,
+        "form": form,
+    }
+    return render(request, "shop/sponsor_catalog.html", context)
+
+
+@login_required
+@user_passes_test(_is_sponsor)
+def sponsor_catalog_edit(request, item_id):
+    """Edit a sponsor catalog item."""
+    sponsor = request.user
+    item = get_object_or_404(SponsorCatalogItem, id=item_id, sponsor=sponsor)
+    
+    if request.method == "POST":
+        form = SponsorCatalogItemForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Item '{item.name}' updated.")
+            return redirect("shop:sponsor_catalog")
+    else:
+        form = SponsorCatalogItemForm(instance=item)
+    
+    return render(request, "shop/sponsor_catalog_edit.html", {
+        "form": form,
+        "item": item,
     })

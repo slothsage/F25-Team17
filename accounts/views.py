@@ -28,7 +28,7 @@ from urllib3 import request
 
 from .forms import RegistrationForm  
 from .models import PasswordPolicy
-from .models import DriverProfile
+from .models import DriverProfile, SponsorProfile
 from .models import ChatRoom, ChatMessage, MessageReadStatus
 from .models import Notification
 from .models import PointsLedger
@@ -52,6 +52,13 @@ from shop.utils import order_is_delayed
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 import csv
+from io import BytesIO
+from django.template.loader import render_to_string
+try:
+    from xhtml2pdf import pisa
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
 
 from django.contrib.auth.views import LoginView
 from django.shortcuts import resolve_url
@@ -92,7 +99,7 @@ from .models import CustomLabel, DriverProfile
 
 from django.db import transaction
 from .models import SponsorPointsAccount
-from .forms import SponsorAwardForm, SetPrimaryWalletForm, ContactSponsorForm, PointsGoalForm
+from .forms import SponsorAwardForm, SetPrimaryWalletForm, ContactSponsorForm, PointsGoalForm, SponsorFeeRatioForm
 from django.db.models import OuterRef, Subquery, IntegerField
 
 User = get_user_model()
@@ -330,21 +337,33 @@ def audit_report(request):
 @login_required
 def profile(request):
     profile_obj, _ = DriverProfile.objects.get_or_create(user=request.user)
-    total_points = get_driver_points_balance(request.user)
     
-    # Calculate progress for goal tracker
+    # Only show points for drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    show_points = is_driver and not is_sponsor and not is_admin
+    
+    total_points = None
     progress_percentage = 0
     points_remaining = 0
-    if profile_obj.points_goal and profile_obj.points_goal > 0:
-        progress_percentage = min(100, int((total_points / profile_obj.points_goal) * 100))
-        points_remaining = max(0, profile_obj.points_goal - total_points)
+    has_goal = False
+    
+    if show_points:
+        total_points = get_driver_points_balance(request.user)
+        # Calculate progress for goal tracker
+        if profile_obj.points_goal and profile_obj.points_goal > 0:
+            progress_percentage = min(100, int((total_points / profile_obj.points_goal) * 100))
+            points_remaining = max(0, profile_obj.points_goal - total_points)
+            has_goal = True
     
     return render(request, "accounts/profile.html", {
         "total_points": total_points,
-        "points_goal": profile_obj.points_goal,
+        "points_goal": profile_obj.points_goal if show_points else None,
         "progress_percentage": progress_percentage,
         "points_remaining": points_remaining,
-        "has_goal": bool(profile_obj.points_goal),
+        "has_goal": has_goal,
+        "show_points": show_points,
     })
 
 @login_required
@@ -887,6 +906,43 @@ def admin_detail(request, user_id):
     }
     
     return render(request, "accounts/admin_detail.html", context)
+
+
+@staff_member_required
+def sponsor_fee_ratio(request, user_id):
+    """Admin view to change the fee ratio (points per USD) for a sponsor."""
+    User = get_user_model()
+    sponsor_user = get_object_or_404(User, pk=user_id, groups__name="sponsor")
+    
+    # Get or create sponsor profile
+    sponsor_profile, created = SponsorProfile.objects.get_or_create(user=sponsor_user)
+    
+    # Get global default for display
+    from shop.models import PointsConfig
+    global_default = PointsConfig.get_solo().points_per_usd
+    
+    if request.method == "POST":
+        form = SponsorFeeRatioForm(request.POST, instance=sponsor_profile)
+        if form.is_valid():
+            form.save()
+            ratio_display = sponsor_profile.points_per_usd if sponsor_profile.points_per_usd else f"Global default ({global_default})"
+            messages.success(
+                request,
+                f"Fee ratio updated for {sponsor_user.username}. Points per USD: {ratio_display}"
+            )
+            return redirect("accounts:sponsor_fee_ratio", user_id=user_id)
+    else:
+        form = SponsorFeeRatioForm(instance=sponsor_profile)
+    
+    context = {
+        "sponsor_user": sponsor_user,
+        "sponsor_profile": sponsor_profile,
+        "form": form,
+        "global_default": global_default,
+        "current_ratio": sponsor_profile.points_per_usd or global_default,
+    }
+    
+    return render(request, "accounts/sponsor_fee_ratio.html", context)
 
 
 @staff_member_required
@@ -1685,13 +1741,99 @@ def notifications_history(request):
 
 @login_required
 def points_history(request):
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        messages.error(request, "Points history is only available to drivers.")
+        return redirect("accounts:profile")
+    
     rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
     return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
 
 @login_required
+def points_history_download(request):
+    """Download points history as CSV or PDF."""
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        return HttpResponse("Points history download is only available to drivers.", status=403)
+    
+    format_type = request.GET.get("format", "csv").lower()
+    rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
+    balance = rows.aggregate(s=Sum("delta"))["s"] or 0
+    
+    if format_type == "csv":
+        # Generate CSV
+        response = HttpResponse(content_type="text/csv")
+        filename = f"points_history_{request.user.username}_{timezone.now().strftime('%Y%m%d')}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        
+        writer = csv.writer(response)
+        writer.writerow(["Date", "Change", "Reason", "Balance After"])
+        
+        for row in rows:
+            writer.writerow([
+                row.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                f"{'+' if row.delta >= 0 else ''}{row.delta}",
+                row.reason or "",
+                row.balance_after,
+            ])
+        
+        # Add summary row
+        writer.writerow([])
+        writer.writerow(["Total Balance", "", "", balance])
+        
+        return response
+    
+    elif format_type == "pdf" and PDF_AVAILABLE:
+        # Generate PDF
+        html = render_to_string(
+            "accounts/points_history_pdf.html",
+            {
+                "rows": rows,
+                "balance": balance,
+                "user": request.user,
+                "generated_at": timezone.now(),
+            },
+        )
+        
+        pdf_io = BytesIO()
+        result = pisa.CreatePDF(src=html, dest=pdf_io, encoding="UTF-8")
+        
+        if result.err:
+            return HttpResponse("Error generating PDF", status=500)
+        
+        pdf = pdf_io.getvalue()
+        filename = f"points_history_{request.user.username}_{timezone.now().strftime('%Y%m%d')}.pdf"
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+    
+    elif format_type == "pdf" and not PDF_AVAILABLE:
+        return HttpResponse("PDF generation is not available. Please use CSV format.", status=400)
+    
+    else:
+        return HttpResponse("Invalid format. Use 'csv' or 'pdf'.", status=400)
+
+@login_required
 def points_goal_tracker(request):
     """Points goal tracker with progress bar for drivers."""
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        messages.error(request, "Points goal tracker is only available to drivers.")
+        return redirect("accounts:profile")
+    
     profile, _ = DriverProfile.objects.get_or_create(user=request.user)
     current_balance = get_driver_points_balance(request.user)
     

@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Change Sponsor Fee Ratio - Driver Incentive Program{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">Change Fee Ratio for Sponsor</h2>
+            <p class="text-muted mb-0">{{ sponsor_user.username }}</p>
+        </div>
+        <a href="{% url 'admin_user_search' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to User Search
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-percentage"></i> Sponsor Fee Ratio Settings</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-4">
+                <h6>Sponsor Information</h6>
+                <p class="mb-1"><strong>Username:</strong> {{ sponsor_user.username }}</p>
+                <p class="mb-1"><strong>Email:</strong> {{ sponsor_user.email }}</p>
+                <p class="mb-0"><strong>Current Fee Ratio:</strong> 
+                    <span class="badge bg-info">{{ current_ratio }} points per USD</span>
+                    {% if not sponsor_profile.points_per_usd %}
+                        <span class="text-muted small">(using global default)</span>
+                    {% endif %}
+                </p>
+            </div>
+
+            <hr>
+
+            <div class="mb-4">
+                <h6>Global Default</h6>
+                <p class="text-muted mb-0">The global default fee ratio is <strong>{{ global_default }} points per USD</strong>.</p>
+                <p class="text-muted small">If no custom ratio is set for this sponsor, they will use this default value.</p>
+            </div>
+
+            <hr>
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="{{ form.points_per_usd.id_for_label }}" class="form-label">
+                        {{ form.points_per_usd.label }}
+                    </label>
+                    {{ form.points_per_usd }}
+                    {% if form.points_per_usd.help_text %}
+                        <div class="form-text">{{ form.points_per_usd.help_text }}</div>
+                    {% endif %}
+                    {% if form.points_per_usd.errors %}
+                        <div class="text-danger small">{{ form.points_per_usd.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <a href="{% url 'admin_user_search' %}" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                    {% if sponsor_profile.points_per_usd %}
+                        <button type="button" class="btn btn-outline-warning" onclick="document.getElementById('id_points_per_usd').value=''; this.form.submit();">
+                            <i class="fas fa-undo"></i> Reset to Global Default
+                        </button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mt-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="fas fa-info-circle"></i> About Fee Ratios</h6>
+        </div>
+        <div class="card-body">
+            <p class="mb-2">The fee ratio determines how many points a sponsor awards per dollar spent.</p>
+            <ul class="mb-0">
+                <li>If set, this sponsor will use their custom ratio when awarding points to drivers.</li>
+                <li>If left blank, the sponsor will use the global default ratio (currently {{ global_default }} points per USD).</li>
+                <li>This setting only affects future point awards, not existing balances.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

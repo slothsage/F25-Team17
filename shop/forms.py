@@ -1,5 +1,5 @@
 from django import forms
-from .models import PointsConfig
+from .models import PointsConfig, SponsorCatalogItem, DriverCatalogItem
 
 class PointsConfigForm(forms.ModelForm):
     class Meta:
@@ -28,3 +28,34 @@ class CheckoutForm(forms.Form):
     ship_state  = forms.CharField(label="State/Province", max_length=100, widget=forms.TextInput(attrs={"class": "form-control"}))
     ship_postal = forms.CharField(label="Postal Code", max_length=20, widget=forms.TextInput(attrs={"class": "form-control"}))
     ship_country = forms.CharField(label="Country Code", max_length=2, initial="US", widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "US"}))
+
+class SponsorCatalogItemForm(forms.ModelForm):
+    class Meta:
+        model = SponsorCatalogItem
+        fields = [
+            "name",
+            "description",
+            "price_usd",
+            "points_cost",
+            "image_url",
+            "product_url",
+            "category",
+            "is_active",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "required": True}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "price_usd": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+            "points_cost": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+            "image_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
+            "product_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
+            "category": forms.TextInput(attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "price_usd": "Price (USD)",
+            "points_cost": "Points Cost",
+            "image_url": "Image URL",
+            "product_url": "Product URL",
+            "is_active": "Active (visible in catalog)",
+        }

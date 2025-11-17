@@ -86,6 +86,7 @@ urlpatterns = [
     path("admin/sponsors/archived/", views.archived_sponsors, name="archived_sponsors"),
     path("admin/sponsors/<int:user_id>/archive/", views.archive_sponsor, name="archive_sponsor"),
     path("admin/sponsors/<int:user_id>/unarchive/", views.unarchive_sponsor, name="unarchive_sponsor"),
+    path("admin/sponsors/<int:user_id>/fee-ratio/", views.sponsor_fee_ratio, name="sponsor_fee_ratio"),
 
     # Sponsorship requests
     path("sponsor/requests/", views.sponsorship_requests, name="sponsorship_requests"),
@@ -147,6 +148,7 @@ urlpatterns = [
     path("notifications/bulk-delete/", views.notifications_bulk_delete, name="notifications_bulk_delete"),
     
     path("points/", views.points_history, name="points_history"),
+    path("points/download/", views.points_history_download, name="points_history_download"),
     path("points/goal/", views.points_goal_tracker, name="points_goal_tracker"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
     path("my-sponsor/", views.my_sponsor, name="my_sponsor"),

@@ -99,10 +99,18 @@ class MessageReadStatusAdmin(admin.ModelAdmin):
 
 @admin.register(SponsorProfile)
 class SponsorProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "is_archived", "archived_at", "archived_by")
+    list_display = ("user", "points_per_usd", "is_archived", "archived_at", "archived_by")
     search_fields = ("user__username", "user__email")
     list_filter = ("is_archived",)
     readonly_fields = ("archived_at", "archived_by")
+    
+    def get_points_per_usd(self, obj):
+        if obj.points_per_usd:
+            return f"{obj.points_per_usd} (custom)"
+        from shop.models import PointsConfig
+        default = PointsConfig.get_solo().points_per_usd
+        return f"{default} (default)"
+    get_points_per_usd.short_description = "Points per USD"
 
 
 @admin.register(CustomLabel)

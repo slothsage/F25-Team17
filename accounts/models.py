@@ -104,9 +104,21 @@ class SponsorProfile(models.Model):
         related_name="archived_sponsors",
         help_text="Admin who archived this sponsor"
     )
+    points_per_usd = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Points per USD for this sponsor (if not set, uses global default)"
+    )
     
     def __str__(self):
         return f"SponsorProfile<{self.user.username}>"
+    
+    def get_points_per_usd(self):
+        """Get the points per USD for this sponsor, or return global default."""
+        if self.points_per_usd is not None:
+            return self.points_per_usd
+        from shop.models import PointsConfig
+        return PointsConfig.get_solo().points_per_usd
 
 class PasswordPolicy(models.Model):
     min_length = models.PositiveIntegerField(default=12)

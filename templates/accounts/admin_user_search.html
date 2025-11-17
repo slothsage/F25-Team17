@@ -1,626 +1,842 @@
 {% extends "base.html" %}
 {% load i18n %}
 
+{% block title %}Admin: User Search{% endblock %}
+
 {% block content %}
-                
-                <div class="container-main">
-                  <header class="toolbar">
-                    <div class="toolbar-left">
-                      <h1 class="page-title">Admin: User, Sponsor &amp; Admin Search</h1>
-                      <p class="page-subtitle">Find drivers, sponsors, and admin users, manage accounts, and export CSVs.</p>
-                    </div>
-                    <div class="toolbar-right" style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                      <a class="btn btn-muted" href="{% url 'accounts:login_activity' %}">View Login Activity</a>
-                      <a class="btn btn-primary" href="{% url 'accounts:admin_active_sessions' %}">Active Sessions</a>
-                      <a class="btn btn-warning" href="{% url 'accounts:archived_sponsors' %}">Archived Sponsors</a>
-                      <!-- Error Log Download (with Date Filter) -->
-                      <form method="get" action="{% url 'accounts:download_error_log' %}" style="display: flex; align-items: center; gap: 0.25rem; margin: 0;">
-                        <input type="date" name="date" class="input" style="height: 38px; padding: 0.4rem 0.8rem; border: 1px solid #888; border-radius: 0.5rem;">
-                        <button class="btn btn-danger" type="submit">Download Logs</button>
-                      </form>
+<div class="container-fluid mt-4 mb-5">
+  <!-- Header Section -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+        <div>
+          <h1 class="h2 mb-2 fw-bold">User Management</h1>
+          <p class="text-muted mb-0">Search and manage drivers, sponsors, and admin users</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-secondary" href="{% url 'accounts:login_activity' %}">
+            <i class="fas fa-history me-1"></i> Login Activity
+          </a>
+          <a class="btn btn-outline-primary" href="{% url 'accounts:admin_active_sessions' %}">
+            <i class="fas fa-users me-1"></i> Active Sessions
+          </a>
+          <a class="btn btn-outline-warning" href="{% url 'accounts:archived_sponsors' %}">
+            <i class="fas fa-archive me-1"></i> Archived Sponsors
+          </a>
+          <a class="btn btn-success" href="{% url 'accounts:bulk_upload_users' %}">
+            <i class="fas fa-upload me-1"></i> Bulk Upload
+          </a>
+          <a class="btn btn-info" href="{% url 'accounts:bulk_assign_sponsorship' %}">
+            <i class="fas fa-user-plus me-1"></i> Bulk Assign
+          </a>
+          <form method="get" action="{% url 'accounts:download_error_log' %}" class="d-inline">
+            <div class="input-group">
+              <input type="date" name="date" class="form-control" style="max-width: 160px;">
+              <button class="btn btn-danger" type="submit">
+                <i class="fas fa-download me-1"></i> Logs
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                      <!-- Bulk Upload CSV -->
-                      <a class="btn btn-success" href="{% url 'accounts:bulk_upload_users' %}">Bulk Upload CSV</a>
-                      <!-- Bulk assign to sponsor -->
-                      <a class="btn btn-info" href="{% url 'accounts:bulk_assign_sponsorship' %}">
-                        Bulk Assign Sponsors
-                      </a>
-                    </div>
+  <!-- Label Management Bar -->
+  <div class="card shadow-sm mb-4 border-0">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <label for="label-filter" class="mb-0 fw-semibold">Filter by Label:</label>
+          <form method="get" class="d-flex align-items-center gap-2">
+            <select id="label-filter" name="label" class="form-select" style="width: 200px;" onchange="this.form.submit()">
+              <option value="">-- All Labels --</option>
+              {% for label in labels %}
+                <option value="{{ label.name }}" {% if label.name == selected_label %}selected{% endif %}>
+                  {{ label.name }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if selected_label %}
+              <a href="?" class="btn btn-outline-danger btn-sm">
+                <i class="fas fa-times me-1"></i> Clear
+              </a>
+            {% endif %}
+          </form>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="{% url 'accounts:manage_labels' %}" class="btn btn-outline-primary">
+            <i class="fas fa-tags me-1"></i> Manage Labels
+          </a>
+          <a href="{% url 'accounts:assign_labels' %}" class="btn btn-outline-success">
+            <i class="fas fa-tag me-1"></i> Assign Labels
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                    <!-- Label Filter -->
-                    <div class="toolbar mt-3" style="display:flex; justify-content:flex-end; gap:10px;">
-                      <form method="get" class="d-flex align-items-center">
-                        <label for="label-filter" class="me-2 fw-semibold">Filter by Label:</label>
-                        <select id="label-filter" name="label" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
-                          <option value="">-- All --</option>
-                          {% for label in labels %}
-                            <option value="{{ label.name }}" {% if label.name == selected_label %}selected{% endif %}>
-                              {{ label.name }}
-                            </option>
-                          {% endfor %}
-                        </select>
-                        {% if selected_label %}
-                          <a href="?" class="btn btn-sm btn-link text-danger ms-2">Clear</a>
-                        {% endif %}
-                      </form>
-                    </div>
+  <!-- Search Cards -->
+  <div class="row g-4 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-primary text-white py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="fas fa-user me-2"></i>Driver Search
+          </h6>
+        </div>
+        <div class="card-body">
+          <form method="get">
+            <div class="autocomplete mb-3" data-limit="6" data-endpoint="{% url 'accounts:api_driver_suggest' %}">
+              <input
+                name="q"
+                value="{{ q }}"
+                class="form-control ac-input"
+                placeholder="username, email, phone, id:123"
+                autocomplete="off"
+              />
+              <div class="ac-panel" role="listbox" hidden></div>
+            </div>
+            <button class="btn btn-primary w-100" type="submit">
+              <i class="fas fa-search me-2"></i>Search Drivers
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
 
-                    <!-- Label Management -->
-                    <div class="toolbar mt-3" style="display: flex; justify-content: flex-end; gap: 10px;">
-                      <a href="{% url 'accounts:manage_labels' %}" class="btn btn-outline-primary">
-                          Manage Labels
-                      </a>
-                      <a href="{% url 'accounts:assign_labels' %}" class="btn btn-outline-success">
-                          Assign Labels
-                      </a>
-                    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-success text-white py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="fas fa-handshake me-2"></i>Sponsor Search
+          </h6>
+        </div>
+        <div class="card-body">
+          <form method="get">
+            <div class="autocomplete mb-3" data-limit="6" data-endpoint="{% url 'accounts:api_sponsor_suggest' %}">
+              <input
+                name="sponsor"
+                value="{{ sponsor_q }}"
+                class="form-control ac-input"
+                placeholder="sponsor name, email"
+                autocomplete="off"
+              />
+              <div class="ac-panel" role="listbox" hidden></div>
+            </div>
+            <button class="btn btn-success w-100" type="submit">
+              <i class="fas fa-search me-2"></i>Search Sponsors
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
 
-                    
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-info text-white py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="fas fa-user-shield me-2"></i>Admin Search
+          </h6>
+        </div>
+        <div class="card-body">
+          <form method="get">
+            <input
+              name="admin"
+              value="{{ admin_q }}"
+              class="form-control mb-3"
+              placeholder="username, email, name"
+              autocomplete="off"
+            />
+            <button class="btn btn-info w-100" type="submit">
+              <i class="fas fa-search me-2"></i>Search Admins
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                  </header>
+  <!-- Export Card -->
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-secondary text-white py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="fas fa-download me-2"></i>Export Data
+          </h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex gap-3 flex-wrap">
+            <form method="get" class="d-inline">
+              <input type="hidden" name="q" value="{{ q }}" />
+              <input type="hidden" name="sponsor" value="{{ sponsor_q }}" />
+              <input type="hidden" name="export" value="csv" />
+              <input type="hidden" name="export_type" value="drivers" />
+              <button class="btn btn-outline-secondary" type="submit">
+                <i class="fas fa-file-csv me-2"></i>Export Drivers CSV
+              </button>
+            </form>
+            <form method="get" class="d-inline">
+              <input type="hidden" name="q" value="{{ q }}" />
+              <input type="hidden" name="sponsor" value="{{ sponsor_q }}" />
+              <input type="hidden" name="export" value="csv" />
+              <input type="hidden" name="export_type" value="sponsors" />
+              <button class="btn btn-outline-secondary" type="submit">
+                <i class="fas fa-file-csv me-2"></i>Export Sponsors CSV
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-                  <!-- Search Cards -->
-                  <section class="grid search-grid center-narrow">
-                    <!-- DRIVER SEARCH -->
-                    <article class="card">
-                      <div class="card-header"><h2 class="card-title">Driver search</h2></div>
-                      <div class="card-body">
-                        <form method="get" class="stack gap-sm">
-                          <div class="autocomplete" data-limit="6" data-endpoint="{% url 'accounts:api_driver_suggest' %}">
-                            <input
-                              name="q"
-                              value="{{ q }}"
-                              class="input ac-input"
-                              placeholder="username, email, phone, address or id:123"
-                              autocomplete="off"
-                              aria-label="Search drivers"
-                            />
-                            <div class="ac-panel" role="listbox" hidden></div>
-                          </div>
-                          <div class="row-actions">
-                            <button class="btn btn-primary">Search Drivers</button>
-                          </div>
-                        </form>
-                      </div>
-                    </article>
-
-                    <!-- SPONSOR SEARCH -->
-                    <article class="card">
-                      <div class="card-header"><h2 class="card-title">Sponsor search</h2></div>
-                      <div class="card-body">
-                        <form method="get" class="stack gap-sm">
-                          <div class="autocomplete" data-limit="6" data-endpoint="{% url 'accounts:api_sponsor_suggest' %}">
-                            <input
-                              name="sponsor"
-                              value="{{ sponsor_q }}"
-                              class="input ac-input"
-                              placeholder="sponsor name, email"
-                              autocomplete="off"
-                              aria-label="Search sponsors"
-                            />
-                            <div class="ac-panel" role="listbox" hidden></div>
-                          </div>
-                          <div class="row-actions">
-                            <button class="btn btn-primary">Search Sponsors</button>
-                          </div>
-                        </form>
-                      </div>
-                    </article>
-
-                    <!-- ADMIN SEARCH -->
-                    <article class="card">
-                      <div class="card-header"><h2 class="card-title">Admin search</h2></div>
-                      <div class="card-body">
-                        <form method="get" class="stack gap-sm">
-                          <input
-                            name="admin"
-                            value="{{ admin_q }}"
-                            class="input"
-                            placeholder="admin username, email, first name, last name"
-                            autocomplete="off"
-                            aria-label="Search admin users"
-                          />
-                          <div class="row-actions">
-                            <button class="btn btn-primary">Search Admins</button>
-                          </div>
-                        </form>
-                      </div>
-                    </article>
-
-                    <!-- EXPORT -->
-                    <article class="card">
-                      <div class="card-header"><h2 class="card-title">Export</h2></div>
-                      <div class="card-body">
-                        <div class="row-actions">
-                          <form method="get" class="inline">
-                            <input type="hidden" name="q" value="{{ q }}" />
-                            <input type="hidden" name="sponsor" value="{{ sponsor_q }}" />
-                            <input type="hidden" name="export" value="csv" />
-                            <input type="hidden" name="export_type" value="drivers" />
-                            <button class="btn btn-muted">Export Drivers</button>
-                          </form>
-                          <form method="get" class="inline">
-                            <input type="hidden" name="q" value="{{ q }}" />
-                            <input type="hidden" name="sponsor" value="{{ sponsor_q }}" />
-                            <input type="hidden" name="export" value="csv" />
-                            <input type="hidden" name="export_type" value="sponsors" />
-                            <button class="btn btn-muted">Export Sponsors</button>
-                          </form>
-                        </div>
-                      </div>
-                    </article>
-                  </section>
-
-                  <!-- DRIVERS RESULT TABLE -->
-                  <section class="card mt-lg">
-                    <div class="card-header">
-                      <div class="card-title-row">
-                        <h2 class="card-title">Drivers</h2>
-                        <div class="pill muted">Showing {{ drivers_matching_count }} / {{ total_drivers_count }}</div>
-                      </div>
-                    </div>
-                    <div class="card-body">
-                      <div class="table-wrap">
-                        <table class="table table-admin">
-                          <thead>
-                            <tr>
-                              <th class="col-id">ID</th>
-                              <th>Username</th>
-                              <th>Email</th>
-                              <th>Phone</th>
-                              <th>Address</th>
-                              <th>Labels</th>
-                              <th>
-                                {% with current_q=request.GET.q|default:"" current_label=request.GET.label|default:"" %}
-                                  {% if request.GET.sort == "sponsor_asc" %}
-                                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_desc" class="link-muted">Sponsor ▼</a>
-                                  {% elif request.GET.sort == "sponsor_desc" %}
-                                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="link-muted">Sponsor ▲</a>
-                                  {% else %}
-                                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="link-muted">Sponsor</a>
-                                  {% endif %}
-                                {% endwith %}
-                              </th>
-                              <th>Last Login</th>
-                              <th class="col-actions">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for u in drivers %}
-                            <tr
-                              {% if not u.is_active %}
-                                style="background-color: rgba(255, 100, 100, 0.08);"
-                              {% elif u.driver_profile.is_locked %}
-                                style="background-color: rgba(255, 0, 0, 0.15);"
-                              {% elif u.driver_profile.is_suspended %}
-                                style="background-color: rgba(255, 200, 0, 0.15);"
-                              {% endif %}
-                            >
-                              <td class="mono">{{ u.id }}</td>
-                              <td class="wrap">{{ u.username }}</td>
-                              <td class="wrap">{{ u.email }}</td>
-                              <td class="wrap">{{ u.driver_profile.phone }}</td>
-                              <td class="wrap">{{ u.driver_profile.address }}</td>
-                              <!-- Labels -->
-                              <td>
-                                {% for label in u.driver_profile.labels.all %}
-                                  <span class="badge" style="background-color: {{ label.color }}; color: #fff;">
-                                    {{ label.name }}
-                                  </span>
-                                {% empty %}
-                                  <span class="text-muted">—</span>
-                                {% endfor %}
-                              </td>
-                              <!-- New Sponsor Column -->
-                              <td class="wrap">
-                                {% if u.driver_profile.sponsor_name %}
-                                  <span class="badge info">{{ u.driver_profile.sponsor_name }}</span><br>
-                                  <small class="subtle">{{ u.driver_profile.sponsor_email }}</small>
-                                {% else %}
-                                  <span class="muted">No Sponsor</span>
-                                {% endif %}
-                              </td>
-
-                              <!-- Last Login -->
-                              <td class="nowrap">
-                                {% if u.last_login %}
-                                  {{ u.last_login|date:"Y-m-d H:i" }}<br>
-                                  <small class="subtle">{{ u.last_login|timesince }} ago</small>
-                                {% else %}
-                                  <span class="badge danger">Never</span>
-                                {% endif %}
-                              </td>
-                              <td class="actions">
-                                <!-- View As Driver (Impersonation) -->
-                                <form method="post" action="{% url 'accounts:view_as_driver' u.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as {{ u.username }}? You will be able to see exactly what they see.');">
-                                    View As Driver
-                                  </button>
-                                </form>
-
-                                <!-- Edit Profile -->
-                                <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' u.id %}">Edit Profile</a>
-
-                                <!-- Transfer Sponsor -->
-                                <a class="btn btn-outline-info" href="{% url 'accounts:transfer_driver_sponsor' u.id %}">
-                                  Transfer Sponsor
-                                </a>
-
-                                <!-- Active toggle -->
-                                <form method="post" action="{% url 'accounts:toggle_user_active' u.id %}" class="inline">
-                                  {% csrf_token %}
-                                  {% if u == request.user %}
-                                    <button class="btn" disabled>Cannot change yourself</button>
-                                  {% else %}
-                                    {% if u.is_active %}
-                                      <button class="btn btn-warning" type="submit">Deactivate</button>
-                                    {% else %}
-                                      <button class="btn btn-success" type="submit">Reactivate</button>
-                                    {% endif %}
-                                  {% endif %}
-                                </form>
-
-                                <!-- Temp password -->
-                                <form method="post" action="{% url 'accounts:admin_set_temp_password' u.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-secondary" type="submit">Temp Password</button>
-                                </form>
-
-                                <!-- Change password page -->
-                                <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' u.id %}">Change Password</a>
-
-                                <!-- Send reset link -->
-                                <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-info" type="submit">Send Reset Link</button>
-                                </form>
-
-                                <!-- Force logout -->
-                                <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
-                                </form>
-
-                                <!-- Lock/Unlock -->
-                                <form method="post" action="{% url 'accounts:toggle_lock_user' u.id %}" class="inline">
-                                  {% csrf_token %}
-                                  {% if u.driver_profile.is_locked %}
-                                    <button class="btn btn-success" type="submit" onclick="return confirm('Unlock this user?');">Unlock</button>
-                                  {% else %}
-                                    <button class="btn btn-dark" type="submit" onclick="return confirm('Lock this user?');">Lock</button>
-                                  {% endif %}
-                                </form>
-
-                                <!-- Suspend -->
-                                <form method="post" action="{% url 'accounts:toggle_suspend_user' u.id %}" style="display:inline; margin-left: 5px;">
-                                  {% csrf_token %}
-                                  {% if u.driver_profile.is_suspended %}
-                                    <button class="btn btn-secondary" type="submit" onclick="return confirm('Unsuspend this user?');">Unsuspend</button>
-                                  {% else %}
-                                    <button class="btn btn-dark" type="submit" onclick="return confirm('Suspend this user?');">Suspend</button>
-                                  {% endif %}
-                                </form>
-
-                                <!-- Session timeout -->
-                                <a class="btn btn-secondary" href="{% url 'accounts:admin_set_timeout' u.id %}">Set Timeout</a>
-                              </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                              <td colspan="7" class="muted">No drivers found.</td>
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <nav class="pagination">
-                        {% if drivers.has_previous %}
-                          <a class="page-link" href="?q={{ q }}&page={{ drivers.previous_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">Previous</a>
-                        {% endif %}
-                        <span class="page-status">Page {{ drivers.number }} of {{ drivers.paginator.num_pages }}</span>
-                        {% if drivers.has_next %}
-                          <a class="page-link" href="?q={{ q }}&page={{ drivers.next_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">Next</a>
-                        {% endif %}
-                      </nav>
-                    </div>
-                  </section>
-
-                  {% if sponsors %}
-                  <section class="card mt-lg">
-                    <div class="card-header">
-                      <div class="card-title-row">
-                        <h2 class="card-title">Sponsors</h2>
-                        <div class="pill muted">Showing {{ sponsors_matching_count }} / {{ total_sponsors_count }}</div>
-                      </div>
-                    </div>
-                    <div class="card-body">
-                      <div class="table-wrap">
-                        <table class="table table-admin">
-                          <thead>
-                            <tr>
-                              <th>Name</th>
-                              <th>Order Count</th>
-                              <th>Sample Drivers</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for s in sponsors %}
-                            <tr>
-                              <td class="wrap">{{ s.name }}</td>
-                              <td class="mono">{{ s.count }}</td>
-                              <td class="wrap">
-                                {% for d in s.drivers %}
-                                  <span class="chip">{{ d }}</span>
-                                {% endfor %}
-                              </td>
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <form method="get" class="inline">
-                        <input type="hidden" name="q" value="{{ q }}">
-                        <input type="hidden" name="sponsor" value="{{ sponsor_q }}">
-                        <input type="hidden" name="export" value="csv">
-                        <input type="hidden" name="export_type" value="sponsors">
-                        <button class="btn btn-muted">Export Sponsors</button>
-                      </form>
-                    </div>
-                  </section>
+  <!-- Drivers Table -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3" style="cursor: pointer;" onclick="toggleSection('drivers-section')">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">
+          <i class="fas fa-users me-2 text-primary"></i>Drivers
+          <i class="fas fa-chevron-down ms-2" id="drivers-chevron"></i>
+        </h5>
+        <span class="badge bg-primary fs-6 px-3 py-2">{{ drivers_matching_count }} / {{ total_drivers_count }}</span>
+      </div>
+    </div>
+    <div id="drivers-section">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 70px;" class="ps-3">ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Address</th>
+              <th>Labels</th>
+              <th>
+                {% with current_q=request.GET.q|default:"" current_label=request.GET.label|default:"" %}
+                  {% if request.GET.sort == "sponsor_asc" %}
+                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_desc" class="text-decoration-none text-dark">
+                      Sponsor <i class="fas fa-sort-down"></i>
+                    </a>
+                  {% elif request.GET.sort == "sponsor_desc" %}
+                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="text-decoration-none text-dark">
+                      Sponsor <i class="fas fa-sort-up"></i>
+                    </a>
+                  {% else %}
+                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="text-decoration-none text-muted">
+                      Sponsor <i class="fas fa-sort"></i>
+                    </a>
                   {% endif %}
-
-                  {% if sponsor_users %}
-                  <section class="card mt-lg">
-                    <div class="card-header">
-                      <div class="card-title-row">
-                        <h2 class="card-title">Sponsor Users</h2>
-                        <div class="pill muted">Showing {{ sponsor_users|length }}</div>
-                      </div>
-                    </div>
-                    <div class="card-body">
-                      <div class="table-wrap">
-                        <table class="table table-admin">
-                          <thead>
-                            <tr>
-                              <th>Username</th>
-                              <th>Email</th>
-                              <th>Status</th>
-                              <th class="col-actions">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for s in sponsor_users %}
-                            <tr class="{% if not s.is_active %}row-inactive{% endif %}">
-                              <td class="wrap">{{ s.username }}</td>
-                              <td class="wrap">{{ s.email }}</td>
-                              <td>
-                                {% if s.is_active %}
-                                  <span class="badge success">Active</span>
-                                {% else %}
-                                  <span class="badge danger">Inactive</span>
-                                {% endif %}
-                              </td>
-                              <td class="actions">
-                                <!-- View As Sponsor (Impersonation) -->
-                                <form method="post" action="{% url 'accounts:view_as_sponsor' s.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-info" type="submit" style="background:#7048e8;border-color:#7048e8;" onclick="return confirm('View the site as sponsor {{ s.username }}? You will be able to see exactly what they see.');">
-                                    View As Sponsor
-                                  </button>
-                                </form>
-
-                                <!-- Edit Profile -->
-                                <a class="btn btn-primary" href="{% url 'accounts:admin_profile_edit' s.id %}">Edit Profile</a>
-
-                                <form method="post" action="{% url 'accounts:toggle_user_active' s.id %}" class="inline">
-                                  {% csrf_token %}
-                                  {% if s == request.user %}
-                                    <button class="btn" disabled>Cannot change yourself</button>
-                                  {% else %}
-                                    {% if s.is_active %}
-                                      <button class="btn btn-warning" type="submit">Deactivate</button>
-                                    {% else %}
-                                      <button class="btn btn-success" type="submit">Reactivate</button>
-                                    {% endif %}
-                                  {% endif %}
-                                </form>
-
-                                <form method="post" action="{% url 'accounts:admin_set_temp_password' s.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-secondary" type="submit">Temp Password</button>
-                                </form>
-
-                                <a class="btn btn-primary" href="{% url 'accounts:admin_set_password' s.id %}">Change Password</a>
-
-                                <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-info" type="submit">Send Reset Link</button>
-                                </form>
-
-                                <!-- Archive Sponsor -->
-                                <form method="post" action="{% url 'accounts:archive_sponsor' s.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-warning" type="submit" onclick="return confirm('Archive sponsor {{ s.username }}? They will be hidden from searches but can be unarchived later.');">
-                                    Archive
-                                  </button>
-                                </form>
-
-                                <form method="post" action="{% url 'accounts:admin_force_logout_user' s.id %}" class="inline">
-                                  {% csrf_token %}
-                                  <button class="btn btn-danger" type="submit" onclick="return confirm('Force logout this user?');">Force Logout</button>
-                                </form>
-                              </td>
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </section>
-                  {% endif %}
-
-                  {% if admin_users %}
-                  <section class="card mt-lg">
-                    <div class="card-header">
-                      <div class="card-title-row">
-                        <h2 class="card-title">Admin Users</h2>
-                        <div class="pill muted">Showing {{ admin_users_matching_count }} / {{ total_admin_users_count }}</div>
-                      </div>
-                    </div>
-                    <div class="card-body">
-                      <div class="table-wrap">
-                        <table class="table table-admin">
-                          <thead>
-                            <tr>
-                              <th>ID</th>
-                              <th>Username</th>
-                              <th>Email</th>
-                              <th>Name</th>
-                              <th>Last Login</th>
-                              <th>Status</th>
-                              <th class="col-actions">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for admin in admin_users %}
-                            <tr class="{% if not admin.is_active %}row-inactive{% endif %}">
-                              <td class="mono">{{ admin.id }}</td>
-                              <td class="wrap">{{ admin.username }}</td>
-                              <td class="wrap">{{ admin.email }}</td>
-                              <td class="wrap">{{ admin.get_full_name|default:"-" }}</td>
-                              <td class="nowrap">
-                                {% if admin.last_login %}
-                                  {{ admin.last_login|date:"Y-m-d H:i" }}<br>
-                                  <small class="subtle">{{ admin.last_login|timesince }} ago</small>
-                                {% else %}
-                                  <span class="badge danger">Never</span>
-                                {% endif %}
-                              </td>
-                              <td>
-                                {% if admin.is_superuser %}
-                                  <span class="badge success">Superuser</span>
-                                {% elif admin.is_staff %}
-                                  <span class="badge info">Staff</span>
-                                {% endif %}
-                                {% if admin.is_active %}
-                                  <span class="badge success">Active</span>
-                                {% else %}
-                                  <span class="badge danger">Inactive</span>
-                                {% endif %}
-                              </td>
-                              <td class="actions">
-                                <!-- View Details -->
-                                <a class="btn btn-info" href="{% url 'accounts:admin_detail' admin.id %}">
-                                  📋 View Details
-                                </a>
-                              </td>
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </section>
-                  {% endif %}
-                </div>
-
-                <script>
-                (function () {
-                  const els = document.querySelectorAll('.autocomplete');
-                  if (!els.length) return;
-
-                  function h(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text) e.textContent=text; return e; }
-
-                  els.forEach(wrapper => {
-                    const input = wrapper.querySelector('.ac-input') || wrapper.querySelector('input');
-                    const panel = wrapper.querySelector('.ac-panel');
-                    const endpoint = wrapper.dataset.endpoint;
-                    const limit = parseInt(wrapper.dataset.limit || "8", 10);
-
-                    let aborter = null, items = [], index = -1, lastQ = "";
-
-                    function clearPanel(){
-                      panel.innerHTML = "";
-                      panel.hidden = true;
-                      wrapper.classList.remove('open');
-                      items = []; index = -1;
-                    }
-
-                    function render(list){
-                      panel.innerHTML = "";
-                      list.slice(0, limit).forEach((row) => {
-                        const it = h('div', 'ac-item'); it.setAttribute('role','option');
-                        it.dataset.value = row.value || row.label || "";
-                        it.append(h('div','ac-label', row.label || row.value || ""));
-                        if (row.hint) it.append(h('div','ac-hint', row.hint));
-                        it.addEventListener('mousedown', (e)=>{ e.preventDefault(); commit(it.dataset.value); });
-                        panel.append(it);
-                      });
-                      panel.hidden = list.length === 0;
-                      if (!panel.hidden) wrapper.classList.add('open');
-                      items = Array.from(panel.children);
-                      index = items.length ? 0 : -1;
-                      highlight();
-                    }
-
-                    function highlight(){ items.forEach((el,i)=>el.setAttribute('aria-selected', i===index ? 'true':'false')); }
-                    function commit(val){ input.value = val; clearPanel(); }
-
-                    async function fetchData(q){
-                      if (!endpoint || !q) { clearPanel(); return; }
-                      try {
-                        if (aborter) aborter.abort();
-                        aborter = new AbortController();
-                        const res = await fetch(`${endpoint}?q=` + encodeURIComponent(q), {signal:aborter.signal});
-                        const data = await res.json();
-                        render(Array.isArray(data) ? data : []);
-                      } catch (_) {}
-                    }
-
-                    input.setAttribute('autocomplete','off');
-                    input.addEventListener('input', (e) => {
-                      const q = e.target.value.trim();
-                      if (q === lastQ) return; lastQ = q;
-                      if (!q) { clearPanel(); return; }
-                      fetchData(q);
-                    });
-
-                    input.addEventListener('keydown', (e) => {
-                      if (panel.hidden) return;
-                      if (e.key === 'ArrowDown'){ e.preventDefault(); index = Math.min(index+1, items.length-1); highlight(); }
-                      else if (e.key === 'ArrowUp'){ e.preventDefault(); index = Math.max(index-1, 0); highlight(); }
-                      else if (e.key === 'Enter'){ if (index>=0){ e.preventDefault(); commit(items[index].dataset.value); } }
-                      else if (e.key === 'Escape'){ clearPanel(); }
-                    });
-
-                    input.addEventListener('blur', () => setTimeout(clearPanel, 100));
-                  });
-                })();
-                </script>
-
-                {% if failed_logins %}
-                  <h2>Recent Failed Login Attempts</h2>
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>IP Address</th>
-                        <th>Timestamp</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for attempt in failed_logins %}
-                      <tr>
-                        <td>{{ attempt.username }}</td>
-                        <td>{{ attempt.ip_address }}</td>
-                        <td>{{ attempt.timestamp|date:"Y-m-d H:i:s" }}</td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
+                {% endwith %}
+              </th>
+              <th>Last Login</th>
+              <th style="width: 180px;" class="pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in drivers %}
+            <tr {% if not u.is_active %}class="table-danger"{% elif u.driver_profile.is_locked %}class="table-danger"{% elif u.driver_profile.is_suspended %}class="table-warning"{% endif %}>
+              <td class="text-muted small ps-3">{{ u.id }}</td>
+              <td><strong>{{ u.username }}</strong></td>
+              <td class="small">{{ u.email|truncatechars:30 }}</td>
+              <td class="small">{{ u.driver_profile.phone|default:"—" }}</td>
+              <td class="small">{{ u.driver_profile.address|truncatechars:25|default:"—" }}</td>
+              <td>
+                {% for label in u.driver_profile.labels.all %}
+                  <span class="badge me-1 mb-1" style="background-color: {{ label.color }}; color: #fff;">{{ label.name }}</span>
+                {% empty %}
+                  <span class="text-muted">—</span>
+                {% endfor %}
+              </td>
+              <td>
+                {% if u.driver_profile.sponsor_name %}
+                  <span class="badge bg-info">{{ u.driver_profile.sponsor_name }}</span>
+                {% else %}
+                  <span class="text-muted small">No Sponsor</span>
                 {% endif %}
+              </td>
+              <td class="small">
+                {% if u.last_login %}
+                  <div>{{ u.last_login|date:"M d, Y" }}</div>
+                  <span class="text-muted">{{ u.last_login|timesince }} ago</span>
+                {% else %}
+                  <span class="badge bg-secondary">Never</span>
+                {% endif %}
+              </td>
+              <td class="pe-3">
+                <div class="dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" aria-expanded="false">
+                    <i class="fas fa-cog me-1"></i>Actions
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li>
+                      <form method="post" action="{% url 'accounts:view_as_driver' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit" onclick="return confirm('View as {{ u.username }}?');">
+                          <i class="fas fa-eye me-2"></i>View As Driver
+                        </button>
+                      </form>
+                    </li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:admin_profile_edit' u.id %}"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:transfer_driver_sponsor' u.id %}"><i class="fas fa-exchange-alt me-2"></i>Transfer Sponsor</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:toggle_user_active' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        {% if u != request.user %}
+                          <button class="dropdown-item" type="submit">
+                            <i class="fas fa-{% if u.is_active %}ban{% else %}check{% endif %} me-2"></i>{% if u.is_active %}Deactivate{% else %}Reactivate{% endif %}
+                          </button>
+                        {% endif %}
+                      </form>
+                    </li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:toggle_lock_user' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit" onclick="return confirm('{% if u.driver_profile.is_locked %}Unlock{% else %}Lock{% endif %} this user?');">
+                          <i class="fas fa-{% if u.driver_profile.is_locked %}unlock{% else %}lock{% endif %} me-2"></i>{% if u.driver_profile.is_locked %}Unlock{% else %}Lock{% endif %}
+                        </button>
+                      </form>
+                    </li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:toggle_suspend_user' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit" onclick="return confirm('{% if u.driver_profile.is_suspended %}Unsuspend{% else %}Suspend{% endif %} this user?');">
+                          <i class="fas fa-{% if u.driver_profile.is_suspended %}check-circle{% else %}ban{% endif %} me-2"></i>{% if u.driver_profile.is_suspended %}Unsuspend{% else %}Suspend{% endif %}
+                        </button>
+                      </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:admin_set_password' u.id %}"><i class="fas fa-key me-2"></i>Change Password</a></li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:admin_set_temp_password' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit"><i class="fas fa-key me-2"></i>Temp Password</button>
+                      </form>
+                    </li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:admin_send_reset_link' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit"><i class="fas fa-envelope me-2"></i>Send Reset Link</button>
+                      </form>
+                    </li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:admin_set_timeout' u.id %}"><i class="fas fa-clock me-2"></i>Set Timeout</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:admin_force_logout_user' u.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item text-danger" type="submit" onclick="return confirm('Force logout this user?');">
+                          <i class="fas fa-sign-out-alt me-2"></i>Force Logout
+                        </button>
+                      </form>
+                    </li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-5">
+                <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                No drivers found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if drivers.has_other_pages %}
+    <div class="card-footer bg-white border-top py-3">
+      <nav aria-label="Driver pagination">
+        <ul class="pagination mb-0 justify-content-center">
+          {% if drivers.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?q={{ q }}&page={{ drivers.previous_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">
+                <i class="fas fa-chevron-left me-1"></i>Previous
+              </a>
+            </li>
+          {% endif %}
+          <li class="page-item disabled">
+            <span class="page-link">Page {{ drivers.number }} of {{ drivers.paginator.num_pages }}</span>
+          </li>
+          {% if drivers.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?q={{ q }}&page={{ drivers.next_page_number }}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}{% if request.GET.inactive %}&inactive={{ request.GET.inactive }}{% endif %}">
+                Next<i class="fas fa-chevron-right ms-1"></i>
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+    </div>
+  </div>
 
-                {% endblock content %}
+  <!-- Sponsor Users Table -->
+  {% if sponsor_users %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3" style="cursor: pointer;" onclick="toggleSection('sponsors-section')">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">
+          <i class="fas fa-handshake me-2 text-success"></i>Sponsor Users
+          <i class="fas fa-chevron-down ms-2" id="sponsors-chevron"></i>
+        </h5>
+        <span class="badge bg-success fs-6 px-3 py-2">{{ sponsor_users|length }}</span>
+      </div>
+    </div>
+    <div id="sponsors-section">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Username</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th style="width: 180px;" class="pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sponsor_users %}
+            <tr {% if not s.is_active %}class="table-danger"{% endif %}>
+              <td class="ps-3"><strong>{{ s.username }}</strong></td>
+              <td class="small">{{ s.email|truncatechars:40 }}</td>
+              <td>
+                {% if s.is_active %}
+                  <span class="badge bg-success">Active</span>
+                {% else %}
+                  <span class="badge bg-danger">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="pe-3">
+                <div class="dropdown">
+                  <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle" aria-expanded="false">
+                    <i class="fas fa-cog me-1"></i>Actions
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end shadow">
+                    <li>
+                      <form method="post" action="{% url 'accounts:view_as_sponsor' s.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit" onclick="return confirm('View as {{ s.username }}?');">
+                          <i class="fas fa-eye me-2"></i>View As Sponsor
+                        </button>
+                      </form>
+                    </li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:admin_profile_edit' s.id %}"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:sponsor_fee_ratio' s.id %}"><i class="fas fa-percentage me-2"></i>Fee Ratio</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:toggle_user_active' s.id %}" class="d-inline">
+                        {% csrf_token %}
+                        {% if s != request.user %}
+                          <button class="dropdown-item" type="submit">
+                            <i class="fas fa-{% if s.is_active %}ban{% else %}check{% endif %} me-2"></i>{% if s.is_active %}Deactivate{% else %}Reactivate{% endif %}
+                          </button>
+                        {% endif %}
+                      </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:admin_set_password' s.id %}"><i class="fas fa-key me-2"></i>Change Password</a></li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:admin_set_temp_password' s.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit"><i class="fas fa-key me-2"></i>Temp Password</button>
+                      </form>
+                    </li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:admin_send_reset_link' s.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit"><i class="fas fa-envelope me-2"></i>Send Reset Link</button>
+                      </form>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:archive_sponsor' s.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item" type="submit" onclick="return confirm('Archive {{ s.username }}?');">
+                          <i class="fas fa-archive me-2"></i>Archive
+                        </button>
+                      </form>
+                    </li>
+                    <li>
+                      <form method="post" action="{% url 'accounts:admin_force_logout_user' s.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="dropdown-item text-danger" type="submit" onclick="return confirm('Force logout?');">
+                          <i class="fas fa-sign-out-alt me-2"></i>Force Logout
+                        </button>
+                      </form>
+                    </li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Admin Users Table -->
+  {% if admin_users %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3" style="cursor: pointer;" onclick="toggleSection('admins-section')">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">
+          <i class="fas fa-user-shield me-2 text-info"></i>Admin Users
+          <i class="fas fa-chevron-down ms-2" id="admins-chevron"></i>
+        </h5>
+        <span class="badge bg-info fs-6 px-3 py-2">{{ admin_users_matching_count }} / {{ total_admin_users_count }}</span>
+      </div>
+    </div>
+    <div id="admins-section">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 70px;" class="ps-3">ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Last Login</th>
+              <th>Status</th>
+              <th style="width: 150px;" class="pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for admin in admin_users %}
+            <tr {% if not admin.is_active %}class="table-danger"{% endif %}>
+              <td class="text-muted small ps-3">{{ admin.id }}</td>
+              <td><strong>{{ admin.username }}</strong></td>
+              <td class="small">{{ admin.email|truncatechars:30 }}</td>
+              <td>{{ admin.get_full_name|default:"—" }}</td>
+              <td class="small">
+                {% if admin.last_login %}
+                  <div>{{ admin.last_login|date:"M d, Y" }}</div>
+                  <span class="text-muted">{{ admin.last_login|timesince }} ago</span>
+                {% else %}
+                  <span class="badge bg-secondary">Never</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if admin.is_superuser %}
+                  <span class="badge bg-danger me-1">Superuser</span>
+                {% elif admin.is_staff %}
+                  <span class="badge bg-info me-1">Staff</span>
+                {% endif %}
+                {% if admin.is_active %}
+                  <span class="badge bg-success">Active</span>
+                {% else %}
+                  <span class="badge bg-danger">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="pe-3">
+                <a class="btn btn-sm btn-outline-info" href="{% url 'accounts:admin_detail' admin.id %}">
+                  <i class="fas fa-info-circle me-1"></i>Details
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Legacy Sponsors Table (if exists) -->
+  {% if sponsors %}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3" style="cursor: pointer;" onclick="toggleSection('legacy-sponsors-section')">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">
+          <i class="fas fa-building me-2 text-warning"></i>Legacy Sponsors
+          <i class="fas fa-chevron-down ms-2" id="legacy-sponsors-chevron"></i>
+        </h5>
+        <span class="badge bg-warning text-dark fs-6 px-3 py-2">{{ sponsors_matching_count }} / {{ total_sponsors_count }}</span>
+      </div>
+    </div>
+    <div id="legacy-sponsors-section">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Name</th>
+              <th>Order Count</th>
+              <th class="pe-3">Sample Drivers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sponsors %}
+            <tr>
+              <td class="ps-3"><strong>{{ s.name }}</strong></td>
+              <td><span class="badge bg-primary">{{ s.count }}</span></td>
+              <td class="pe-3">
+                {% for d in s.drivers %}
+                  <span class="badge bg-secondary me-1 mb-1">{{ d }}</span>
+                {% endfor %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Failed Logins -->
+  {% if failed_logins %}
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom py-3" style="cursor: pointer;" onclick="toggleSection('failed-logins-section')">
+      <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold">
+          <i class="fas fa-exclamation-triangle text-warning me-2"></i>Recent Failed Login Attempts
+          <i class="fas fa-chevron-down ms-2" id="failed-logins-chevron"></i>
+        </h5>
+      </div>
+    </div>
+    <div id="failed-logins-section">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Username</th>
+              <th>IP Address</th>
+              <th class="pe-3">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for attempt in failed_logins %}
+            <tr>
+              <td class="ps-3"><code>{{ attempt.username }}</code></td>
+              <td><code>{{ attempt.ip_address }}</code></td>
+              <td class="small pe-3">{{ attempt.timestamp|date:"Y-m-d H:i:s" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Toggle section collapse/expand with localStorage persistence
+function toggleSection(sectionId) {
+  const section = document.getElementById(sectionId);
+  const chevron = document.getElementById(sectionId.replace('-section', '-chevron'));
+  
+  if (!section || !chevron) return;
+  
+  if (section.style.display === 'none') {
+    section.style.display = '';
+    chevron.classList.remove('fa-chevron-right');
+    chevron.classList.add('fa-chevron-down');
+    localStorage.setItem(sectionId, 'expanded');
+  } else {
+    section.style.display = 'none';
+    chevron.classList.remove('fa-chevron-down');
+    chevron.classList.add('fa-chevron-right');
+    localStorage.setItem(sectionId, 'collapsed');
+  }
+}
+
+// Restore collapsed state from localStorage on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const sections = ['drivers-section', 'sponsors-section', 'admins-section', 'legacy-sponsors-section', 'failed-logins-section'];
+  
+  sections.forEach(sectionId => {
+    const savedState = localStorage.getItem(sectionId);
+    if (savedState === 'collapsed') {
+      const section = document.getElementById(sectionId);
+      const chevron = document.getElementById(sectionId.replace('-section', '-chevron'));
+      if (section && chevron) {
+        section.style.display = 'none';
+        chevron.classList.remove('fa-chevron-down');
+        chevron.classList.add('fa-chevron-right');
+      }
+    }
+  });
+});
+
+(function () {
+  const els = document.querySelectorAll('.autocomplete');
+  if (!els.length) return;
+
+  function h(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text) e.textContent=text; return e; }
+
+  els.forEach(wrapper => {
+    const input = wrapper.querySelector('.ac-input') || wrapper.querySelector('input');
+    const panel = wrapper.querySelector('.ac-panel');
+    const endpoint = wrapper.dataset.endpoint;
+    const limit = parseInt(wrapper.dataset.limit || "8", 10);
+
+    let aborter = null, items = [], index = -1, lastQ = "";
+
+    function clearPanel(){
+      panel.innerHTML = "";
+      panel.hidden = true;
+      wrapper.classList.remove('open');
+      items = []; index = -1;
+    }
+
+    function render(list){
+      panel.innerHTML = "";
+      list.slice(0, limit).forEach((row) => {
+        const it = h('div', 'ac-item'); it.setAttribute('role','option');
+        it.dataset.value = row.value || row.label || "";
+        it.append(h('div','ac-label', row.label || row.value || ""));
+        if (row.hint) it.append(h('div','ac-hint', row.hint));
+        it.addEventListener('mousedown', (e)=>{ e.preventDefault(); commit(it.dataset.value); });
+        panel.append(it);
+      });
+      panel.hidden = list.length === 0;
+      if (!panel.hidden) wrapper.classList.add('open');
+      items = Array.from(panel.children);
+      index = items.length ? 0 : -1;
+      highlight();
+    }
+
+    function highlight(){ items.forEach((el,i)=>el.setAttribute('aria-selected', i===index ? 'true':'false')); }
+    function commit(val){ input.value = val; clearPanel(); }
+
+    async function fetchData(q){
+      if (!endpoint || !q) { clearPanel(); return; }
+      try {
+        if (aborter) aborter.abort();
+        aborter = new AbortController();
+        const res = await fetch(`${endpoint}?q=` + encodeURIComponent(q), {signal:aborter.signal});
+        const data = await res.json();
+        render(Array.isArray(data) ? data : []);
+      } catch (_) {}
+    }
+
+    input.setAttribute('autocomplete','off');
+    input.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      if (q === lastQ) return; lastQ = q;
+      if (!q) { clearPanel(); return; }
+      fetchData(q);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (panel.hidden) return;
+      if (e.key === 'ArrowDown'){ e.preventDefault(); index = Math.min(index+1, items.length-1); highlight(); }
+      else if (e.key === 'ArrowUp'){ e.preventDefault(); index = Math.max(index-1, 0); highlight(); }
+      else if (e.key === 'Enter'){ if (index>=0){ e.preventDefault(); commit(items[index].dataset.value); } }
+      else if (e.key === 'Escape'){ clearPanel(); }
+    });
+
+    input.addEventListener('blur', () => setTimeout(clearPanel, 100));
+  });
+})();
+</script>
+
+<style>
+.autocomplete {
+  position: relative;
+}
+.ac-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
+.ac-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.15s ease;
+}
+.ac-item:hover, .ac-item[aria-selected="true"] {
+  background-color: #f8f9fa;
+}
+.ac-label {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+.ac-hint {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  min-width: 200px;
+  position: absolute;
+  right: 0;
+  left: auto;
+}
+.dropdown-item {
+  padding: 0.5rem 1rem;
+  display: block;
+  width: 100%;
+  clear: both;
+  font-weight: 400;
+  color: #212529;
+  text-align: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  background-color: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #1e2125;
+}
+.dropdown-item.text-danger:hover {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+.table th {
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1rem 0.75rem;
+}
+.table td {
+  padding: 1rem 0.75rem;
+  vertical-align: middle;
+}
+.card-header {
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+}
+.card-header[style*="cursor: pointer"]:hover {
+  background-color: #f8f9fa !important;
+}
+#drivers-section,
+#sponsors-section,
+#admins-section,
+#legacy-sponsors-section,
+#failed-logins-section {
+  transition: opacity 0.2s ease;
+}
+</style>
+{% endblock content %}

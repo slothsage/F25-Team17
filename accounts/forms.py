@@ -4,6 +4,7 @@ from .models import Message
 from .models import DriverNotificationPreference
 from .models import CustomLabel
 from .models import SecurityQuestion, UserSecurityAnswer
+from .models import SponsorProfile
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
 from django.contrib.auth.password_validation import password_validators_help_text_html
@@ -336,6 +337,32 @@ class SponsorAwardForm(forms.Form):
         amt = self.cleaned_data["amount"]
         return amt if self.cleaned_data["action"] == "award" else -amt
     
+class SponsorFeeRatioForm(forms.ModelForm):
+    """Form for admins to set fee ratio (points per USD) for a sponsor."""
+    class Meta:
+        model = SponsorProfile
+        fields = ["points_per_usd"]
+        widgets = {
+            "points_per_usd": forms.NumberInput(attrs={
+                "min": 1,
+                "step": 1,
+                "class": "form-control",
+                "placeholder": "Leave blank to use global default"
+            })
+        }
+        labels = {
+            "points_per_usd": "Points per USD (Fee Ratio)"
+        }
+        help_texts = {
+            "points_per_usd": "How many points this sponsor awards per $1. Leave blank to use the global default."
+        }
+    
+    def clean_points_per_usd(self):
+        value = self.cleaned_data.get("points_per_usd")
+        if value is not None and value < 1:
+            raise forms.ValidationError("Points per USD must be at least 1.")
+        return value
+
 class SetPrimaryWalletForm(forms.Form):
     wallet_id = forms.ModelChoiceField(queryset=SponsorPointsAccount.objects.none())
 

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Points History - {{ user.username }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .header-info {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #0056b3;
+        }
+        td {
+            padding: 6px;
+            border: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .summary {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-left: 4px solid #007bff;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            font-size: 8pt;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Points History</h1>
+    
+    <div class="header-info">
+        <p><strong>User:</strong> {{ user.get_full_name|default:user.username }} ({{ user.username }})</p>
+        <p><strong>Generated:</strong> {{ generated_at|date:"F d, Y \a\t g:i A" }}</p>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Change</th>
+                <th>Reason</th>
+                <th>Balance After</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.created_at|date:"Y-m-d H:i:s" }}</td>
+                <td class="{% if row.delta >= 0 %}positive{% else %}negative{% endif %}">
+                    {% if row.delta >= 0 %}+{% endif %}{{ row.delta }}
+                </td>
+                <td>{{ row.reason|default:"—" }}</td>
+                <td>{{ row.balance_after }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #666;">No points activity yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="summary">
+        <p><strong>Total Balance:</strong> {{ balance }} points</p>
+    </div>
+    
+    <div class="footer">
+        <p>This report was generated on {{ generated_at|date:"F d, Y \a\t g:i A" }}</p>
+    </div>
+</body>
+</html>
+

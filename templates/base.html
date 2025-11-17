@@ -203,6 +203,10 @@
               <li><a class="dropdown-item" href="{% url 'shop:order_list' %}">Orders</a></li>
               <li><a class="dropdown-item" href="{% url 'shop:favorites_list' %}">Favorites</a></li>
               <li><a class="dropdown-item" href="{% url 'shop:wishlist_list' %}">Wishlists</a></li>
+              {% if is_sponsor or user|has_group:"sponsor" %}
+                <li class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'shop:sponsor_catalog' %}"><i class="fas fa-store"></i> My Sponsor Catalog</a></li>
+              {% endif %}
             </ul>
           </li>
 

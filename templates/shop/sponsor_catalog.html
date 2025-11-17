@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sponsor Catalog - Driver Incentive Program{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">My Catalog</h2>
+            <p class="text-muted mb-0">Items not yet added to driver catalog - click "Add to Drivers" to make them visible</p>
+        </div>
+        <a href="{% url 'shop:catalog_search' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Catalog
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Add New Item Form -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Add New Item to Sponsor Catalog</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{% url 'shop:sponsor_catalog' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="text-danger small">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label for="{{ form.category.id_for_label }}" class="form-label">{{ form.category.label }}</label>
+                        {{ form.category }}
+                        {% if form.category.errors %}
+                            <div class="text-danger small">{{ form.category.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger small">{{ form.description.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.price_usd.id_for_label }}" class="form-label">{{ form.price_usd.label }}</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.price_usd }}
+                        </div>
+                        {% if form.price_usd.errors %}
+                            <div class="text-danger small">{{ form.price_usd.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.points_cost.id_for_label }}" class="form-label">{{ form.points_cost.label }}</label>
+                        {{ form.points_cost }}
+                        {% if form.points_cost.errors %}
+                            <div class="text-danger small">{{ form.points_cost.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ form.is_active.label }}</label>
+                        <div class="form-check form-switch mt-2">
+                            {{ form.is_active }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="{{ form.image_url.id_for_label }}" class="form-label">{{ form.image_url.label }}</label>
+                        {{ form.image_url }}
+                        {% if form.image_url.errors %}
+                            <div class="text-danger small">{{ form.image_url.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label for="{{ form.product_url.id_for_label }}" class="form-label">{{ form.product_url.label }}</label>
+                        {{ form.product_url }}
+                        {% if form.product_url.errors %}
+                            <div class="text-danger small">{{ form.product_url.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Item
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Existing Items -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-box"></i> Items Not in Driver Catalog ({{ items|length }})</h5>
+        </div>
+        <div class="card-body">
+            {% if items %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Points</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                                <tr>
+                                    <td>
+                                        {% if item.image_url %}
+                                            <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px;">
+                                        {% else %}
+                                            <div style="width: 60px; height: 60px; background: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ item.name }}</strong>
+                                        {% if item.description %}
+                                            <br><small class="text-muted">{{ item.description|truncatewords:10 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.category|default:"—" }}</td>
+                                    <td>${{ item.price_usd|floatformat:2 }}</td>
+                                    <td><strong>{{ item.points_cost }} pts</strong></td>
+                                    <td>
+                                        {% if item.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <form method="POST" action="{% url 'shop:sponsor_catalog' %}" style="display: inline;">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="add_to_driver_catalog">
+                                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Add to Driver Catalog">
+                                                    <i class="fas fa-plus"></i> Add to Drivers
+                                                </button>
+                                            </form>
+                                            <a href="{% url 'shop:sponsor_catalog_edit' item.id %}" class="btn btn-sm btn-primary" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <form method="POST" action="{% url 'shop:sponsor_catalog' %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this item?');">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <p class="text-muted">All your catalog items have been added to the driver catalog!</p>
+                    <p class="text-muted small">Add new items above to make them available to drivers.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

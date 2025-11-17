@@ -32,4 +32,8 @@ urlpatterns = [
 urlpatterns += [
     path("wishlists/", views.wishlist_list, name="wishlist_list"),
     path("wishlists/select/", views.select_wishlist, name="select_wishlist"),
+    
+    # Sponsor Catalog
+    path("sponsor/catalog/", views.sponsor_catalog, name="sponsor_catalog"),
+    path("sponsor/catalog/<int:item_id>/edit/", views.sponsor_catalog_edit, name="sponsor_catalog_edit"),
 ]

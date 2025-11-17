@@ -27,7 +27,17 @@
     <p>No points activity yet.</p>
   {% endif %}
 
-  <p style="margin-top:1rem">
+  <div style="margin-top:1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+    <form method="get" action="{% url 'accounts:points_history_download' %}" style="display: flex; gap: 0.5rem; align-items: center;">
+      <label for="format" style="font-weight: 600;">Download History:</label>
+      <select name="format" id="format" class="btn" style="padding: 0.4rem 0.8rem;">
+        <option value="csv">CSV</option>
+        <option value="pdf">PDF</option>
+      </select>
+      <button type="submit" class="btn" style="background: #007bff; color: white;">
+        Download
+      </button>
+    </form>
     <a class="btn" href="{% url 'accounts:notifications_feed' %}">Back to Notifications</a>
-  </p>
+  </div>
 {% endblock content %}

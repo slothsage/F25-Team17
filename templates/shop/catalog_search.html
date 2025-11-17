@@ -5,14 +5,11 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="row gy-3 align-items-center mb-2">
+    <!-- Header with Points Balance and Cart -->
+    <div class="row gy-3 align-items-center mb-4">
         <div class="col-lg-6">
-            <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
-                <div>
-                    <h2 class="mb-0">Product Catalog</h2>
-                    <p class="text-muted mb-0">Browse items and spend your points</p>
-                </div>
-            </div>
+            <h2 class="mb-0">Product Catalog</h2>
+            <p class="text-muted mb-0">Browse items and spend your points</p>
         </div>
         <div class="col-md-6 col-lg-3">
             {% if points_balance is not None %}
@@ -29,14 +26,15 @@
         </div>
     </div>
 
-    <!-- Search Form -->
+    <!-- Top Row: Search, Categories, List View Toggle -->
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body">
-            <form method="GET" action="{% url 'shop:catalog_search' %}">
+            <form method="GET" action="{% url 'shop:catalog_search' %}" id="searchForm">
                 <div class="row g-3 align-items-end">
-                    <div class="col-lg-6">
+                    <!-- Search Bar -->
+                    <div class="col-md-6 col-lg-5">
                         <label class="form-label text-uppercase small fw-semibold text-muted">Search</label>
-                        <div class="input-group input-group-lg">
+                        <div class="input-group">
                             <span class="input-group-text bg-white text-muted"><i class="fas fa-search"></i></span>
                             <input 
                                 type="text" 
@@ -44,46 +42,72 @@
                                 class="form-control" 
                                 placeholder="Laptop, headphones, camera..."
                                 value="{{ query }}"
-                                required
                             >
                         </div>
                     </div>
-                    <div class="col-sm-6 col-lg-3">
+                    
+                    <!-- Category Filter -->
+                    <div class="col-md-6 col-lg-4">
                         <label class="form-label text-uppercase small fw-semibold text-muted">Category</label>
-                        <select name="cat" class="form-select form-select-lg" onchange="this.form.submit()">
+                        <select name="cat" class="form-select" onchange="this.form.submit()">
                             {% for cid, label in category_choices %}
                                 <option value="{{ cid }}" {% if category_id == cid %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-6 col-lg-1">
-                        <label class="form-label text-uppercase small fw-semibold text-muted">Min pts</label>
+                    
+                    <!-- List View Toggle -->
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label text-uppercase small fw-semibold text-muted">View</label>
+                        <div class="btn-group view-toggle w-100" role="group" aria-label="View toggle">
+                            <button type="button" class="btn btn-outline-secondary view-btn active" data-view="grid" title="Grid View">
+                                <i class="fas fa-th"></i> Grid
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary view-btn" data-view="list" title="List View">
+                                <i class="fas fa-list"></i> List
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Point Range Filters (Hidden by default, can be expanded) -->
+                <div class="row g-3 mt-2" id="pointFilters" style="display: none;">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label text-uppercase small fw-semibold text-muted">Min Points</label>
                         <input 
                             type="number"
                             min="0"
                             name="min_points"
-                            class="form-control form-control-lg"
+                            class="form-control"
                             value="{{ min_points }}"
                             placeholder="0"
                         >
                     </div>
-                    <div class="col-6 col-lg-1">
-                        <label class="form-label text-uppercase small fw-semibold text-muted">Max pts</label>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label text-uppercase small fw-semibold text-muted">Max Points</label>
                         <input 
                             type="number"
                             min="0"
                             name="max_points"
-                            class="form-control form-control-lg"
+                            class="form-control"
                             value="{{ max_points }}"
                             placeholder="∞"
                         >
                     </div>
-                    <div class="col-lg-1 d-grid">
-                        <button class="btn btn-primary btn-lg" type="submit">
-                            <span class="d-none d-lg-inline"><i class="fas fa-search me-1"></i>Search</span>
-                            <span class="d-lg-none"><i class="fas fa-search"></i></span>
+                    <div class="col-12 col-md-6 d-flex align-items-end">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-search me-1"></i> Search
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="document.getElementById('pointFilters').style.display='none'">
+                            Hide Filters
                         </button>
                     </div>
+                </div>
+                
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-link text-muted p-0" onclick="document.getElementById('pointFilters').style.display='block'">
+                        <i class="fas fa-filter"></i> Advanced Filters
+                    </button>
                 </div>
             </form>
         </div>
@@ -103,22 +127,17 @@
     {% if results %}
     <!-- Results Header -->
     <div class="row mb-3">
-        <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h4 class="mb-0">
-                Found {{ results.total|default:0 }} products for "{{ query }}"
-                {% if results.total > 20 %}
-                (showing {{ results.products|length }})
-                {% endif %}
-            </h4>
-            <!-- View Toggle -->
-            <div class="btn-group view-toggle" role="group" aria-label="View toggle">
-                <button type="button" class="btn btn-outline-secondary btn-sm view-btn active" data-view="grid" title="Grid View">
-                    <i class="fas fa-th"></i> Grid
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm view-btn" data-view="list" title="List View">
-                    <i class="fas fa-list"></i> List
-                </button>
-            </div>
+        <div class="col-12">
+            {% if is_default_view %}
+                <h4 class="mb-0">Featured Products</h4>
+            {% else %}
+                <h4 class="mb-0">
+                    Found {{ results.total|default:0 }} products{% if query %} for "{{ query }}"{% endif %}
+                    {% if results.total > 20 %}
+                    (showing {{ results.products|length }})
+                    {% endif %}
+                </h4>
+            {% endif %}
         </div>
     </div>
 
@@ -177,7 +196,6 @@
                                 class="w-100">
                                 {% csrf_token %}
 
-                                <!-- Only include hidden fields when adding a favorite -->
                                 {% if product.ebay_item_id not in user_favorites %}
                                     <input type="hidden" name="product_id"  value="{{ product.ebay_item_id }}">
                                     <input type="hidden" name="name"        value="{{ product.name }}">
@@ -204,44 +222,44 @@
         {% empty %}
         <div class="col-12">
             <div class="alert alert-info">
-                No products found for "{{ query }}". Try a different search term.
+                No products found{% if query %} for "{{ query }}"{% endif %}. Try a different search term.
             </div>
         </div>
         {% endfor %}
     </div>
 
-<!-- Pagination -->
-{% if results.has_prev or results.has_next %}
-<div class="row mt-4">
-  <div class="col-12">
-    <nav aria-label="Product pagination">
-      <ul class="pagination justify-content-center">
-        {% if results.has_prev %}
-        <li class="page-item">
-          <a class="page-link" 
-             href="?q={{ query|urlencode }}&cat={{ category_id|urlencode }}&page={{ page|add:'-1' }}">
-            <i class="fas fa-chevron-left"></i> Previous
-          </a>
-        </li>
-        {% endif %}
+    <!-- Pagination -->
+    {% if results.has_prev or results.has_next %}
+    <div class="row mt-4">
+      <div class="col-12">
+        <nav aria-label="Product pagination">
+          <ul class="pagination justify-content-center">
+            {% if results.has_prev %}
+            <li class="page-item">
+              <a class="page-link" 
+                 href="?q={{ query|urlencode }}&cat={{ category_id|urlencode }}&page={{ page|add:'-1' }}">
+                <i class="fas fa-chevron-left"></i> Previous
+              </a>
+            </li>
+            {% endif %}
 
-        <li class="page-item active">
-          <span class="page-link">Page {{ page }}</span>
-        </li>
+            <li class="page-item active">
+              <span class="page-link">Page {{ page }}</span>
+            </li>
 
-        {% if results.has_next %}
-        <li class="page-item">
-          <a class="page-link" 
-             href="?q={{ query|urlencode }}&cat={{ category_id|urlencode }}&page={{ page|add:'1' }}">
-            Next <i class="fas fa-chevron-right"></i>
-          </a>
-        </li>
-        {% endif %}
-      </ul>
-    </nav>
-  </div>
-</div>
-{% endif %}
+            {% if results.has_next %}
+            <li class="page-item">
+              <a class="page-link" 
+                 href="?q={{ query|urlencode }}&cat={{ category_id|urlencode }}&page={{ page|add:'1' }}">
+                Next <i class="fas fa-chevron-right"></i>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    </div>
+    {% endif %}
 
     {% elif query %}
     <!-- No results but query exists -->
@@ -249,30 +267,34 @@
         <div class="col-12">
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i> 
-                No results yet. Try searching for something like "laptop", "headphones", or "camera".
+                No results found for "{{ query }}". Try a different search term.
             </div>
         </div>
     </div>
-    {% else %}
-    <!-- No search yet - show suggestions -->
-    <div class="row">
-        <div class="col-md-8 offset-md-2 text-center">
-            <div class="card">
+    {% endif %}
+
+    <!-- Popular Searches Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h5>Popular Searches</h5>
-                    <p class="text-muted">Try searching for:</p>
-                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <h5 class="mb-3"><i class="fas fa-fire text-danger"></i> Popular Searches</h5>
+                    <div class="d-flex flex-wrap gap-2">
                         <a href="?q=laptop" class="btn btn-outline-primary">Laptops</a>
                         <a href="?q=headphones" class="btn btn-outline-primary">Headphones</a>
                         <a href="?q=camera" class="btn btn-outline-primary">Cameras</a>
                         <a href="?q=watch" class="btn btn-outline-primary">Watches</a>
                         <a href="?q=phone" class="btn btn-outline-primary">Phones</a>
+                        <a href="?q=tablet" class="btn btn-outline-primary">Tablets</a>
+                        <a href="?q=speaker" class="btn btn-outline-primary">Speakers</a>
+                        <a href="?q=gaming" class="btn btn-outline-primary">Gaming</a>
+                        <a href="?q=electronics" class="btn btn-outline-primary">Electronics</a>
+                        <a href="?q=accessories" class="btn btn-outline-primary">Accessories</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    {% endif %}
 </div>
 
 <style>
@@ -459,6 +481,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize view
     function setView(view) {
+        if (!productsContainer) return;
+        
         // Remove all view classes
         productsContainer.classList.remove('grid-view', 'list-view');
         
@@ -492,7 +516,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Add to Cart functionality
-    // Add to Cart buttons
     document.querySelectorAll('.add-to-cart-btn').forEach(button => {
         button.addEventListener('click', async function() {
             const ebayId = this.dataset.ebayId;
