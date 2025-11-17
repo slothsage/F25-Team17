@@ -255,6 +255,28 @@ class NotificationPreferenceForm(forms.ModelForm):
         return cleaned
     
 
+class ContactSponsorForm(forms.Form):
+    subject = forms.CharField(
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Subject"}),
+        label="Subject"
+    )
+    message = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 5, "placeholder": "Your message..."}),
+        label="Message"
+    )
+
+class PointsGoalForm(forms.Form):
+    points_goal = forms.IntegerField(
+        required=True,
+        min_value=0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "1"}),
+        label="Points Goal",
+        help_text="Set your personal points goal to track your progress"
+    )
+
 class LabelForm(forms.ModelForm):
     """Create or edit a label."""
     class Meta:

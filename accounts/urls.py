@@ -147,6 +147,7 @@ urlpatterns = [
     path("notifications/bulk-delete/", views.notifications_bulk_delete, name="notifications_bulk_delete"),
     
     path("points/", views.points_history, name="points_history"),
+    path("points/goal/", views.points_goal_tracker, name="points_goal_tracker"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
     path("my-sponsor/", views.my_sponsor, name="my_sponsor"),
 

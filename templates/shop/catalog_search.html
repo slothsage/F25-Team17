@@ -103,34 +103,45 @@
     {% if results %}
     <!-- Results Header -->
     <div class="row mb-3">
-        <div class="col-12">
-            <h4>
+        <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h4 class="mb-0">
                 Found {{ results.total|default:0 }} products for "{{ query }}"
                 {% if results.total > 20 %}
                 (showing {{ results.products|length }})
                 {% endif %}
             </h4>
+            <!-- View Toggle -->
+            <div class="btn-group view-toggle" role="group" aria-label="View toggle">
+                <button type="button" class="btn btn-outline-secondary btn-sm view-btn active" data-view="grid" title="Grid View">
+                    <i class="fas fa-th"></i> Grid
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm view-btn" data-view="list" title="List View">
+                    <i class="fas fa-list"></i> List
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Products Grid -->
-    <div class="row g-4">
+    <!-- Products Container -->
+    <div class="products-container row g-4 grid-view" id="productsContainer">
         {% for product in results.products %}
-        <div class="col-md-6 col-lg-4 col-xl-3">
+        <div class="product-item col-md-6 col-lg-4 col-xl-3">
             <div class="card product-card h-100 border-0 shadow-sm">
-                {% if product.image_url %}
-                <img 
-                    src="{{ product.image_url }}" 
-                    class="card-img-top product-image" 
-                    alt="{{ product.name }}"
-                    loading="lazy"
-                    onerror="this.onerror=null; this.src='https://via.placeholder.com/200x200/e5e7eb/6b7280?text=No+Image'; this.style.objectFit='contain';"
-                >
-                {% else %}
-                <div class="card-img-top bg-light d-flex align-items-center justify-content-center placeholder-img">
-                    <span>No Image</span>
+                <div class="product-image-wrapper">
+                    {% if product.image_url %}
+                    <img 
+                        src="{{ product.image_url }}" 
+                        class="card-img-top product-image" 
+                        alt="{{ product.name }}"
+                        loading="lazy"
+                        onerror="this.onerror=null; this.src='https://via.placeholder.com/200x200/e5e7eb/6b7280?text=No+Image'; this.style.objectFit='contain';"
+                    >
+                    {% else %}
+                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center placeholder-img">
+                        <span>No Image</span>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 
                 <div class="card-body d-flex flex-column p-3">
                     <div class="d-flex justify-content-between align-items-start mb-2">
@@ -139,12 +150,12 @@
                         <span class="badge bg-light text-dark border">{{ product.condition }}</span>
                         {% endif %}
                     </div>
-                    <h6 class="card-title fw-semibold mb-2">
+                    <h6 class="card-title fw-semibold mb-2 product-name">
                         {{ product.name|truncatewords:10 }}
                     </h6>
-                    <p class="text-muted small mb-3">${{ product.price_usd }}</p>
+                    <p class="text-muted small mb-3 product-price">${{ product.price_usd }}</p>
                     
-                    <div class="mt-auto">
+                    <div class="product-actions mt-auto">
                         <div class="d-grid gap-2">
                             <button 
                                 type="button" 
@@ -155,17 +166,12 @@
                             >
                                 <i class="fas fa-shopping-cart"></i> Add to Cart
                             </button>
-                            <button 
-                                type="button" 
-                                class="btn btn-outline-secondary btn-sm add-to-wishlist-btn"
-                                data-ebay-id="{{ product.ebay_item_id }}"
-                                data-product-name="{{ product.name }}"
-                                data-points="{{ product.price_points }}"
-                                data-bs-toggle="modal" 
-                                data-bs-target="#wishlistModal"
+                            <a 
+                                href="{% url 'shop:select_wishlist' %}?ebay_item_id={{ product.ebay_item_id|urlencode }}&product_name={{ product.name|urlencode }}&points={{ product.price_points }}&product_url={{ product.view_url|default:''|urlencode }}&thumb_url={{ product.image_url|default:''|urlencode }}&return_url={{ request.get_full_path|urlencode }}"
+                                class="btn btn-outline-secondary btn-sm"
                             >
                                 <i class="fas fa-heart"></i> Wishlist
-                            </button>
+                            </a>
                             <form method="post"
                                 action="{% if product.ebay_item_id in user_favorites %}{% url 'shop:remove_favorite' product.ebay_item_id %}{% else %}{% url 'shop:add_favorite' %}{% endif %}"
                                 class="w-100">
@@ -269,27 +275,6 @@
     {% endif %}
 </div>
 
-<!-- Wishlist Selection Modal -->
-<div class="modal fade" id="wishlistModal" tabindex="-1" aria-labelledby="wishlistModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="wishlistModalLabel">Add to Wishlist</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Select a wishlist:</p>
-                <div id="wishlistList" class="list-group">
-                    <!-- Wishlists will be loaded here via AJAX or you can pre-populate -->
-                    <a href="{% url 'shop:wishlist_list' %}" class="list-group-item list-group-item-action">
-                        <i class="fas fa-plus"></i> Create New Wishlist
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <style>
 .points-balance-card {
     background: linear-gradient(135deg, #f7fbff, #eef4ff);
@@ -336,16 +321,177 @@
 .card .btn-outline-secondary {
     font-weight: 600;
 }
+
+/* View Toggle Styles */
+.view-toggle .btn.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+/* Grid View (Default) */
+.products-container.grid-view .product-item {
+    transition: all 0.3s ease;
+}
+
+/* List View */
+.products-container.list-view {
+    flex-direction: column;
+}
+.products-container.list-view .product-item {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 100%;
+}
+.products-container.list-view .product-card {
+    display: flex;
+    flex-direction: row;
+    height: auto;
+}
+.products-container.list-view .product-image-wrapper {
+    flex: 0 0 200px;
+    max-width: 200px;
+}
+.products-container.list-view .product-image,
+.products-container.list-view .placeholder-img {
+    height: 200px;
+    width: 100%;
+    border-top-left-radius: 1rem;
+    border-bottom-left-radius: 1rem;
+    border-top-right-radius: 0;
+    object-fit: cover;
+}
+.products-container.list-view .card-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto 1fr;
+    gap: 0.75rem 2rem;
+    padding: 1.5rem !important;
+    align-items: start;
+}
+.products-container.list-view .card-body > div:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    margin-bottom: 0;
+}
+.products-container.list-view .product-name {
+    grid-column: 1;
+    grid-row: 2;
+    margin-bottom: 0;
+    font-size: 1.1rem;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+.products-container.list-view .product-price {
+    grid-column: 1;
+    grid-row: 3;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+.products-container.list-view .product-actions {
+    grid-column: 2;
+    grid-row: 1 / -1;
+    margin-top: 0 !important;
+    min-width: 220px;
+    align-self: center;
+}
+.products-container.list-view .product-actions .d-grid {
+    display: flex !important;
+    flex-direction: row;
+    gap: 0.5rem;
+}
+.products-container.list-view .product-actions .btn {
+    flex: 1;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .products-container.list-view .product-card {
+        flex-direction: column;
+    }
+    .products-container.list-view .product-image-wrapper {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .products-container.list-view .product-image,
+    .products-container.list-view .placeholder-img {
+        border-top-left-radius: 1rem;
+        border-top-right-radius: 1rem;
+        border-bottom-left-radius: 0;
+        height: 250px;
+    }
+    .products-container.list-view .card-body {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .products-container.list-view .product-actions {
+        min-width: 100%;
+    }
+    .products-container.list-view .product-actions .d-grid {
+        flex-direction: column;
+    }
+}
+
 @media (max-width: 576px) {
     .points-balance-card {
         text-align: center;
+    }
+    .view-toggle .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .view-toggle .btn i {
+        margin-right: 0.25rem;
     }
 }
 </style>
 
 <script>
-// Add to Cart functionality
+// View Toggle Functionality
 document.addEventListener('DOMContentLoaded', function() {
+    const productsContainer = document.getElementById('productsContainer');
+    const viewButtons = document.querySelectorAll('.view-btn');
+    const STORAGE_KEY = 'catalog_view_preference';
+    
+    // Load saved preference or default to grid
+    const savedView = localStorage.getItem(STORAGE_KEY) || 'grid';
+    
+    // Initialize view
+    function setView(view) {
+        // Remove all view classes
+        productsContainer.classList.remove('grid-view', 'list-view');
+        
+        // Add the selected view class
+        productsContainer.classList.add(view + '-view');
+        
+        // Update button states
+        viewButtons.forEach(btn => {
+            if (btn.dataset.view === view) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
+        // Save preference
+        localStorage.setItem(STORAGE_KEY, view);
+    }
+    
+    // Set initial view
+    if (productsContainer) {
+        setView(savedView);
+    }
+    
+    // Handle toggle button clicks
+    viewButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const view = this.dataset.view;
+            setView(view);
+        });
+    });
+    
+    // Add to Cart functionality
     // Add to Cart buttons
     document.querySelectorAll('.add-to-cart-btn').forEach(button => {
         button.addEventListener('click', async function() {
@@ -401,18 +547,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.innerHTML = originalText;
                 this.disabled = false;
             }
-        });
-    });
-    
-    // Add to Wishlist buttons
-    document.querySelectorAll('.add-to-wishlist-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const ebayId = this.dataset.ebayId;
-            const productName = this.dataset.productName;
-            
-            // Store for later use in modal
-            document.getElementById('wishlistModal').dataset.ebayId = ebayId;
-            document.getElementById('wishlistModal').dataset.productName = productName;
         });
     });
 });

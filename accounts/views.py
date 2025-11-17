@@ -92,7 +92,7 @@ from .models import CustomLabel, DriverProfile
 
 from django.db import transaction
 from .models import SponsorPointsAccount
-from .forms import SponsorAwardForm, SetPrimaryWalletForm
+from .forms import SponsorAwardForm, SetPrimaryWalletForm, ContactSponsorForm, PointsGoalForm
 from django.db.models import OuterRef, Subquery, IntegerField
 
 User = get_user_model()
@@ -329,9 +329,23 @@ def audit_report(request):
 
 @login_required
 def profile(request):
-    DriverProfile.objects.get_or_create(user=request.user)
+    profile_obj, _ = DriverProfile.objects.get_or_create(user=request.user)
     total_points = get_driver_points_balance(request.user)
-    return render(request, "accounts/profile.html", {"total_points": total_points})
+    
+    # Calculate progress for goal tracker
+    progress_percentage = 0
+    points_remaining = 0
+    if profile_obj.points_goal and profile_obj.points_goal > 0:
+        progress_percentage = min(100, int((total_points / profile_obj.points_goal) * 100))
+        points_remaining = max(0, profile_obj.points_goal - total_points)
+    
+    return render(request, "accounts/profile.html", {
+        "total_points": total_points,
+        "points_goal": profile_obj.points_goal,
+        "progress_percentage": progress_percentage,
+        "points_remaining": points_remaining,
+        "has_goal": bool(profile_obj.points_goal),
+    })
 
 @login_required
 def profile_edit(request):
@@ -1632,12 +1646,7 @@ def notifications_history(request):
     Dashboard list of all notifications with search, filters, pagination.
     Groups by day in the template via the annotated 'day' field.
     """
-    qs = (
-        Notification.objects
-        .filter(user=request.user)
-        .order_by("-created_at")
-        .annotate(day=TruncDate("created_at"))
-    )
+    qs = Notification.objects.filter(user=request.user)
 
     # filters
     kind = request.GET.get("kind", "")
@@ -1654,11 +1663,18 @@ def notifications_history(request):
     if q:
         qs = qs.filter(Q(title__icontains=q) | Q(body__icontains=q))
 
+    # Apply annotation and ordering after filters
+    qs = qs.annotate(day=TruncDate("created_at")).order_by("-created_at")
+
     paginator = Paginator(qs, 15)  
     page_obj = paginator.get_page(request.GET.get("page"))
+    
+    # Convert to list to ensure annotation is evaluated
+    notifications_list = list(page_obj.object_list)
 
     context = {
         "page_obj": page_obj,
+        "notifications_list": notifications_list,  # Pass as list for template
         "q": q,
         "read": read,
         "kind": kind,
@@ -1673,24 +1689,132 @@ def points_history(request):
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
     return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
 
+@login_required
+def points_goal_tracker(request):
+    """Points goal tracker with progress bar for drivers."""
+    profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+    current_balance = get_driver_points_balance(request.user)
+    
+    # Calculate progress
+    progress_percentage = 0
+    points_remaining = 0
+    if profile.points_goal and profile.points_goal > 0:
+        progress_percentage = min(100, int((current_balance / profile.points_goal) * 100))
+        points_remaining = max(0, profile.points_goal - current_balance)
+    
+    # Handle form submission
+    if request.method == "POST":
+        form = PointsGoalForm(request.POST)
+        if form.is_valid():
+            profile.points_goal = form.cleaned_data["points_goal"]
+            profile.save()
+            messages.success(request, f"Points goal updated to {profile.points_goal} points!")
+            return redirect("accounts:points_goal_tracker")
+    else:
+        form = PointsGoalForm(initial={"points_goal": profile.points_goal or 0})
+    
+    context = {
+        "form": form,
+        "current_balance": current_balance,
+        "points_goal": profile.points_goal,
+        "progress_percentage": progress_percentage,
+        "points_remaining": points_remaining,
+        "has_goal": bool(profile.points_goal),
+    }
+    
+    return render(request, "accounts/points_goal_tracker.html", context)
+
 
 @login_required
 def contact_sponsor(request):
     profile = getattr(request.user, "driver_profile", None)
 
-    # If driver has no sponsor info, show a friendly error
-    if not profile or not profile.sponsor_email:
+    if not profile:
         return render(request, "accounts/contact_sponsor.html", {
             "error": "No sponsor contact information available.",
         })
 
-    sponsor_name = profile.sponsor_name or "Your Sponsor"
-    email = profile.sponsor_email
+    # Try to get sponsor user from multiple sources
+    sponsor_user = None
+    sponsor_name = None
 
-    # Pass data to the template for display (not redirect)
+    # First, check if there are sponsors via M2M relationship
+    if profile.sponsors.exists():
+        sponsor_user = profile.sponsors.first()  # Get the first sponsor
+        sponsor_name = sponsor_user.get_full_name() or sponsor_user.username
+    
+    # If no sponsor from M2M, try to find by sponsor_name
+    if not sponsor_user and profile.sponsor_name:
+        try:
+            sponsor_user = User.objects.filter(
+                username=profile.sponsor_name,
+                groups__name="sponsor"
+            ).first()
+            if sponsor_user:
+                sponsor_name = sponsor_user.get_full_name() or sponsor_user.username
+            else:
+                sponsor_name = profile.sponsor_name
+        except Exception:
+            sponsor_name = profile.sponsor_name
+
+    # If we still don't have a sponsor user, show error
+    if not sponsor_user:
+        return render(request, "accounts/contact_sponsor.html", {
+            "error": "No sponsor contact information available.",
+            "form": ContactSponsorForm(),
+        })
+
+    # Handle form submission
+    if request.method == "POST":
+        form = ContactSponsorForm(request.POST)
+        if form.is_valid():
+            subject = form.cleaned_data["subject"]
+            message_body = form.cleaned_data["message"]
+            
+            # Create a notification for the sponsor
+            from .notifications import send_in_app_notification
+            from django.urls import reverse
+            
+            try:
+                # Create notification with a link to messages
+                messages_url = reverse("accounts:messages_inbox")
+                notification_body = f"Message from {request.user.get_full_name() or request.user.username}:\n\n{message_body}"
+                
+                send_in_app_notification(
+                    sponsor_user,
+                    "dropped",  # Use "dropped" kind so it can't be muted
+                    f"Message from Driver: {subject}",
+                    notification_body,
+                    url=messages_url,
+                )
+                
+                # Also create a Message/MessageRecipient for the inbox
+                from .models import Message, MessageRecipient
+                msg = Message.objects.create(
+                    author=request.user,
+                    subject=f"Driver Message: {subject}",
+                    body=message_body,
+                )
+                MessageRecipient.objects.create(
+                    message=msg,
+                    user=sponsor_user,
+                )
+                
+                messages.success(request, f"Message sent to {sponsor_name}!")
+                return redirect("accounts:contact_sponsor")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send message to sponsor: {e}", exc_info=True)
+                messages.error(request, "Failed to send message. Please try again.")
+    else:
+        form = ContactSponsorForm()
+
+    # Pass data to the template
     return render(request, "accounts/contact_sponsor.html", {
-        "email": email,
-        "sponsor_name": sponsor_name,
+        "form": form,
+        "sponsor_name": sponsor_name or "Your Sponsor",
+        "sponsor_user": sponsor_user,
     })
 
 

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<h1>Notifications Feed</h1>
+
+<div style="margin-bottom: 1rem;">
+  <a class="btn" href="{% url 'accounts:notifications' %}">All Notifications</a>
+  <a class="btn" href="{% url 'accounts:notifications_history' %}">View History</a>
+  <a class="btn" href="{% url 'accounts:notification_settings' %}">Settings</a>
+</div>
+
+{% if rows %}
+  <div class="notifications-feed" style="max-width: 800px;">
+    {% for n in rows %}
+      <div style="padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border, #ddd); border-radius: 0.5rem; background: var(--bg, #fff);">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+          <div style="flex: 1;">
+            <span style="font-size: 0.8rem; opacity: 0.8; border: 1px solid var(--border, #ddd); padding: 0.1rem 0.4rem; border-radius: 0.5rem; margin-right: 0.5rem;">
+              {{ n.get_kind_display }}
+            </span>
+            {% if not n.read %}
+              <strong style="color: var(--primary, #007bff);">[new]</strong>
+            {% endif %}
+            <strong style="font-size: 1.1rem;">{{ n.title }}</strong>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--muted, #666); white-space: nowrap; margin-left: 1rem;">
+            {{ n.created_at|naturaltime }}
+          </div>
+        </div>
+        
+        <div style="color: var(--text, #333); margin-bottom: 0.5rem; white-space: pre-wrap;">{{ n.body }}</div>
+        
+        {% if n.url %}
+          <div style="margin-top: 0.5rem;">
+            <a href="{{ n.url }}" class="btn" style="display: inline-block;">View Details</a>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p>No notifications yet.</p>
+{% endif %}
+{% endblock content %}
+

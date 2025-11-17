@@ -6,16 +6,38 @@
     {% for m in messages %}<p>{{ m }}</p>{% endfor %}
   {% endif %}
 
-  {% if email %}
-    <p>Sponsor: <strong>{{ sponsor_name|default:"Your Sponsor" }}</strong></p>
-    <p>
-      <a class="btn" href="mailto:{{ email }}?subject={{ 'Question from Driver'|urlencode }}">
-        Email {{ sponsor_name|default:"Sponsor" }}
-      </a>
-    </p>
+  {% if error %}
+    <p>{{ error }}</p>
+    <p><a class="btn" href="{% url 'accounts:profile' %}">Back to Profile</a></p>
+  {% elif sponsor_user %}
+    <p>Send a message to: <strong>{{ sponsor_name|default:"Your Sponsor" }}</strong></p>
+    
+    <form method="post" style="max-width: 600px; margin-top: 1rem;">
+      {% csrf_token %}
+      
+      <div style="margin-bottom: 1rem;">
+        <label for="{{ form.subject.id_for_label }}">{{ form.subject.label }}</label>
+        {{ form.subject }}
+        {% if form.subject.errors %}
+          <div style="color: red; font-size: 0.9rem;">{{ form.subject.errors }}</div>
+        {% endif %}
+      </div>
+      
+      <div style="margin-bottom: 1rem;">
+        <label for="{{ form.message.id_for_label }}">{{ form.message.label }}</label>
+        {{ form.message }}
+        {% if form.message.errors %}
+          <div style="color: red; font-size: 0.9rem;">{{ form.message.errors }}</div>
+        {% endif %}
+      </div>
+      
+      <div style="margin-top: 1.5rem;">
+        <button type="submit" class="btn">Send Message</button>
+        <a class="btn" href="{% url 'accounts:profile' %}" style="margin-left: 0.5rem;">Cancel</a>
+      </div>
+    </form>
   {% else %}
-    <p>We don’t have a sponsor email on file for your account yet.</p>
+    <p>We don't have a sponsor on file for your account yet.</p>
+    <p><a class="btn" href="{% url 'accounts:profile' %}">Back to Profile</a></p>
   {% endif %}
-
-  <p><a class="btn" href="{% url 'accounts:profile' %}">Back to Profile</a></p>
 {% endblock %}

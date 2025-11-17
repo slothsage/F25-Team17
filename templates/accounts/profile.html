@@ -6,19 +6,76 @@
 
 {% if total_points is not None %}
 <div class="points-summary card shadow-sm mb-4 border-0">
-  <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-    <div class="d-flex align-items-center gap-3">
-      <div class="points-circle text-white">
-        <i class="fas fa-star"></i>
+  <div class="card-body">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="points-circle text-white">
+          <i class="fas fa-star"></i>
+        </div>
+        <div>
+          <p class="text-uppercase text-muted mb-1 small">Total Points</p>
+          <p class="h2 mb-0 fw-bold">{{ total_points|default:0 }} <span class="fs-6 text-muted">pts</span></p>
+        </div>
       </div>
-      <div>
-        <p class="text-uppercase text-muted mb-1 small">Total Points</p>
-        <p class="h2 mb-0 fw-bold">{{ total_points|default:0 }} <span class="fs-6 text-muted">pts</span></p>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-primary btn-lg px-4" href="{% url 'accounts:points_history' %}">
+          View History
+        </a>
+        <a class="btn btn-primary btn-lg px-4" href="{% url 'accounts:points_goal_tracker' %}">
+          {% if has_goal %}Update Goal{% else %}Set Goal{% endif %}
+        </a>
       </div>
     </div>
-    <a class="btn btn-outline-primary btn-lg px-4" href="{% url 'accounts:points_history' %}">
-      View History
-    </a>
+    
+    {% if has_goal %}
+      <!-- Progress Bar Section -->
+      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border, #dee2e6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-weight: 600; font-size: 0.9rem;">Goal: {{ points_goal|floatformat:0 }} points</span>
+          <span style="font-weight: 600; color: var(--primary, #007bff); font-size: 0.9rem;">{{ progress_percentage }}%</span>
+        </div>
+        
+        <!-- Progress Bar Container -->
+        <div style="background: var(--bg-secondary, #e9ecef); border-radius: 0.5rem; height: 1.5rem; position: relative; overflow: hidden; border: 1px solid var(--border, #dee2e6);">
+          <!-- Progress Bar Fill -->
+          <div style="
+            background: {% if progress_percentage >= 100 %}linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            {% elif progress_percentage >= 75 %}linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+            {% elif progress_percentage >= 50 %}linear-gradient(90deg, #17a2b8 0%, #138496 100%);
+            {% elif progress_percentage >= 25 %}linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+            {% else %}linear-gradient(90deg, #dc3545 0%, #c82333 100%);{% endif %}
+            height: 100%;
+            width: {{ progress_percentage }}%;
+            transition: width 0.3s ease;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.75rem;
+          ">
+            {% if progress_percentage > 15 %}{{ progress_percentage }}%{% endif %}
+          </div>
+        </div>
+        
+        {% if progress_percentage >= 100 %}
+          <p style="margin-top: 0.5rem; margin-bottom: 0; color: #28a745; font-weight: 600; font-size: 0.9rem;">
+            🎉 Goal achieved! You have {{ total_points|floatformat:0 }} points!
+          </p>
+        {% else %}
+          <p style="margin-top: 0.5rem; margin-bottom: 0; color: var(--muted, #6c757d); font-size: 0.85rem;">
+            {{ points_remaining|floatformat:0 }} points remaining
+          </p>
+        {% endif %}
+      </div>
+    {% else %}
+      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border, #dee2e6); text-align: center;">
+        <p style="color: var(--muted, #6c757d); margin: 0; font-size: 0.9rem;">
+          Set a points goal to track your progress!
+        </p>
+      </div>
+    {% endif %}
   </div>
 </div>
 {% endif %}

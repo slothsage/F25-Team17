@@ -30,5 +30,6 @@ urlpatterns = [
 
 
 urlpatterns += [
-    path("wishlists/", views.wishlist_list, name="wishlist_list")
+    path("wishlists/", views.wishlist_list, name="wishlist_list"),
+    path("wishlists/select/", views.select_wishlist, name="select_wishlist"),
 ]

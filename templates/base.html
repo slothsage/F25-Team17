@@ -198,8 +198,9 @@
           <li class="nav-item dropdown">
             <button class="nav-link dropdown-toggle" aria-expanded="false">Shop</button>
             <ul class="dropdown-menu">
-              <li><a class="dropdown-item" href="{% url 'shop:order_list' %}">Orders</a></li>
               <li><a class="dropdown-item" href="{% url 'shop:catalog_search' %}">Browse Catalog</a></li>
+              <li><a class="dropdown-item" href="{% url 'shop:cart' %}">Cart</a></li>
+              <li><a class="dropdown-item" href="{% url 'shop:order_list' %}">Orders</a></li>
               <li><a class="dropdown-item" href="{% url 'shop:favorites_list' %}">Favorites</a></li>
               <li><a class="dropdown-item" href="{% url 'shop:wishlist_list' %}">Wishlists</a></li>
             </ul>

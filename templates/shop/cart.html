@@ -18,16 +18,36 @@
     <li>{{ it.name_snapshot }} — {{ it.quantity }} × {{ it.points_each }} pts</li>
   {% endfor %}
   </ul>
-  <p><strong>Total:</strong> {{ total_points }} pts</p>
+  
+  <!-- Points Summary -->
+  <div style="background: #f8f9fa; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border: 1px solid #dee2e6;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+      <span>Available Points:</span>
+      <strong style="color: #007bff;">{{ total_balance|default:0 }} pts</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+      <span>Cart Total:</span>
+      <strong>{{ total_points }} pts</strong>
+    </div>
+    <hr style="margin: 0.75rem 0;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+      <span><strong>Remaining Points After Purchase:</strong></span>
+      <strong style="font-size: 1.1rem; color: {% if remaining_points >= 0 %}#28a745{% else %}#dc3545{% endif %};">
+        {{ remaining_points|default:0 }} pts
+      </strong>
+    </div>
+    <div style="text-align: right; color: #6c757d; font-size: 0.85rem;">
+      {{ total_balance|default:0 }} - {{ total_points }} = {{ remaining_points|default:0 }}
+    </div>
+  </div>
 
-  <form method="post" action="{% url 'shop:clear_cart' %}">
+  <form method="post" action="{% url 'shop:clear_cart' %}" style="display: inline-block; margin-right: 0.5rem;">
     {% csrf_token %}
     <button class="btn" onclick="return confirm('Clear all items?')">Clear Cart</button>
   </form>
   <a href="{% url 'shop:checkout' %}" class="btn" style="background:#16a34a;color:#fff;">
-      Proceed to Checkout
-    </a>
-  </div>
+    Proceed to Checkout
+  </a>
 {% else %}
   <p>Your cart is empty.</p>
 {% endif %}

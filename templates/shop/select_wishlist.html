@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Select Wishlist{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2>Add to Wishlist</h2>
+            <p class="text-muted">Select a wishlist to add this product to, or create a new one.</p>
+        </div>
+    </div>
+
+    <!-- Product Preview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            {% if product.thumb_url %}
+                            <img src="{{ product.thumb_url }}" alt="{{ product.name }}" class="img-thumbnail" style="max-width: 120px; max-height: 120px; object-fit: cover;">
+                            {% else %}
+                            <div class="bg-light d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                                <span class="text-muted small">No Image</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col">
+                            <h5 class="mb-1">{{ product.name }}</h5>
+                            <p class="text-muted mb-0">
+                                <strong class="text-primary">{{ product.points }} points</strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create New Wishlist -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Create New Wishlist</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="row g-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="create_wishlist">
+                        <input type="hidden" name="ebay_item_id" value="{{ product.ebay_item_id }}">
+                        <input type="hidden" name="product_name" value="{{ product.name }}">
+                        <input type="hidden" name="points" value="{{ product.points }}">
+                        <input type="hidden" name="product_url" value="{{ product.product_url }}">
+                        <input type="hidden" name="thumb_url" value="{{ product.thumb_url }}">
+                        <input type="hidden" name="return_url" value="{{ return_url }}">
+                        
+                        <div class="col-md-8">
+                            <input 
+                                type="text" 
+                                name="name" 
+                                class="form-control" 
+                                placeholder="Enter wishlist name" 
+                                required
+                                maxlength="150"
+                            >
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-plus"></i> Create & Add
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing Wishlists -->
+    <div class="row">
+        <div class="col-12">
+            <h4>Your Wishlists</h4>
+            {% if wishlists %}
+                <div class="row g-3">
+                    {% for wishlist in wishlists %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body d-flex flex-column">
+                                <h5 class="card-title">{{ wishlist.name }}</h5>
+                                <p class="text-muted small mb-3">
+                                    <i class="fas fa-box"></i> {{ wishlist.item_count }} item{{ wishlist.item_count|pluralize }}
+                                </p>
+                                <form method="post" class="mt-auto">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="wishlist_id" value="{{ wishlist.id }}">
+                                    <input type="hidden" name="ebay_item_id" value="{{ product.ebay_item_id }}">
+                                    <input type="hidden" name="product_name" value="{{ product.name }}">
+                                    <input type="hidden" name="points" value="{{ product.points }}">
+                                    <input type="hidden" name="product_url" value="{{ product.product_url }}">
+                                    <input type="hidden" name="thumb_url" value="{{ product.thumb_url }}">
+                                    <input type="hidden" name="return_url" value="{{ return_url }}">
+                                    
+                                    <button type="submit" class="btn btn-outline-primary w-100">
+                                        <i class="fas fa-heart"></i> Add to This Wishlist
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> You don't have any wishlists yet. Create one above to get started!
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{{ return_url }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Catalog
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

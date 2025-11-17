@@ -1,99 +1,343 @@
 {% extends "base.html" %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+
 {% block content %}
-<h1>Order #{{ order.id }}</h1>
-
-<p>Status: <strong>{{ order.status|title }}</strong>
-  {% if is_delayed %}
-    <span style="margin-left:.5rem;padding:.15rem .4rem;border:1px solid #f59e0b;border-radius:.35rem;background:#fff7ed;">
-      Delayed
-    </span>
-  {% endif %}
-</p>
-
-<p>Points spent: {{ order.points_spent }}</p>
-
-<!-- Shipping / ETA Section -->
-<div style="border:1px solid #e5e7eb;border-radius:.5rem;padding:1rem;margin:.75rem 0;">
-  <h3 style="margin-top:0;">Shipping & ETA</h3>
-
-  <div style="display:flex;flex-wrap:wrap;gap:1rem;">
-    <div style="min-width:220px;">
-      <div><strong>Expected delivery:</strong>
-        {% if order.expected_delivery_date %}
-          {{ order.expected_delivery_date }}
-        {% else %}
-          <span class="text-muted">TBD</span>
-        {% endif %}
-        {% if is_delayed %}
-          <span style="margin-left:.4rem;padding:.1rem .35rem;border:1px solid #f59e0b;border-radius:.35rem;background:#fff7ed;">
-            Delayed
-          </span>
-        {% endif %}
-      </div>
-      <div><strong>Status:</strong>
-        <span style="padding:.1rem .4rem;border:1px solid #d1d5db;border-radius:.35rem;">
-          {{ order.status|title }}
-        </span>
-      </div>
-    </div>
-
-    <div style="flex:1;min-width:260px;">
-      <strong>Ship to:</strong>
-      <div style="margin-top:.25rem;line-height:1.35;">
-        {% if order.ship_name %}{{ order.ship_name }}<br>{% endif %}
-        {% if order.ship_line1 %}{{ order.ship_line1 }}<br>{% endif %}
-        {% if order.ship_line2 %}{{ order.ship_line2 }}<br>{% endif %}
-        {% if order.ship_city or order.ship_state or order.ship_postal %}
-          {{ order.ship_city }}{% if order.ship_city and order.ship_state %}, {% endif %}{{ order.ship_state }} {{ order.ship_postal }}<br>
-        {% endif %}
-        {% if order.ship_country %}{{ order.ship_country }}{% endif %}
-        {% if not order.ship_name and not order.ship_line1 and not order.ship_city and not order.ship_state and not order.ship_postal %}
-          <span class="text-muted">(no address on file)</span>
-        {% endif %}
+<div class="container mt-4">
+  <!-- Order Confirmation Header -->
+  {% if order.status == "pending" and order.placed_at|timesince|slice:":1"|add:"0" < 5 %}
+  <div class="alert alert-success mb-4" role="alert">
+    <div class="d-flex align-items-center">
+      <i class="fas fa-check-circle fa-2x me-3"></i>
+      <div>
+        <h4 class="alert-heading mb-1">Order Placed Successfully!</h4>
+        <p class="mb-0">Thank you for your order. We've received your order and will begin processing it shortly.</p>
       </div>
     </div>
   </div>
+  {% endif %}
 
-  <div style="margin-top:.75rem;">
-    <div style="font-size:.9rem;color:#6b7280;">Order timeline</div>
-    <ul style="margin:.25rem 0 0;padding-left:1rem;">
-      <li>Placed: {{ order.placed_at|date:"Y-m-d H:i" }}</li>
-      {% if order.updated_at %}<li>Last update: {{ order.updated_at|date:"Y-m-d H:i" }}</li>{% endif %}
-      {% if order.status == "processing" %}<li>Processing at warehouse</li>{% endif %}
-      {% if order.status == "shipped" %}<li>Shipped — en route</li>{% endif %}
-      {% if order.status == "delivered" %}<li>Delivered</li>{% endif %}
-      {% if order.status == "cancelled" %}<li>Cancelled</li>{% endif %}
-    </ul>
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <h1>Order #{{ order.id }}</h1>
+        <span class="{{ status_class }} fs-6 px-3 py-2">{{ order.status|title }}</span>
+      </div>
+      <p class="text-muted">Placed on {{ order.placed_at|date:"F d, Y \a\t g:i A" }}</p>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Order Details Column -->
+    <div class="col-lg-8 mb-4">
+      <!-- Order Items -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+          <h5 class="mb-0"><i class="fas fa-box"></i> Order Items</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th class="text-center">Quantity</th>
+                  <th class="text-end">Points Each</th>
+                  <th class="text-end">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in line_items %}
+                <tr>
+                  <td>{{ item.name }}</td>
+                  <td class="text-center">{{ item.qty }}</td>
+                  <td class="text-end">{{ item.points_each }} pts</td>
+                  <td class="text-end"><strong>{{ item.points_line }} pts</strong></td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted">No items found</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="table-active">
+                  <th colspan="3" class="text-end">Total Points:</th>
+                  <th class="text-end">{{ total_points }} pts</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping Information -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+          <h5 class="mb-0"><i class="fas fa-truck"></i> Shipping Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="text-muted mb-2">Ship To:</h6>
+              <address class="mb-0">
+                {% if order.ship_name %}<strong>{{ order.ship_name }}</strong><br>{% endif %}
+                {% if order.ship_line1 %}{{ order.ship_line1 }}<br>{% endif %}
+                {% if order.ship_line2 %}{{ order.ship_line2 }}<br>{% endif %}
+                {% if order.ship_city or order.ship_state or order.ship_postal %}
+                  {{ order.ship_city }}{% if order.ship_city and order.ship_state %}, {% endif %}{{ order.ship_state }} {{ order.ship_postal }}<br>
+                {% endif %}
+                {% if order.ship_country %}{{ order.ship_country }}{% endif %}
+                {% if not order.ship_name and not order.ship_line1 and not order.ship_city %}
+                  <span class="text-muted">(no address on file)</span>
+                {% endif %}
+              </address>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-muted mb-2">Order Timeline</h6>
+              <ul class="list-unstyled mb-0">
+                <li class="mb-2">
+                  <i class="fas fa-calendar-check text-primary"></i>
+                  <strong>Placed:</strong> {{ order.placed_at|date:"M d, Y g:i A" }}
+                </li>
+                {% if order.updated_at and order.updated_at != order.placed_at %}
+                <li class="mb-2">
+                  <i class="fas fa-clock text-info"></i>
+                  <strong>Last Updated:</strong> {{ order.updated_at|date:"M d, Y g:i A" }}
+                </li>
+                {% endif %}
+                {% if order.status == "processing" %}
+                <li class="mb-2">
+                  <i class="fas fa-warehouse text-warning"></i>
+                  <strong>Status:</strong> Processing at warehouse
+                </li>
+                {% elif order.status == "shipped" %}
+                <li class="mb-2">
+                  <i class="fas fa-shipping-fast text-primary"></i>
+                  <strong>Status:</strong> Shipped — en route
+                </li>
+                {% elif order.status == "delivered" %}
+                <li class="mb-2">
+                  <i class="fas fa-check-double text-success"></i>
+                  <strong>Status:</strong> Delivered
+                </li>
+                {% elif order.status == "cancelled" %}
+                <li class="mb-2">
+                  <i class="fas fa-times-circle text-danger"></i>
+                  <strong>Status:</strong> Cancelled
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Summary Sidebar -->
+    <div class="col-lg-4">
+      <!-- Tracking & Delivery -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-map-marker-alt"></i> Tracking & Delivery</h5>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <h6 class="text-muted mb-2">Order Status</h6>
+            <div class="d-flex align-items-center mb-3">
+              <span class="{{ status_class }} px-3 py-2">{{ order.status|title }}</span>
+              {% if is_delayed %}
+              <span class="badge bg-warning text-dark ms-2">Delayed</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="text-muted mb-2">Estimated Delivery</h6>
+            {% if expected_delivery %}
+              <p class="mb-0">
+                <strong class="fs-5">{{ expected_delivery|date:"F d, Y" }}</strong>
+                {% if is_delayed %}
+                <br><small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Delivery may be delayed</small>
+                {% endif %}
+              </p>
+            {% else %}
+              <p class="text-muted mb-0">To be determined</p>
+            {% endif %}
+          </div>
+
+          <!-- Tracking Progress -->
+          <div class="mt-4">
+            <h6 class="text-muted mb-3">Order Progress</h6>
+            <div class="tracking-progress">
+              <div class="tracking-step {% if order.status != 'cancelled' %}active{% endif %} {% if order.status == 'pending' or order.status == 'processing' or order.status == 'shipped' or order.status == 'delivered' %}completed{% endif %}">
+                <div class="step-icon"><i class="fas fa-check"></i></div>
+                <div class="step-label">Order Placed</div>
+                <div class="step-date">{{ order.placed_at|date:"M d" }}</div>
+              </div>
+              <div class="tracking-step {% if order.status == 'processing' or order.status == 'shipped' or order.status == 'delivered' %}active completed{% elif order.status == 'pending' %}active{% endif %}">
+                <div class="step-icon"><i class="fas fa-warehouse"></i></div>
+                <div class="step-label">Processing</div>
+              </div>
+              <div class="tracking-step {% if order.status == 'shipped' or order.status == 'delivered' %}active completed{% elif order.status == 'processing' %}active{% endif %}">
+                <div class="step-icon"><i class="fas fa-shipping-fast"></i></div>
+                <div class="step-label">Shipped</div>
+              </div>
+              <div class="tracking-step {% if order.status == 'delivered' %}active completed{% elif order.status == 'shipped' %}active{% endif %}">
+                <div class="step-icon"><i class="fas fa-check-double"></i></div>
+                <div class="step-label">Delivered</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Order Summary -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+          <h5 class="mb-0"><i class="fas fa-receipt"></i> Order Summary</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <span>Order Number:</span>
+            <strong>#{{ order.id }}</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Points Spent:</span>
+            <strong class="text-primary">{{ total_points }} pts</strong>
+          </div>
+          {% if order.sponsor_name %}
+          <div class="d-flex justify-content-between mb-2">
+            <span>Sponsor:</span>
+            <span>{{ order.sponsor_name }}</span>
+          </div>
+          {% endif %}
+          <hr>
+          <div class="d-flex justify-content-between">
+            <span><strong>Total:</strong></span>
+            <strong class="text-primary">{{ total_points }} pts</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-3">Actions</h6>
+          <div class="d-grid gap-2">
+            <a href="{% url 'shop:order_receipt_pdf' order.id %}" class="btn btn-outline-primary">
+              <i class="fas fa-file-pdf"></i> Download Receipt (PDF)
+            </a>
+            {% if order.status == "pending" or order.status == "processing" %}
+            <form method="post" action="{% url 'shop:cancel_order' order.id %}" class="d-grid">
+              {% csrf_token %}
+              <button class="btn btn-outline-danger" type="submit" onclick="return confirm('Are you sure you want to cancel this order?');">
+                <i class="fas fa-times"></i> Cancel Order
+              </button>
+            </form>
+            {% endif %}
+            {% if order.can_mark_received %}
+            <form method="post" action="{% url 'shop:mark_order_received' order.id %}" class="d-grid">
+              {% csrf_token %}
+              <button class="btn btn-success" type="submit">
+                <i class="fas fa-check"></i> Mark as Received
+              </button>
+            </form>
+            {% endif %}
+            <a href="{% url 'shop:order_list' %}" class="btn btn-outline-secondary">
+              <i class="fas fa-arrow-left"></i> Back to Orders
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
-<!-- End Shipping / ETA Section -->
 
-<h3>Items</h3>
-<ul>
-{% for it in order.items.all %}
-  <li>{{ it.name_snapshot }} — {{ it.quantity }} × {{ it.points_each }} pts = {{ it.line_points }} pts</li>
-{% endfor %}
-</ul>
+<style>
+.tracking-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+  padding-left: 2rem;
+}
 
-<p>
-  <a class="btn" href="{% url 'shop:order_receipt_pdf' order.id %}">
-    <i class="fas fa-file-pdf"></i> Download Receipt (PDF)
-  </a>
-</p>
+.tracking-progress::before {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 2px;
+  background: #e5e7eb;
+}
 
-{% if order.status == "pending" or order.status == "processing" %}
-  <form method="post" action="{% url 'shop:cancel_order' order.id %}" style="display:inline">
-    {% csrf_token %}
-    <button class="btn" type="submit">Cancel Order</button>
-  </form>
-{% endif %}
+.tracking-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  opacity: 0.5;
+}
 
-{% if order.can_mark_received %}
-  <form method="post" action="{% url 'shop:mark_order_received' order.id %}">
-    {% csrf_token %}
-    <button class="btn">Mark as received</button>
-  </form>
-{% endif %}
+.tracking-step.active {
+  opacity: 1;
+}
 
-<p><a class="btn" href="{% url 'shop:order_list' %}">Back to Orders</a></p>
+.tracking-step.completed .step-icon {
+  background: #10b981;
+  color: white;
+}
+
+.tracking-step.active:not(.completed) .step-icon {
+  background: #3b82f6;
+  color: white;
+  animation: pulse 2s infinite;
+}
+
+.tracking-step .step-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.tracking-step .step-label {
+  font-weight: 500;
+  flex: 1;
+}
+
+.tracking-step .step-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+  }
+}
+
+@media (max-width: 768px) {
+  .tracking-progress {
+    padding-left: 1.5rem;
+  }
+  
+  .tracking-step .step-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.65rem;
+  }
+}
+</style>
 {% endblock %}

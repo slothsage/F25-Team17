@@ -247,8 +247,9 @@ def mark_order_received(request, order_id):
 def cart_view(request):
     items = CartItem.objects.filter(driver=request.user).order_by("-added_at")
     total_points = sum(i.points_each * i.quantity for i in items)
-    return render(request, "shop/cart.html", {"items": items, "total_points": total_points})
-
+    total_balance = get_driver_points_balance(request.user)
+    remaining_points = max(0, total_balance - total_points)
+    
     # Get/create profile + form
     profile, _ = DriverProfile.objects.get_or_create(user=request.user)
     from accounts.forms import AddressForm
@@ -268,6 +269,8 @@ def cart_view(request):
         {
             "items": items,
             "total_points": total_points,
+            "total_balance": total_balance,
+            "remaining_points": remaining_points,
             "address_form": form,
             "profile": profile,
         },
@@ -358,6 +361,102 @@ def wishlist_list(request):
         "shop/wishlist_list.html",
         {"wishlists": wishlists},
     )
+
+
+@login_required
+def select_wishlist(request):
+    """
+    Page to select a wishlist when adding a product from catalog.
+    GET params: ebay_item_id, product_name, points, product_url, thumb_url
+    """
+    # Get product info from query params
+    ebay_item_id = request.GET.get("ebay_item_id", "").strip()
+    product_name = request.GET.get("product_name", "").strip()
+    points = request.GET.get("points", "0")
+    product_url = request.GET.get("product_url", "").strip()
+    thumb_url = request.GET.get("thumb_url", "").strip()
+    
+    if not ebay_item_id:
+        messages.error(request, "Missing product information.")
+        return redirect("shop:catalog_search")
+    
+    # Handle POST: add to selected wishlist
+    if request.method == "POST":
+        # Get product info from POST (in case it wasn't in GET)
+        ebay_item_id = request.POST.get("ebay_item_id", ebay_item_id)
+        product_name = request.POST.get("product_name", product_name)
+        points = request.POST.get("points", points)
+        product_url = request.POST.get("product_url", product_url)
+        thumb_url = request.POST.get("thumb_url", thumb_url)
+        
+        wishlist_id = request.POST.get("wishlist_id")
+        action = request.POST.get("action")
+        
+        if action == "create_wishlist":
+            name = (request.POST.get("name") or "").strip()
+            if not name:
+                messages.error(request, "Please enter a wishlist name.")
+                # Re-render with error
+            else:
+                wishlist, created = Wishlist.objects.get_or_create(user=request.user, name=name)
+                if created:
+                    messages.success(request, f"Wishlist '{name}' created.")
+                # Continue to add item to this wishlist
+                wishlist_id = wishlist.id
+        
+        if wishlist_id:
+            try:
+                wishlist = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
+                
+                # Check if item already exists in this wishlist
+                existing = WishListItem.objects.filter(
+                    wishlist=wishlist,
+                    product_id=ebay_item_id
+                ).first()
+                
+                if existing:
+                    messages.info(request, f"'{product_name}' is already in '{wishlist.name}'.")
+                else:
+                    WishListItem.objects.create(
+                        wishlist=wishlist,
+                        product_id=ebay_item_id,
+                        product_url=product_url[:1000] if product_url else "",
+                        thumb_url=thumb_url[:1000] if thumb_url else "",
+                        name_snapshot=product_name[:255],
+                        points_each=int(points) if points.isdigit() else 0,
+                        quantity=1
+                    )
+                    wishlist.save(update_fields=["updated_at"])
+                    messages.success(request, f"Added '{product_name}' to '{wishlist.name}'.")
+                
+                # Redirect back to catalog with the search query if available
+                return_url = request.POST.get("return_url") or request.GET.get("return_url", reverse("shop:catalog_search"))
+                return redirect(return_url)
+                
+            except Exception as e:
+                messages.error(request, f"Error adding to wishlist: {str(e)}")
+    
+    # GET: show wishlists for selection
+    wishlists = (
+        Wishlist.objects
+        .filter(user=request.user)
+        .annotate(item_count=Count("items"))
+        .order_by("-updated_at", "-created_at")
+    )
+    
+    context = {
+        "wishlists": wishlists,
+        "product": {
+            "ebay_item_id": ebay_item_id,
+            "name": product_name,
+            "points": points,
+            "product_url": product_url,
+            "thumb_url": thumb_url,
+        },
+        "return_url": request.GET.get("return_url", reverse("shop:catalog_search")),
+    }
+    
+    return render(request, "shop/select_wishlist.html", context)
 
 
 @login_required
@@ -998,70 +1097,117 @@ def checkout(request):
     if request.method == "POST":
         form = CheckoutForm(request.POST)
         if form.is_valid():
-            with transaction.atomic():
-                wallet = (SponsorPointsAccount.objects
-                    .select_for_update()
-                    .filter(driver=driver, is_primary=True)
-                    .select_related("sponsor")
-                    .first())
+            # Check total balance across all wallets
+            total_balance = get_driver_points_balance(driver)
+            
+            if total_balance < total_points:
+                messages.error(request, f"Insufficient points. You have {total_balance} points but need {total_points} points.")
+            else:
+                try:
+                    with transaction.atomic():
+                        # Get all wallets with balance, ordered by balance descending
+                        wallets = list(SponsorPointsAccount.objects
+                            .select_for_update()
+                            .filter(driver=driver, balance__gt=0)
+                            .select_related("sponsor")
+                            .order_by("-balance"))
+                        
+                        if not wallets:
+                            messages.error(request, "No sponsor wallets found with available points.")
+                        else:
+                            # Get primary sponsor name from first wallet
+                            primary_sponsor_name = getattr(wallets[0].sponsor, "username", "") or ""
+                            
+                            # Create order first
+                            order = Order.objects.create(
+                                driver=driver,
+                                sponsor_name=primary_sponsor_name,
+                                status="pending",
+                                points_spent=total_points,
+                                ship_name=form.cleaned_data["ship_name"],
+                                ship_line1=form.cleaned_data["ship_line1"],
+                                ship_line2=form.cleaned_data["ship_line2"],
+                                ship_city=form.cleaned_data["ship_city"],
+                                ship_state=form.cleaned_data["ship_state"],
+                                ship_postal=form.cleaned_data["ship_postal"],
+                                ship_country=(form.cleaned_data["ship_country"] or "US").upper(),
+                                expected_delivery_date=None, 
+                            )
 
-            if not wallet:
-                messages.error(request, "You must choose a primary sponsor wallet before checkout.")
-                return redirect("accounts:wallets")
+                            # Move cart items → order items
+                            bulk_items = []
+                            for c in cart_qs:
+                                qty = c.quantity if c.quantity and c.quantity > 0 else 1
+                                bulk_items.append(OrderItem(
+                                    order=order,
+                                    name_snapshot=c.name_snapshot,
+                                    points_each=c.points_each or 0,
+                                    quantity=qty,
+                                ))
+                            OrderItem.objects.bulk_create(bulk_items)
 
-            if wallet.balance < total_points:
-                messages.error(request, "Insufficient points in your primary sponsor wallet.")
-                return redirect("shop:cart")
+                            # Set ETA
+                            order.expected_delivery_date = order.estimate_delivery_date()
+                            order.save(update_fields=["expected_delivery_date"])
 
-            sponsor_name = getattr(wallet.sponsor, "username", "") or ""
-            order = Order.objects.create(
-                driver=driver,
-                sponsor_name=sponsor_name,
-                status="pending",
-                points_spent=total_points,
-                ship_name=form.cleaned_data["ship_name"],
-                ship_line1=form.cleaned_data["ship_line1"],
-                ship_line2=form.cleaned_data["ship_line2"],
-                ship_city=form.cleaned_data["ship_city"],
-                ship_state=form.cleaned_data["ship_state"],
-                ship_postal=form.cleaned_data["ship_postal"],
-                ship_country=(form.cleaned_data["ship_country"] or "US").upper(),
-                expected_delivery_date=None, 
-            )
+                            # Deduct points from wallets, starting with the highest balance
+                            remaining_points = total_points
+                            
+                            for wallet in wallets:
+                                if remaining_points <= 0:
+                                    break
+                                
+                                points_to_deduct = min(remaining_points, wallet.balance)
+                                wallet.apply_points(
+                                    -points_to_deduct,
+                                    reason=f"Checkout Order #{order.id}",
+                                    created_by=driver,
+                                    order=order,
+                                )
+                                remaining_points -= points_to_deduct
 
-            # Move cart items → order items
-            bulk_items = []
-            for c in cart_qs:
-                qty = c.quantity if c.quantity and c.quantity > 0 else 1
-                bulk_items.append(OrderItem(
-                    order=order,
-                    name_snapshot=c.name_snapshot,
-                    points_each=c.points_each or 0,
-                    quantity=qty,
-                ))
-            OrderItem.objects.bulk_create(bulk_items)
+                            # Clear cart
+                            cart_qs.delete()
 
-            # Set ETA
-            order.expected_delivery_date = order.estimate_delivery_date()
-            order.save(update_fields=["expected_delivery_date"])
+                            # Send order creation notification
+                            if send_in_app_notification:
+                                try:
+                                    from django.urls import reverse
+                                    order_url = reverse("shop:order_detail", args=[order.id])
+                                    send_in_app_notification(
+                                        driver,
+                                        "orders",
+                                        "Order Placed",
+                                        f"Your order #{order.id} has been placed successfully. Total: {total_points} points.",
+                                        url=order_url,
+                                    )
+                                except Exception as e:
+                                    import logging
+                                    logger = logging.getLogger(__name__)
+                                    logger.warning(f"Failed to send order notification: {e}", exc_info=True)
 
-            wallet.apply_points(
-                -total_points,
-                reason=f"Checkout Order #{order.id}",
-                created_by=driver,
-                order=order,
-            )
-
-            # Clear cart
-            cart_qs.delete()
-
-        messages.success(request, f"Order #{order.id} placed successfully.")
-        return redirect("shop:order_detail", pk=order.id)
+                            messages.success(request, f"Order #{order.id} placed successfully.")
+                            return redirect("shop:order_detail", order_id=order.id)
+                except Exception as e:
+                    messages.error(request, f"An error occurred while processing your order: {str(e)}")
+                    import logging
+                    logging.exception("Checkout error")
+        else:
+            # Form is invalid - show errors
+            messages.error(request, "Please correct the errors below.")
     else:
         form = CheckoutForm()
+
+    # Get total balance for display
+    total_balance = get_driver_points_balance(driver)
+    points_needed = max(0, total_points - total_balance)
+    remaining_points = max(0, total_balance - total_points)
 
     return render(request, "shop/checkout.html", {
         "form": form,
         "cart_items": cart_qs,
         "total_points": total_points,
+        "total_balance": total_balance,
+        "points_needed": points_needed,
+        "remaining_points": remaining_points,
     })

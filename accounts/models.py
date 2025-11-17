@@ -64,6 +64,13 @@ class DriverProfile(models.Model):
         help_text="If checked, this user is prevented from logging in (admin only)",
         editable=False  
     )
+    
+    # Points goal for progress tracking
+    points_goal = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Personal points goal for progress tracking"
+    )
     is_suspended = models.BooleanField(
         default=False,
         help_text="If checked, this user is temporarily suspended and cannot access any part of the system (admin only)",
@@ -740,12 +747,23 @@ class SponsorPointsAccount(models.Model):
         ledger_reason = reason or (
             f"{'Awarded' if delta > 0 else 'Spent'} via {self.sponsor.get_full_name() or self.sponsor.username}"
         )
+        new_balance = prior_total + delta
         PointsLedger.objects.create(
             user=self.driver,
             delta=delta,
             reason=ledger_reason[:255],
-            balance_after=prior_total + delta,
+            balance_after=new_balance,
         )
+        
+        # Trigger notification for points update
+        try:
+            from .notifications import on_points_updated
+            on_points_updated(self.driver, delta, ledger_reason[:255], new_balance)
+        except Exception as e:
+            # Log error but don't fail the transaction
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to send points notification: {e}", exc_info=True)
 
 class SponsorPointsTransaction(models.Model):
     wallet = models.ForeignKey(SponsorPointsAccount, on_delete=models.CASCADE, related_name="transactions")

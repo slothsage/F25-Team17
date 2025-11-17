@@ -21,10 +21,10 @@ class PointsConfigForm(forms.ModelForm):
         return v
     
 class CheckoutForm(forms.Form):
-    ship_name   = forms.CharField(label="Full Name", max_length=200)
-    ship_line1  = forms.CharField(label="Address Line 1", max_length=200)
-    ship_line2  = forms.CharField(label="Address Line 2", max_length=200, required=False)
-    ship_city   = forms.CharField(label="City", max_length=100)
-    ship_state  = forms.CharField(label="State/Province", max_length=100)
-    ship_postal = forms.CharField(label="Postal Code", max_length=20)
-    ship_country = forms.CharField(label="Country Code", max_length=2, initial="US")
+    ship_name   = forms.CharField(label="Full Name", max_length=200, widget=forms.TextInput(attrs={"class": "form-control"}))
+    ship_line1  = forms.CharField(label="Address Line 1", max_length=200, widget=forms.TextInput(attrs={"class": "form-control"}))
+    ship_line2  = forms.CharField(label="Address Line 2", max_length=200, required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    ship_city   = forms.CharField(label="City", max_length=100, widget=forms.TextInput(attrs={"class": "form-control"}))
+    ship_state  = forms.CharField(label="State/Province", max_length=100, widget=forms.TextInput(attrs={"class": "form-control"}))
+    ship_postal = forms.CharField(label="Postal Code", max_length=20, widget=forms.TextInput(attrs={"class": "form-control"}))
+    ship_country = forms.CharField(label="Country Code", max_length=2, initial="US", widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "US"}))

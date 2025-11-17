@@ -4,56 +4,128 @@
   <h2>Checkout</h2>
   <p class="text-muted">Enter your shipping address to place the order.</p>
 
-  <form method="post" class="row g-3">
+  <form method="post" class="row g-3" id="checkoutForm">
     {% csrf_token %}
-    {{ form.non_field_errors }}
+    
+    {% if form.non_field_errors %}
+    <div class="col-12">
+      <div class="alert alert-danger">
+        {{ form.non_field_errors }}
+      </div>
+    </div>
+    {% endif %}
 
     <div class="col-md-6">
-      {{ form.ship_name.label_tag }} {{ form.ship_name }} {{ form.ship_name.errors }}
+      <label for="{{ form.ship_name.id_for_label }}" class="form-label">{{ form.ship_name.label }}</label>
+      {{ form.ship_name }}
+      {% if form.ship_name.errors %}
+      <div class="text-danger small">{{ form.ship_name.errors }}</div>
+      {% endif %}
     </div>
     <div class="col-12">
-      {{ form.ship_line1.label_tag }} {{ form.ship_line1 }} {{ form.ship_line1.errors }}
+      <label for="{{ form.ship_line1.id_for_label }}" class="form-label">{{ form.ship_line1.label }}</label>
+      {{ form.ship_line1 }}
+      {% if form.ship_line1.errors %}
+      <div class="text-danger small">{{ form.ship_line1.errors }}</div>
+      {% endif %}
     </div>
     <div class="col-12">
-      {{ form.ship_line2.label_tag }} {{ form.ship_line2 }} {{ form.ship_line2.errors }}
+      <label for="{{ form.ship_line2.id_for_label }}" class="form-label">{{ form.ship_line2.label }}</label>
+      {{ form.ship_line2 }}
+      {% if form.ship_line2.errors %}
+      <div class="text-danger small">{{ form.ship_line2.errors }}</div>
+      {% endif %}
     </div>
     <div class="col-md-5">
-      {{ form.ship_city.label_tag }} {{ form.ship_city }} {{ form.ship_city.errors }}
+      <label for="{{ form.ship_city.id_for_label }}" class="form-label">{{ form.ship_city.label }}</label>
+      {{ form.ship_city }}
+      {% if form.ship_city.errors %}
+      <div class="text-danger small">{{ form.ship_city.errors }}</div>
+      {% endif %}
     </div>
     <div class="col-md-3">
-      {{ form.ship_state.label_tag }} {{ form.ship_state }} {{ form.ship_state.errors }}
+      <label for="{{ form.ship_state.id_for_label }}" class="form-label">{{ form.ship_state.label }}</label>
+      {{ form.ship_state }}
+      {% if form.ship_state.errors %}
+      <div class="text-danger small">{{ form.ship_state.errors }}</div>
+      {% endif %}
     </div>
     <div class="col-md-4">
-      {{ form.ship_postal.label_tag }} {{ form.ship_postal }} {{ form.ship_postal.errors }}
+      <label for="{{ form.ship_postal.id_for_label }}" class="form-label">{{ form.ship_postal.label }}</label>
+      {{ form.ship_postal }}
+      {% if form.ship_postal.errors %}
+      <div class="text-danger small">{{ form.ship_postal.errors }}</div>
+      {% endif %}
+    </div>
+    <div class="col-md-6">
+      <label for="{{ form.ship_country.id_for_label }}" class="form-label">{{ form.ship_country.label }}</label>
+      {{ form.ship_country }}
+      {% if form.ship_country.errors %}
+      <div class="text-danger small">{{ form.ship_country.errors }}</div>
+      {% endif %}
     </div>
 
-    {% comment %} Minimal wallet info; v2 can add a dropdown to choose a non-primary wallet {% endcomment %}
-<div class="card mb-3">
-  <div class="card-body">
-    <h5 class="card-title">Payment with Points</h5>
-    {% if request.user.sponsor_wallets.all %}
-      {% with primary=request.user.sponsor_wallets.all|dictsortreversed:"is_primary"|first %}
-        <p>Primary wallet:
-          {% if primary.0 %} {{ primary.0.sponsor.username }} — Balance: {{ primary.0.balance }} pts
-          {% else %} <em>No primary wallet selected</em>
+    <!-- Points Summary -->
+    <div class="col-12">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Payment with Points</h5>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>Available Points:</span>
+            <strong class="text-primary">{{ total_balance|default:0 }} pts</strong>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>Order Total:</span>
+            <strong>{{ total_points }} pts</strong>
+          </div>
+          <hr style="margin: 1rem 0;">
+          <div class="d-flex justify-content-between align-items-center mb-2" style="font-size: 1.1rem;">
+            <span><strong>Remaining Points After Purchase:</strong></span>
+            <strong class="{% if remaining_points >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.2rem;">
+              {{ remaining_points|default:0 }} pts
+            </strong>
+          </div>
+          <div class="text-muted small mb-3" style="text-align: right;">
+            {{ total_balance|default:0 }} - {{ total_points }} = {{ remaining_points|default:0 }}
+          </div>
+          {% if total_balance < total_points %}
+            <div class="alert alert-warning mt-3 mb-0">
+              <i class="fas fa-exclamation-triangle"></i> 
+              Insufficient points. You need {{ points_needed }} more points to complete this order.
+            </div>
+          {% else %}
+            <div class="alert alert-success mt-3 mb-0">
+              <i class="fas fa-check-circle"></i> 
+              You have sufficient points to complete this order.
+            </div>
           {% endif %}
-        </p>
-        <p>Order total: {{ total_points }} pts</p>
-        {% if primary.0 and primary.0.balance < total_points %}
-          <div class="alert alert-warning">Not enough points in your primary wallet.</div>
-        {% endif %}
-      {% endwith %}
-      <p><a class="btn btn-outline-secondary" href="{% url 'accounts:wallets' %}">Manage wallets</a></p>
-    {% else %}
-      <div class="alert alert-info">You don’t have any sponsor wallets yet.</div>
-    {% endif %}
-  </div>
-</div>
+        </div>
+      </div>
+    </div>
 
     <div class="col-12">
-      <button class="btn btn-primary" type="submit">Place Order</button>
+      <button class="btn btn-primary btn-lg" type="submit" id="placeOrderBtn">
+        <i class="fas fa-check"></i> Place Order
+      </button>
       <a class="btn btn-outline-secondary" href="{% url 'shop:cart' %}">Back to Cart</a>
     </div>
   </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('checkoutForm');
+  const submitBtn = document.getElementById('placeOrderBtn');
+  
+  if (form && submitBtn) {
+    form.addEventListener('submit', function(e) {
+      // Disable button and show loading state
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+      
+      // Form will submit normally
+    });
+  }
+});
+</script>
 {% endblock %}

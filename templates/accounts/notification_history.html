@@ -26,9 +26,9 @@
   <button class="btn" type="submit">Apply</button>
 </form>
 
-{% if page_obj.object_list %}
+{% if notifications_list %}
   {# Group by day (annotated in the view) #}
-  {% regroup page_obj.object_list by day as day_groups %}
+  {% regroup notifications_list|dictsort:"day" by day as day_groups %}
 
   <div class="history">
     {% for group in day_groups %}

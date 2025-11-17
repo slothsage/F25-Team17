@@ -105,8 +105,8 @@ class WishListItem(models.Model):
 
     # API integration fields (still don't know what is available)
     product_id = models.CharField(max_length=130, blank=True) #Ebay item ID
-    product_url = models.URLField(blank=True) #URL
-    thumb_url = models.URLField(blank=True) #Image URL
+    product_url = models.CharField(max_length=1000, blank=True) #URL
+    thumb_url = models.CharField(max_length=1000, blank=True) #Image URL
     
     name_snapshot = models.CharField(max_length=255)
     points_each = models.IntegerField(default=0)
@@ -126,8 +126,8 @@ class Favorite(models.Model):
     product_id = models.CharField(max_length=130)         
     name_snapshot = models.CharField(max_length=255)
     points_each = models.IntegerField(default=0)
-    product_url = models.URLField(blank=True)
-    thumb_url = models.URLField(blank=True)
+    product_url = models.CharField(max_length=1000, blank=True)
+    thumb_url = models.CharField(max_length=1000, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

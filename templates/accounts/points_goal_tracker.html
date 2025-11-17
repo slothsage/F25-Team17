@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Points Goal Tracker</h1>
+
+{% if messages %}
+  {% for m in messages %}<p>{{ m }}</p>{% endfor %}
+{% endif %}
+
+<div style="max-width: 800px; margin-top: 2rem;">
+  <!-- Current Balance Display -->
+  <div style="background: var(--bg, #f8f9fa); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid var(--border, #dee2e6);">
+    <h2 style="margin-top: 0; margin-bottom: 0.5rem;">Current Points Balance</h2>
+    <p style="font-size: 2rem; font-weight: bold; color: var(--primary, #007bff); margin: 0;">
+      {{ current_balance|floatformat:0 }} points
+    </p>
+  </div>
+
+  <!-- Goal Setting Form -->
+  <div style="background: var(--bg, #fff); padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 2rem; border: 1px solid var(--border, #dee2e6);">
+    <h2 style="margin-top: 0;">Set Your Points Goal</h2>
+    <form method="post">
+      {% csrf_token %}
+      
+      <div style="margin-bottom: 1rem;">
+        <label for="{{ form.points_goal.id_for_label }}" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+          {{ form.points_goal.label }}
+        </label>
+        {{ form.points_goal }}
+        {% if form.points_goal.help_text %}
+          <small style="display: block; margin-top: 0.25rem; color: var(--muted, #6c757d);">
+            {{ form.points_goal.help_text }}
+          </small>
+        {% endif %}
+        {% if form.points_goal.errors %}
+          <div style="color: red; font-size: 0.9rem; margin-top: 0.25rem;">
+            {{ form.points_goal.errors }}
+          </div>
+        {% endif %}
+      </div>
+      
+      <button type="submit" class="btn" style="margin-top: 0.5rem;">
+        {% if has_goal %}Update Goal{% else %}Set Goal{% endif %}
+      </button>
+    </form>
+  </div>
+
+  <!-- Progress Bar Section -->
+  {% if has_goal %}
+    <div style="background: var(--bg, #fff); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border, #dee2e6);">
+      <h2 style="margin-top: 0;">Progress Towards Goal</h2>
+      
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="font-weight: 600;">{{ current_balance|floatformat:0 }} / {{ points_goal|floatformat:0 }} points</span>
+          <span style="font-weight: 600; color: var(--primary, #007bff);">{{ progress_percentage }}%</span>
+        </div>
+        
+        <!-- Progress Bar Container -->
+        <div style="background: var(--bg-secondary, #e9ecef); border-radius: 0.5rem; height: 2rem; position: relative; overflow: hidden; border: 1px solid var(--border, #dee2e6);">
+          <!-- Progress Bar Fill -->
+          <div style="
+            background: {% if progress_percentage >= 100 %}linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            {% elif progress_percentage >= 75 %}linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+            {% elif progress_percentage >= 50 %}linear-gradient(90deg, #17a2b8 0%, #138496 100%);
+            {% elif progress_percentage >= 25 %}linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+            {% else %}linear-gradient(90deg, #dc3545 0%, #c82333 100%);{% endif %}
+            height: 100%;
+            width: {{ progress_percentage }}%;
+            transition: width 0.3s ease;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.875rem;
+          ">
+            {% if progress_percentage > 10 %}{{ progress_percentage }}%{% endif %}
+          </div>
+        </div>
+      </div>
+      
+      {% if progress_percentage >= 100 %}
+        <div style="background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 1rem; border-radius: 0.375rem; margin-top: 1rem;">
+          <strong>🎉 Congratulations!</strong> You've reached your goal of {{ points_goal|floatformat:0 }} points!
+        </div>
+      {% else %}
+        <p style="margin-top: 1rem; color: var(--muted, #6c757d);">
+          <strong>{{ points_remaining|floatformat:0 }} points</strong> remaining to reach your goal.
+        </p>
+      {% endif %}
+    </div>
+  {% else %}
+    <div style="background: var(--bg-secondary, #f8f9fa); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border, #dee2e6); text-align: center;">
+      <p style="color: var(--muted, #6c757d); margin: 0;">
+        Set a points goal above to start tracking your progress!
+      </p>
+    </div>
+  {% endif %}
+</div>
+
+<p style="margin-top: 2rem;">
+  <a class="btn" href="{% url 'accounts:profile' %}">Back to Profile</a>
+  <a class="btn" href="{% url 'accounts:points_history' %}" style="margin-left: 0.5rem;">View Points History</a>
+</p>
+{% endblock content %}
+
