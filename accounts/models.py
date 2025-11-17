@@ -791,3 +791,38 @@ class SponsorPointsTransaction(models.Model):
 
     def __str__(self):
         return f"{self.tx_type} {self.amount} to {self.wallet}"
+
+
+class BulkUploadLog(models.Model):
+    """Track bulk user uploads for audit and history purposes."""
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="bulk_uploads",
+        help_text="Admin who performed the upload"
+    )
+    filename = models.CharField(max_length=255, help_text="Name of the uploaded file")
+    total_rows = models.PositiveIntegerField(default=0, help_text="Total rows processed")
+    created_count = models.PositiveIntegerField(default=0, help_text="Users successfully created")
+    skipped_count = models.PositiveIntegerField(default=0, help_text="Rows skipped (duplicates, invalid data)")
+    error_count = models.PositiveIntegerField(default=0, help_text="Rows with errors")
+    errors = models.JSONField(default=list, blank=True, help_text="List of error messages")
+    created_users = models.JSONField(default=list, blank=True, help_text="List of usernames created")
+    skipped_users = models.JSONField(default=list, blank=True, help_text="List of usernames skipped")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Bulk Upload Log"
+        verbose_name_plural = "Bulk Upload Logs"
+
+    def __str__(self):
+        return f"Upload by {self.uploaded_by.username if self.uploaded_by else 'Unknown'} on {self.created_at.strftime('%Y-%m-%d %H:%M')} - {self.created_count} created, {self.skipped_count} skipped"
+
+    @property
+    def success_rate(self):
+        """Calculate success rate as percentage."""
+        if self.total_rows == 0:
+            return 0
+        return round((self.created_count / self.total_rows) * 100, 1)

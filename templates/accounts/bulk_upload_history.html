@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">
+            <i class="fas fa-history me-2"></i>Upload History
+        </h1>
+        <div>
+            <a href="{% url 'accounts:bulk_upload_users' %}" class="btn btn-primary">
+                <i class="fas fa-upload me-1"></i>New Upload
+            </a>
+            <a href="{% url 'admin_user_search' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back
+            </a>
+        </div>
+    </div>
+
+    {% if page_obj %}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Uploaded By</th>
+                            <th>Filename</th>
+                            <th>Total Rows</th>
+                            <th>Created</th>
+                            <th>Skipped</th>
+                            <th>Success Rate</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for upload in page_obj %}
+                        <tr>
+                            <td>{{ upload.created_at|date:"M d, Y H:i" }}</td>
+                            <td>{{ upload.uploaded_by.username|default:"Unknown" }}</td>
+                            <td>
+                                <span class="text-truncate d-inline-block" style="max-width: 200px;" title="{{ upload.filename }}">
+                                    {{ upload.filename }}
+                                </span>
+                            </td>
+                            <td>{{ upload.total_rows }}</td>
+                            <td>
+                                <span class="badge bg-success">{{ upload.created_count }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-warning text-dark">{{ upload.skipped_count }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 20px; min-width: 60px;">
+                                        <div class="progress-bar {% if upload.success_rate >= 80 %}bg-success{% elif upload.success_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             role="progressbar" 
+                                             style="width: {{ upload.success_rate }}%"
+                                             aria-valuenow="{{ upload.success_rate }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <span class="small">{{ upload.success_rate }}%</span>
+                                </div>
+                            </td>
+                            <td>
+                                <a href="{% url 'accounts:bulk_upload_detail' upload.id %}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i>View Details
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="card-footer">
+            <nav aria-label="Upload history pagination">
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>No upload history found. 
+        <a href="{% url 'accounts:bulk_upload_users' %}">Start your first upload</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

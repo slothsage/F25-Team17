@@ -88,6 +88,46 @@
           <div class="text-muted small mb-3" style="text-align: right;">
             {{ total_balance|default:0 }} - {{ total_points }} = {{ remaining_points|default:0 }}
           </div>
+          
+          <!-- Point Splitting Breakdown -->
+          {% if point_split_breakdown and point_split_breakdown|length > 1 %}
+          <div class="mt-3 mb-3">
+            <h6 class="small fw-bold text-muted mb-2">Points will be split across wallets:</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered mb-0" style="font-size: 0.85rem;">
+                <thead class="table-light">
+                  <tr>
+                    <th>Sponsor</th>
+                    <th class="text-end">Wallet Balance</th>
+                    <th class="text-end">Points to Use</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for split in point_split_breakdown %}
+                  <tr>
+                    <td>{{ split.sponsor }}</td>
+                    <td class="text-end">{{ split.wallet_balance }} pts</td>
+                    <td class="text-end"><strong>{{ split.points_to_use }} pts</strong></td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                  <tr>
+                    <th>Total</th>
+                    <th class="text-end">{{ total_balance }} pts</th>
+                    <th class="text-end"><strong>{{ total_points }} pts</strong></th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+          {% elif point_split_breakdown and point_split_breakdown|length == 1 %}
+          <div class="alert alert-info mt-3 mb-0">
+            <i class="fas fa-info-circle"></i> 
+            All {{ total_points }} points will be deducted from {{ point_split_breakdown.0.sponsor }}'s wallet.
+          </div>
+          {% endif %}
+          
           {% if total_balance < total_points %}
             <div class="alert alert-warning mt-3 mb-0">
               <i class="fas fa-exclamation-triangle"></i> 

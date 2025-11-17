@@ -29,6 +29,16 @@
   </label>
 
   <label>
+    Sort by:
+    <select name="sort">
+      <option value="newest" {% if filters.sort == "newest" %}selected{% endif %}>Newest First</option>
+      <option value="oldest" {% if filters.sort == "oldest" %}selected{% endif %}>Oldest First</option>
+      <option value="points_low" {% if filters.sort == "points_low" %}selected{% endif %}>Points: Low to High</option>
+      <option value="points_high" {% if filters.sort == "points_high" %}selected{% endif %}>Points: High to Low</option>
+    </select>
+  </label>
+
+  <label>
     Per page:
     <input type="number" name="per_page" min="1" max="200" value="{{ filters.per_page }}" style="width:60px;">
   </label>
@@ -56,10 +66,69 @@
         <td style="padding:6px;">{{ o.id }}</td>
         <td style="padding:6px;">{{ o.placed_at|date:"Y-m-d H:i" }}</td>
         <td style="padding:6px;">{{ o.sponsor_name|default:"—" }}</td>
-        <td style="padding:6px;">{{ o.get_status_display }}</td>
-        <td style="text-align:right; padding:6px;">{{ o.points_spent }}</td>
+        <td style="padding:6px;">
+          <span class="badge {% if o.status == 'pending' %}bg-secondary{% elif o.status == 'confirmed' %}bg-info{% elif o.status == 'processing' %}bg-warning text-dark{% elif o.status == 'shipped' %}bg-primary{% elif o.status == 'delivered' %}bg-success{% elif o.status == 'cancelled' %}bg-danger{% endif %}">
+            {{ o.get_status_display }}
+          </span>
+        </td>
+        <td style="text-align:right; padding:6px;">{{ o.points_spent }} pts</td>
         <td style="text-align:center; padding:6px;">
-          <a href="{% url 'shop:order_detail' o.id %}">View</a>
+          <div class="d-flex gap-2 justify-content-center flex-wrap">
+            <a href="{% url 'shop:order_detail' o.id %}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-eye"></i> View
+            </a>
+            <form method="post" action="{% url 'shop:reorder_all' o.id %}" class="d-inline">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-success" type="submit" title="Reorder all items from this order">
+                <i class="fas fa-redo"></i> Reorder
+              </button>
+            </form>
+            {% if o.can_cancel %}
+            <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#cancelOrderModal{{ o.id }}" title="Cancel Order">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+            
+            <!-- Cancel Order Warning Modal -->
+            <div class="modal fade" id="cancelOrderModal{{ o.id }}" tabindex="-1" aria-labelledby="cancelOrderModalLabel{{ o.id }}" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="cancelOrderModalLabel{{ o.id }}">
+                      <i class="fas fa-exclamation-triangle me-2"></i>Cancel Order #{{ o.id }}?
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="alert alert-warning mb-3">
+                      <i class="fas fa-exclamation-triangle me-2"></i>
+                      <strong>Warning:</strong> You are about to cancel this order.
+                    </div>
+                    <p><strong>What will happen:</strong></p>
+                    <ul>
+                      <li>This order will be marked as <strong>cancelled</strong></li>
+                      <li><strong>{{ o.points_spent }} points</strong> will be refunded to your account</li>
+                      <li>You will receive a notification confirming the cancellation</li>
+                    </ul>
+                    <p class="text-muted mb-0">
+                      <small>This action cannot be undone. Are you sure you want to proceed?</small>
+                    </p>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                      <i class="fas fa-times me-1"></i> Keep Order
+                    </button>
+                    <form method="post" action="{% url 'shop:cancel_order' o.id %}?redirect_to=shop:order_list" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-check me-1"></i> Yes, Cancel Order
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
         </td>
       </tr>
     {% endfor %}
@@ -69,11 +138,11 @@
   <!-- PAGINATION -->
   <div style="margin-top:1rem; text-align:center;">
     {% if page_obj.has_previous %}
-      <a class="btn" href="?page={{ page_obj.previous_page_number }}&status={{ filters.status }}&sponsor={{ filters.sponsor }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&per_page={{ filters.per_page }}">« Prev</a>
+      <a class="btn" href="?page={{ page_obj.previous_page_number }}&status={{ filters.status }}&sponsor={{ filters.sponsor }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&per_page={{ filters.per_page }}">« Prev</a>
     {% endif %}
     <span style="margin:0 .5rem;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
-      <a class="btn" href="?page={{ page_obj.next_page_number }}&status={{ filters.status }}&sponsor={{ filters.sponsor }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&per_page={{ filters.per_page }}">Next »</a>
+      <a class="btn" href="?page={{ page_obj.next_page_number }}&status={{ filters.status }}&sponsor={{ filters.sponsor }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&sort={{ filters.sort }}&per_page={{ filters.per_page }}">Next »</a>
     {% endif %}
   </div>
 {% else %}

@@ -87,6 +87,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 
 from .models import LoginActivity, PointChangeLog, PasswordChangeLog, DriverApplicationLog
 from .models import SponsorshipRequest, SponsorPointsAccount, SponsorPointsTransaction
+from .models import BulkUploadLog
 import io, base64, pyotp, qrcode
 from django.contrib.auth import login as auth_login
 from django.views.decorators.csrf import csrf_protect
@@ -1475,64 +1476,146 @@ def bulk_upload_users(request):
     CSV format:
     username,email,password,user_type,phone,address,sponsor_name,sponsor_email
     """
+    upload_log = None
+    results = None
+    
     if request.method == "POST":
         csv_file = request.FILES.get("file")
         if not csv_file or not csv_file.name.endswith(".csv"):
             messages.error(request, "Please upload a valid .csv file.")
-            return redirect("admin_user_search")
+            return render(request, "accounts/bulk_upload.html", {
+                "upload_log": upload_log,
+                "results": results,
+            })
 
         file_data = TextIOWrapper(csv_file.file, encoding="utf-8")
         reader = csv.DictReader(file_data)
 
         created_count = 0
         skipped_count = 0
+        error_count = 0
         errors = []
+        created_users = []
+        skipped_users = []
+        total_rows = 0
 
-        for row in reader:
-            username = row.get("username", "").strip()
-            email = row.get("email", "").strip()
-            password = row.get("password", "").strip()
-            user_type = row.get("user_type", "").strip().lower()
+        with transaction.atomic():
+            for row in reader:
+                total_rows += 1
+                username = row.get("username", "").strip()
+                email = row.get("email", "").strip()
+                password = row.get("password", "").strip()
+                user_type = row.get("user_type", "").strip().lower()
 
-            if not username or not password or not email or user_type not in ["driver", "sponsor"]:
-                skipped_count += 1
-                errors.append(f"Invalid data for user {username or '(missing username)'}")
-                continue
+                if not username or not password or not email or user_type not in ["driver", "sponsor"]:
+                    skipped_count += 1
+                    error_count += 1
+                    error_msg = f"Row {total_rows}: Invalid data for user {username or '(missing username)'} - missing required fields or invalid user_type"
+                    errors.append(error_msg)
+                    skipped_users.append(username or f"Row {total_rows}")
+                    continue
 
-            # Skip duplicates
-            if User.objects.filter(username=username).exists():
-                skipped_count += 1
-                errors.append(f"User '{username}' already exists.")
-                continue
+                # Skip duplicates
+                if User.objects.filter(username=username).exists():
+                    skipped_count += 1
+                    error_msg = f"Row {total_rows}: User '{username}' already exists"
+                    errors.append(error_msg)
+                    skipped_users.append(username)
+                    continue
 
-            # Create user
-            user = User.objects.create_user(username=username, email=email, password=password)
-            user.is_active = True
-            user.save()
+                try:
+                    # Create user
+                    user = User.objects.create_user(username=username, email=email, password=password)
+                    user.is_active = True
+                    user.save()
 
-            # Handle driver creation
-            if user_type == "driver":
-                phone = row.get("phone", "").strip()
-                address = row.get("address", "").strip()
-                DriverProfile.objects.create(user=user, phone=phone, address=address)
+                    # Handle driver creation
+                    if user_type == "driver":
+                        phone = row.get("phone", "").strip()
+                        address = row.get("address", "").strip()
+                        DriverProfile.objects.create(user=user, phone=phone, address=address)
 
-            # Handle sponsor group
-            elif user_type == "sponsor":
-                sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
-                user.groups.add(sponsor_group)
+                    # Handle sponsor group
+                    elif user_type == "sponsor":
+                        sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
+                        user.groups.add(sponsor_group)
 
-            created_count += 1
+                    created_count += 1
+                    created_users.append(username)
+                except Exception as e:
+                    skipped_count += 1
+                    error_count += 1
+                    error_msg = f"Row {total_rows}: Error creating user '{username}': {str(e)}"
+                    errors.append(error_msg)
+                    skipped_users.append(username)
 
-        summary = f"✅ {created_count} users created, ⚠️ {skipped_count} skipped."
-        if errors:
-            summary += f" ({len(errors)} errors logged.)"
-            for e in errors[:5]:  # show first few
-                messages.warning(request, e)
+            # Create upload log
+            upload_log = BulkUploadLog.objects.create(
+                uploaded_by=request.user,
+                filename=csv_file.name,
+                total_rows=total_rows,
+                created_count=created_count,
+                skipped_count=skipped_count,
+                error_count=error_count,
+                errors=errors,
+                created_users=created_users,
+                skipped_users=skipped_users,
+            )
 
-        messages.success(request, summary)
-        return redirect("admin_user_search")
+        # Prepare results for display
+        results = {
+            "total_rows": total_rows,
+            "created_count": created_count,
+            "skipped_count": skipped_count,
+            "error_count": error_count,
+            "success_rate": round((created_count / total_rows * 100), 1) if total_rows > 0 else 0,
+            "errors": errors[:20],  # Show first 20 errors
+            "created_users": created_users[:50],  # Show first 50 created users
+            "skipped_users": skipped_users[:50],  # Show first 50 skipped users
+            "has_more_errors": len(errors) > 20,
+            "has_more_created": len(created_users) > 50,
+            "has_more_skipped": len(skipped_users) > 50,
+        }
 
-    return render(request, "accounts/bulk_upload.html")
+        if created_count > 0:
+            messages.success(request, f"✅ Successfully created {created_count} user(s)!")
+        if skipped_count > 0:
+            messages.warning(request, f"⚠️ {skipped_count} row(s) were skipped. See details below.")
+
+    # Get recent upload history
+    recent_uploads = BulkUploadLog.objects.all()[:10]
+    
+    return render(request, "accounts/bulk_upload.html", {
+        "upload_log": upload_log,
+        "results": results,
+        "recent_uploads": recent_uploads,
+    })
+
+
+@staff_member_required
+def bulk_upload_history(request):
+    """View upload history and details of past uploads."""
+    uploads = BulkUploadLog.objects.all().order_by("-created_at")
+    
+    # Pagination
+    paginator = Paginator(uploads, 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, "accounts/bulk_upload_history.html", {
+        "page_obj": page_obj,
+    })
+
+
+@staff_member_required
+def bulk_upload_detail(request, upload_id):
+    """View detailed results of a specific upload."""
+    upload_log = get_object_or_404(BulkUploadLog, id=upload_id)
+    
+    return render(request, "accounts/bulk_upload_detail.html", {
+        "upload_log": upload_log,
+    })
+
 
 @staff_member_required
 def toggle_user_active(request, user_id):

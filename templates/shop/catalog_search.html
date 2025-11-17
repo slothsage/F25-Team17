@@ -56,6 +56,17 @@
                         </select>
                     </div>
                     
+                    <!-- Sort Options -->
+                    <div class="col-md-6 col-lg-3">
+                        <label class="form-label text-uppercase small fw-semibold text-muted">Sort By</label>
+                        <select name="sort" class="form-select" onchange="this.form.submit()">
+                            <option value="newest" {% if sort_by == "newest" %}selected{% endif %}>Newest First</option>
+                            <option value="oldest" {% if sort_by == "oldest" %}selected{% endif %}>Oldest First</option>
+                            <option value="points_low" {% if sort_by == "points_low" %}selected{% endif %}>Points: Low to High</option>
+                            <option value="points_high" {% if sort_by == "points_high" %}selected{% endif %}>Points: High to Low</option>
+                        </select>
+                    </div>
+                    
                     <!-- List View Toggle -->
                     <div class="col-md-6 col-lg-3">
                         <label class="form-label text-uppercase small fw-semibold text-muted">View</label>

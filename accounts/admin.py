@@ -10,6 +10,7 @@ from .models import FailedLoginAttempt
 from .models import PasswordPolicy
 from .models import ChatRoom, ChatMessage, MessageReadStatus
 from .models import SponsorPointsAccount, SponsorPointsTransaction
+from .models import BulkUploadLog
 
 
 # Register your models here.
@@ -136,3 +137,18 @@ class SponsorPointsTransactionAdmin(admin.ModelAdmin):
     list_filter = ("tx_type", "created_at")
     search_fields = ("wallet__driver__username", "wallet__sponsor__username", "reason")
     readonly_fields = ("created_at",)
+
+@admin.register(BulkUploadLog)
+class BulkUploadLogAdmin(admin.ModelAdmin):
+    list_display = ("filename", "uploaded_by", "created_at", "total_rows", "created_count", "skipped_count", "success_rate_display")
+    list_filter = ("created_at",)
+    search_fields = ("filename", "uploaded_by__username")
+    readonly_fields = ("uploaded_by", "filename", "total_rows", "created_count", "skipped_count", "error_count", "errors", "created_users", "skipped_users", "created_at")
+    date_hierarchy = "created_at"
+    
+    @admin.display(description="Success Rate")
+    def success_rate_display(self, obj):
+        return f"{obj.success_rate}%"
+    
+    def has_add_permission(self, request):
+        return False  # Prevent manual creation, only via upload

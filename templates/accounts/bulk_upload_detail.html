@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">
+            <i class="fas fa-info-circle me-2"></i>Upload Details
+        </h1>
+        <div>
+            <a href="{% url 'accounts:bulk_upload_history' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to History
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Summary Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header {% if upload_log.success_rate >= 80 %}bg-success{% elif upload_log.success_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %} text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Upload Summary
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3">
+                            <strong>Uploaded By:</strong><br>
+                            <span class="text-muted">{{ upload_log.uploaded_by.username|default:"Unknown" }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Date & Time:</strong><br>
+                            <span class="text-muted">{{ upload_log.created_at|date:"F d, Y at H:i" }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Filename:</strong><br>
+                            <span class="text-muted">{{ upload_log.filename }}</span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Total Rows:</strong><br>
+                            <span class="text-muted">{{ upload_log.total_rows }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-success">{{ upload_log.created_count }}</h3>
+                                <small class="text-muted">Successfully Created</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-warning">{{ upload_log.skipped_count }}</h3>
+                                <small class="text-muted">Skipped</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-light rounded">
+                                <h3 class="mb-0 text-info">{{ upload_log.success_rate }}%</h3>
+                                <small class="text-muted">Success Rate</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Upload Progress</span>
+                            <span>{{ upload_log.success_rate }}%</span>
+                        </div>
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar {% if upload_log.success_rate >= 80 %}bg-success{% elif upload_log.success_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ upload_log.success_rate }}%"
+                                 aria-valuenow="{{ upload_log.success_rate }}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                {{ upload_log.success_rate }}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Created Users -->
+            {% if upload_log.created_users %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Successfully Created Users ({{ upload_log.created_count }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;">
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for username in upload_log.created_users %}
+                            <span class="badge bg-success fs-6 px-3 py-2">{{ username }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Skipped Users -->
+            {% if upload_log.skipped_users %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Skipped Users ({{ upload_log.skipped_count }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;">
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for username in upload_log.skipped_users %}
+                            <span class="badge bg-warning text-dark fs-6 px-3 py-2">{{ username }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Errors -->
+            {% if upload_log.errors %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-circle me-2"></i>Errors ({{ upload_log.error_count }})
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="bg-light p-3 rounded" style="max-height: 500px; overflow-y: auto;">
+                        <ul class="list-unstyled mb-0">
+                            {% for error in upload_log.errors %}
+                            <li class="text-danger mb-2 pb-2 border-bottom">
+                                <i class="fas fa-times-circle me-2"></i>{{ error }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Quick Actions
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'accounts:bulk_upload_users' %}" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-upload me-1"></i>New Upload
+                    </a>
+                    <a href="{% url 'accounts:bulk_upload_history' %}" class="btn btn-outline-secondary w-100 mb-2">
+                        <i class="fas fa-history me-1"></i>View All History
+                    </a>
+                    <a href="{% url 'admin_user_search' %}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-users me-1"></i>User Search
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

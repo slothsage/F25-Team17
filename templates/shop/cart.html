@@ -41,15 +41,44 @@
     </div>
   </div>
 
-  <form method="post" action="{% url 'shop:clear_cart' %}" style="display: inline-block; margin-right: 0.5rem;">
-    {% csrf_token %}
-    <button class="btn" onclick="return confirm('Clear all items?')">Clear Cart</button>
-  </form>
-  <a href="{% url 'shop:checkout' %}" class="btn" style="background:#16a34a;color:#fff;">
-    Proceed to Checkout
-  </a>
+  <div class="d-flex gap-2 flex-wrap align-items-center" style="margin-top: 1rem;">
+    <form method="post" action="{% url 'shop:save_cart_for_later' %}" style="display: inline-block;">
+      {% csrf_token %}
+      <div class="d-flex gap-2 align-items-center">
+        <input type="text" 
+               name="cart_name" 
+               placeholder="Cart name (optional)" 
+               class="form-control" 
+               style="max-width: 200px; display: inline-block;"
+               maxlength="200">
+        <button type="submit" class="btn btn-outline-primary">
+          <i class="fas fa-bookmark"></i> Save for Later
+        </button>
+      </div>
+    </form>
+    
+    <form method="post" action="{% url 'shop:clear_cart' %}" style="display: inline-block;">
+      {% csrf_token %}
+      <button class="btn btn-outline-secondary" onclick="return confirm('Clear all items?')">
+        <i class="fas fa-trash"></i> Clear Cart
+      </button>
+    </form>
+    
+    <a href="{% url 'shop:checkout' %}" class="btn" style="background:#16a34a;color:#fff;">
+      <i class="fas fa-shopping-cart"></i> Proceed to Checkout
+    </a>
+  </div>
+  
+  <div style="margin-top: 1rem;">
+    <a href="{% url 'shop:saved_carts' %}" class="btn btn-outline-info">
+      <i class="fas fa-bookmark"></i> View Saved Carts
+    </a>
+  </div>
 {% else %}
-  <p>Your cart is empty.</p>
+  <div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>Your cart is empty.
+    <a href="{% url 'shop:saved_carts' %}" class="alert-link">View your saved carts</a> to restore items.
+  </div>
 {% endif %}
 
 {% endblock %}

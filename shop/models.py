@@ -54,6 +54,10 @@ class Order(models.Model):
     def can_mark_received(self):
         return self.status in ("shipped", "delivered") and self.status != "cancelled"
     
+    def can_cancel(self):
+        """Check if this order can be cancelled by the driver."""
+        return self.status in ("pending", "confirmed", "processing")
+    
     def estimate_delivery_date(self) -> date:
         days = 0
         d = date.today()
@@ -81,6 +85,48 @@ class CartItem(models.Model):
     points_each = models.IntegerField(default=0)
     quantity = models.IntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
+
+
+class SavedCart(models.Model):
+    """Saved cart for later checkout - allows drivers to save cart items when they don't have enough points."""
+    driver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_carts")
+    name = models.CharField(max_length=200, default="Saved Cart", help_text="Name for this saved cart")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    total_points = models.PositiveIntegerField(default=0, help_text="Total points for all items in this saved cart")
+
+    class Meta:
+        ordering = ["-updated_at"]
+        verbose_name = "Saved Cart"
+        verbose_name_plural = "Saved Carts"
+
+    def __str__(self):
+        return f"{self.name} - {self.driver.username} ({self.total_points} pts)"
+
+    def calculate_total(self):
+        """Calculate and update total points for this saved cart."""
+        total = sum(item.points_each * item.quantity for item in self.items.all())
+        self.total_points = total
+        self.save(update_fields=["total_points"])
+        return total
+
+
+class SavedCartItem(models.Model):
+    """Individual items in a saved cart."""
+    saved_cart = models.ForeignKey(SavedCart, on_delete=models.CASCADE, related_name="items")
+    name_snapshot = models.CharField(max_length=255)
+    points_each = models.IntegerField(default=0)
+    quantity = models.IntegerField(default=1)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["added_at"]
+
+    def __str__(self):
+        return f"{self.name_snapshot} × {self.quantity} ({self.saved_cart.name})"
+
+    def line_points(self):
+        return self.points_each * self.quantity
 
 class Wishlist(models.Model):
     user = models.ForeignKey(

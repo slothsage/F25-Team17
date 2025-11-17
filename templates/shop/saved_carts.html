@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">
+            <i class="fas fa-bookmark me-2"></i>Saved Carts
+        </h1>
+        <a href="{% url 'shop:cart' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Cart
+        </a>
+    </div>
+
+    {% if saved_carts %}
+    <div class="row">
+        {% for saved_cart in saved_carts %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-bag me-2"></i>{{ saved_cart.name }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Total Points:</span>
+                            <strong class="text-primary">{{ saved_cart.total_points }} pts</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Items:</span>
+                            <strong>{{ saved_cart.item_count }} item(s)</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Saved:</span>
+                            <small>{{ saved_cart.created_at|date:"M d, Y" }}</small>
+                        </div>
+                        {% if saved_cart.updated_at != saved_cart.created_at %}
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Updated:</span>
+                            <small>{{ saved_cart.updated_at|date:"M d, Y" }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Cart Items Preview -->
+                    <div class="mb-3">
+                        <h6 class="text-muted small mb-2">Items:</h6>
+                        <ul class="list-unstyled mb-0" style="max-height: 150px; overflow-y: auto;">
+                            {% for item in saved_cart.items.all %}
+                                {% if forloop.counter <= 5 %}
+                                <li class="small mb-1">
+                                    <i class="fas fa-circle text-primary" style="font-size: 0.4rem; vertical-align: middle;"></i>
+                                    {{ item.name_snapshot }} × {{ item.quantity }} ({{ item.line_points }} pts)
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+                            {% if saved_cart.item_count > 5 %}
+                            <li class="small text-muted">
+                                ... and {{ saved_cart.item_count|add:"-5" }} more item(s)
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-footer bg-white">
+                    <div class="d-grid gap-2">
+                        <form method="post" action="{% url 'shop:restore_saved_cart' saved_cart.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-undo me-1"></i>Restore to Cart
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'shop:delete_saved_cart' saved_cart.id %}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this saved cart?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger w-100">
+                                <i class="fas fa-trash me-1"></i>Delete
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>You don't have any saved carts yet. 
+        <a href="{% url 'shop:cart' %}">Go to your cart</a> to save items for later.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

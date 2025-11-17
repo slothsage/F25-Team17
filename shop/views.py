@@ -14,7 +14,7 @@ from accounts.models import PointsLedger, DriverProfile
 from accounts.services import get_driver_points_balance
 from .models import PointsConfig
 from .forms import PointsConfigForm, CheckoutForm, SponsorCatalogItemForm
-from .models import Order, OrderItem, CartItem, Favorite, PointsConfig, SponsorCatalogItem, DriverCatalogItem
+from .models import Order, OrderItem, CartItem, Favorite, PointsConfig, SponsorCatalogItem, DriverCatalogItem, SavedCart, SavedCartItem
 from django.urls import reverse
 from .models import Wishlist, WishListItem
 from django.core.paginator import Paginator
@@ -26,7 +26,6 @@ from xhtml2pdf import pisa
 import json
 import csv
 from accounts.models import SponsorPointsAccount
-from django.db.models import Sum
 
 
 # A tiny editable set of eBay category IDs (Browse API uses numeric IDs)
@@ -68,27 +67,63 @@ def cancel_order(request, order_id):
     if request.method != "POST":
         return redirect("shop:order_detail", order_id=order.id)
 
-    # Only allow cancel before ship/delivered
-    cancellable_statuses = {"pending", "processing"}
-    if order.status in cancellable_statuses:
-        order.status = "cancelled"
-        order.save(update_fields=["status", "updated_at"])
+    # Check if order can be cancelled
+    if not order.can_cancel():
+        messages.error(request, f"Order #{order.id} cannot be cancelled. Only pending, confirmed, or processing orders can be cancelled.")
+        return redirect("shop:order_detail", order_id=order.id)
+
+    # Refund points to the wallets that were used for this order
+    from accounts.models import SponsorPointsTransaction
+    transactions = SponsorPointsTransaction.objects.filter(
+        order=order,
+        tx_type="debit"  # Only refund debit transactions (point deductions)
+    ).select_related("wallet")
+
+    refunded_total = 0
+    for transaction in transactions:
+        # Refund the points to the same wallet
+        refund_amount = transaction.amount
+        transaction.wallet.apply_points(
+            refund_amount,
+            reason=f"Refund for cancelled Order #{order.id}",
+            created_by=request.user,
+            order=None,  # Don't link refund transaction to the cancelled order
+        )
+        refunded_total += refund_amount
+
+    # Update order status
+    order.status = "cancelled"
+    order.save(update_fields=["status", "updated_at"])
+
+    # Send success message
+    if refunded_total > 0:
+        messages.success(
+            request,
+            f"Order #{order.id} has been cancelled. {refunded_total} points have been refunded to your account."
+        )
+    else:
         messages.success(request, f"Order #{order.id} has been cancelled.")
 
-        if send_in_app_notification:
-            try:
-                send_in_app_notification(
-                    request.user,
-                    "orders",
-                    "Order Cancelled",
-                    f"Order #{order.id} was cancelled.",
-                    url=reverse("shop:order_detail", args=[order.id]),
-                )
-            except Exception:
-                pass
-    else:
-        messages.error(request, "This order can’t be cancelled at its current status.")
+    # Send notification
+    try:
+        from accounts.notifications import send_in_app_notification
+        from django.urls import reverse
+        send_in_app_notification(
+            request.user,
+            "orders",
+            "Order Cancelled",
+            f"Order #{order.id} was cancelled. {refunded_total} points refunded." if refunded_total > 0 else f"Order #{order.id} was cancelled.",
+            url=reverse("shop:order_detail", args=[order.id]),
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to send cancellation notification: {e}", exc_info=True)
 
+    # Redirect based on where the request came from
+    redirect_to = request.GET.get("redirect_to", "shop:order_detail")
+    if redirect_to == "shop:order_list":
+        return redirect("shop:order_list")
     return redirect("shop:order_detail", order_id=order.id)
 
 # STORY: Order Status (list)
@@ -101,10 +136,11 @@ def order_list(request):
         sponsor=<substring>
         date_from=YYYY-MM-DD
         date_to=YYYY-MM-DD
+        sort=<newest|oldest|points_low|points_high>
         per_page=<int>
         page=<int>
     """
-    qs = Order.objects.filter(driver=request.user).order_by("-placed_at")
+    qs = Order.objects.filter(driver=request.user)
 
     # filters 
     status = request.GET.get("status", "").strip()
@@ -130,6 +166,19 @@ def order_list(request):
             end_dt = timezone.make_aware(timezone.datetime.combine(d, timezone.datetime.max.time()))
             qs = qs.filter(placed_at__lte=end_dt)
 
+    # Sorting
+    sort_by = request.GET.get("sort", "newest").strip()
+    if sort_by == "newest":
+        qs = qs.order_by("-placed_at")
+    elif sort_by == "oldest":
+        qs = qs.order_by("placed_at")
+    elif sort_by == "points_low":
+        qs = qs.order_by("points_spent")
+    elif sort_by == "points_high":
+        qs = qs.order_by("-points_spent")
+    else:
+        qs = qs.order_by("-placed_at")  # Default to newest
+
     # pagination 
     try:
         per_page = int(request.GET.get("per_page", "10"))
@@ -150,6 +199,7 @@ def order_list(request):
             "date_from": date_from_str,
             "date_to": date_to_str,
             "per_page": per_page,
+            "sort": sort_by,
         },
         "STATUS_CHOICES": [("", "All")] + list(Order.STATUS_CHOICES),
     }
@@ -209,6 +259,7 @@ def order_detail(request, order_id):
             line_total = qty * pts
             total_points += line_total
             line_items.append({
+                "id": it.id,  # Include item ID for reordering
                 "name": name,
                 "qty": qty,
                 "points_each": pts,
@@ -287,6 +338,195 @@ def clear_cart(request):
         else:
             messages.info(request, "Your cart is already empty.")
         return redirect("shop:cart")
+    return redirect("shop:cart")
+
+
+@login_required
+@transaction.atomic
+def save_cart_for_later(request):
+    """Save current cart items for later checkout."""
+    if request.method != "POST":
+        return redirect("shop:cart")
+    
+    cart_items = CartItem.objects.filter(driver=request.user)
+    
+    if not cart_items.exists():
+        messages.warning(request, "Your cart is empty. Nothing to save.")
+        return redirect("shop:cart")
+    
+    # Get cart name from form or use default
+    cart_name = request.POST.get("cart_name", "").strip() or f"Saved Cart {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+    
+    # Create saved cart
+    saved_cart = SavedCart.objects.create(
+        driver=request.user,
+        name=cart_name,
+    )
+    
+    # Copy cart items to saved cart
+    total_points = 0
+    for cart_item in cart_items:
+        SavedCartItem.objects.create(
+            saved_cart=saved_cart,
+            name_snapshot=cart_item.name_snapshot,
+            points_each=cart_item.points_each,
+            quantity=cart_item.quantity,
+        )
+        total_points += cart_item.points_each * cart_item.quantity
+    
+    saved_cart.total_points = total_points
+    saved_cart.save(update_fields=["total_points"])
+    
+    messages.success(request, f"Cart saved as '{saved_cart.name}' ({total_points} points). You can restore it later when you have enough points.")
+    return redirect("shop:saved_carts")
+
+
+@login_required
+def saved_carts_list(request):
+    """List all saved carts for the current driver."""
+    saved_carts = SavedCart.objects.filter(driver=request.user).annotate(
+        item_count=Count("items")
+    ).order_by("-updated_at")
+    
+    return render(request, "shop/saved_carts.html", {
+        "saved_carts": saved_carts,
+    })
+
+
+@login_required
+@transaction.atomic
+def restore_saved_cart(request, saved_cart_id):
+    """Restore a saved cart to the active cart."""
+    if request.method != "POST":
+        return redirect("shop:saved_carts")
+    
+    saved_cart = get_object_or_404(SavedCart, id=saved_cart_id, driver=request.user)
+    
+    # Get existing cart items to check for duplicates
+    existing_items = {item.name_snapshot: item for item in CartItem.objects.filter(driver=request.user)}
+    
+    restored_count = 0
+    skipped_count = 0
+    
+    for saved_item in saved_cart.items.all():
+        if saved_item.name_snapshot in existing_items:
+            # Update quantity if item already exists
+            existing_item = existing_items[saved_item.name_snapshot]
+            existing_item.quantity += saved_item.quantity
+            existing_item.points_each = saved_item.points_each  # Update price in case it changed
+            existing_item.save()
+            restored_count += 1
+        else:
+            # Create new cart item
+            CartItem.objects.create(
+                driver=request.user,
+                name_snapshot=saved_item.name_snapshot,
+                points_each=saved_item.points_each,
+                quantity=saved_item.quantity,
+            )
+            restored_count += 1
+    
+    if restored_count > 0:
+        messages.success(request, f"Restored {restored_count} item(s) from '{saved_cart.name}' to your cart.")
+    else:
+        messages.info(request, "No items were restored.")
+    
+    return redirect("shop:cart")
+
+
+@login_required
+@transaction.atomic
+def delete_saved_cart(request, saved_cart_id):
+    """Delete a saved cart."""
+    if request.method != "POST":
+        return redirect("shop:saved_carts")
+    
+    saved_cart = get_object_or_404(SavedCart, id=saved_cart_id, driver=request.user)
+    cart_name = saved_cart.name
+    saved_cart.delete()
+    
+    messages.success(request, f"Saved cart '{cart_name}' has been deleted.")
+    return redirect("shop:saved_carts")
+
+
+@login_required
+@transaction.atomic
+def reorder_item(request, order_item_id):
+    """Add a single item from a past order back to the cart."""
+    if request.method != "POST":
+        return redirect("shop:order_list")
+    
+    order_item = get_object_or_404(OrderItem, id=order_item_id, order__driver=request.user)
+    order = order_item.order
+    
+    # Check if item already exists in cart
+    existing_item = CartItem.objects.filter(
+        driver=request.user,
+        name_snapshot=order_item.name_snapshot
+    ).first()
+    
+    if existing_item:
+        # Update quantity
+        existing_item.quantity += order_item.quantity
+        existing_item.points_each = order_item.points_each  # Update price in case it changed
+        existing_item.save()
+        messages.success(request, f"Added {order_item.quantity} more '{order_item.name_snapshot}' to your cart (quantity updated).")
+    else:
+        # Create new cart item
+        CartItem.objects.create(
+            driver=request.user,
+            name_snapshot=order_item.name_snapshot,
+            points_each=order_item.points_each,
+            quantity=order_item.quantity,
+        )
+        messages.success(request, f"Added '{order_item.name_snapshot}' to your cart.")
+    
+    # Store order ID in session to pre-fill shipping info at checkout
+    request.session['reorder_order_id'] = order.id
+    
+    return redirect("shop:checkout")
+
+
+@login_required
+@transaction.atomic
+def reorder_all(request, order_id):
+    """Add all items from a past order back to the cart."""
+    if request.method != "POST":
+        return redirect("shop:order_list")
+    
+    order = get_object_or_404(Order, id=order_id, driver=request.user)
+    
+    existing_items = {item.name_snapshot: item for item in CartItem.objects.filter(driver=request.user)}
+    added_count = 0
+    
+    for order_item in order.items.all():
+        if order_item.name_snapshot in existing_items:
+            # Update quantity
+            existing_item = existing_items[order_item.name_snapshot]
+            existing_item.quantity += order_item.quantity
+            existing_item.points_each = order_item.points_each
+            existing_item.save()
+            added_count += 1
+        else:
+            # Create new cart item
+            CartItem.objects.create(
+                driver=request.user,
+                name_snapshot=order_item.name_snapshot,
+                points_each=order_item.points_each,
+                quantity=order_item.quantity,
+            )
+            added_count += 1
+    
+    if added_count > 0:
+        messages.success(request, f"Added {added_count} item(s) from Order #{order.id} to your cart.")
+        
+        # Store order ID in session to pre-fill shipping info at checkout
+        request.session['reorder_order_id'] = order.id
+        
+        return redirect("shop:checkout")
+    else:
+        messages.info(request, "No items were added to your cart.")
+    
     return redirect("shop:cart")
 
 @login_required
@@ -467,6 +707,7 @@ def catalog_search(request):
     query       = (request.GET.get("q") or "").strip()
     category_id = (request.GET.get("cat") or "").strip()
     page_num    = request.GET.get("page", "1")
+    sort_by     = request.GET.get("sort", "newest")  # newest, oldest, points_low, points_high
 
     # --- point-range filters ---
     def _to_int(val):
@@ -495,6 +736,7 @@ def catalog_search(request):
         "category_id": category_id,
         "category_choices": EBAY_CATEGORY_CHOICES,
         "page": page_num,
+        "sort_by": sort_by,
         "results": None,
         "error": None,
         "user_favorites": user_favorites,   
@@ -504,8 +746,18 @@ def catalog_search(request):
 
     context["points_balance"] = get_driver_points_balance(request.user)
 
-    # Get driver catalog items (always include these)
+    # Get driver catalog items (always include these) - apply sorting
     driver_catalog_items = DriverCatalogItem.objects.filter(is_active=True)
+    
+    # Apply sorting to driver catalog items
+    if sort_by == "newest":
+        driver_catalog_items = driver_catalog_items.order_by("-created_at")
+    elif sort_by == "oldest":
+        driver_catalog_items = driver_catalog_items.order_by("created_at")
+    elif sort_by == "points_low":
+        driver_catalog_items = driver_catalog_items.order_by("points_cost")
+    elif sort_by == "points_high":
+        driver_catalog_items = driver_catalog_items.order_by("-points_cost")
     
     # Convert driver catalog items to product format
     driver_products = []
@@ -522,6 +774,7 @@ def catalog_search(request):
             "is_available": True,
             "view_url": item.product_url or "",
             "is_catalog_item": True,  # Flag to identify catalog items
+            "created_at": item.created_at,  # Include created_at for sorting
         })
     
     # If no query, show random/default products + driver catalog items
@@ -543,15 +796,17 @@ def catalog_search(request):
                 for item in results.get("itemSummaries", [])
             ]
 
-            # Shuffle eBay products for randomness
-            import random
-            random.shuffle(ebay_products)
-            
             # Combine driver catalog items with eBay products
             all_products.extend(ebay_products)
-
-            # Shuffle combined list
-            random.shuffle(all_products)
+            
+            # Only shuffle if no specific sort is requested (default behavior)
+            if sort_by == "newest":
+                # Don't shuffle - sorting will be applied later
+                pass
+            else:
+                # Shuffle for randomness when not sorting by newest
+                import random
+                random.shuffle(all_products)
 
             # --- apply point-range filter on formatted products ---
             def _eligible(p):
@@ -565,6 +820,22 @@ def catalog_search(request):
                 return True
 
             filtered = [p for p in all_products if _eligible(p)]
+            
+            # Apply sorting to filtered products
+            if sort_by == "newest":
+                # For catalog items, sort by created_at (newest first)
+                # For eBay items, we don't have created_at, so keep them as-is
+                filtered.sort(key=lambda p: (
+                    p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now() - timedelta(days=365)
+                ), reverse=True)
+            elif sort_by == "oldest":
+                filtered.sort(key=lambda p: (
+                    p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now()
+                ), reverse=False)
+            elif sort_by == "points_low":
+                filtered.sort(key=lambda p: p.get("price_points", 0))
+            elif sort_by == "points_high":
+                filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
 
             context["results"] = {
                 "products": filtered[:20],  # Limit to 20 for default view
@@ -576,6 +847,17 @@ def catalog_search(request):
         except Exception as e:
             # If eBay fails, still show driver catalog items
             filtered = [p for p in driver_products if p.get("price_points", 0) >= (min_points or 0) and (max_points is None or p.get("price_points", 0) <= max_points)]
+            
+            # Apply sorting to filtered products
+            if sort_by == "newest":
+                filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=True)
+            elif sort_by == "oldest":
+                filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=False)
+            elif sort_by == "points_low":
+                filtered.sort(key=lambda p: p.get("price_points", 0))
+            elif sort_by == "points_high":
+                filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+            
             context["results"] = {
                 "products": filtered[:20],
                 "total": len(filtered),
@@ -625,6 +907,22 @@ def catalog_search(request):
             return True
 
         filtered = [p for p in all_products if _eligible(p)]
+        
+        # Apply sorting to filtered products
+        if sort_by == "newest":
+            # For catalog items, sort by created_at (newest first)
+            # For eBay items, we don't have created_at, so keep them as-is
+            filtered.sort(key=lambda p: (
+                p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now() - timedelta(days=365)
+            ), reverse=True)
+        elif sort_by == "oldest":
+            filtered.sort(key=lambda p: (
+                p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now()
+            ), reverse=False)
+        elif sort_by == "points_low":
+            filtered.sort(key=lambda p: p.get("price_points", 0))
+        elif sort_by == "points_high":
+            filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
         
         # Calculate total (driver catalog items + eBay results)
         total_count = len(matching_driver_items) if query else len(driver_products)
@@ -1213,6 +1511,26 @@ def checkout(request):
         qty = c.quantity if c.quantity and c.quantity > 0 else 1
         total_points += (c.points_each or 0) * qty
 
+    # Calculate point splitting breakdown for display (always calculate for GET and POST)
+    total_balance = get_driver_points_balance(driver)
+    wallets = list(SponsorPointsAccount.objects
+        .filter(driver=driver, balance__gt=0)
+        .select_related("sponsor")
+        .order_by("-balance"))
+    
+    point_split_breakdown = []
+    remaining_points = total_points
+    for wallet in wallets:
+        if remaining_points <= 0:
+            break
+        points_from_wallet = min(remaining_points, wallet.balance)
+        point_split_breakdown.append({
+            "sponsor": wallet.sponsor.get_full_name() or wallet.sponsor.username,
+            "wallet_balance": wallet.balance,
+            "points_to_use": points_from_wallet,
+        })
+        remaining_points -= points_from_wallet
+
     if request.method == "POST":
         form = CheckoutForm(request.POST)
         if form.is_valid():
@@ -1315,10 +1633,29 @@ def checkout(request):
             # Form is invalid - show errors
             messages.error(request, "Please correct the errors below.")
     else:
-        form = CheckoutForm()
+        # Check if we're reordering - pre-fill form with previous order's shipping info
+        reorder_order_id = request.session.pop('reorder_order_id', None)
+        if reorder_order_id:
+            try:
+                previous_order = Order.objects.get(id=reorder_order_id, driver=driver)
+                form = CheckoutForm(initial={
+                    'ship_name': previous_order.ship_name,
+                    'ship_line1': previous_order.ship_line1,
+                    'ship_line2': previous_order.ship_line2 or '',
+                    'ship_city': previous_order.ship_city,
+                    'ship_state': previous_order.ship_state,
+                    'ship_postal': previous_order.ship_postal,
+                    'ship_country': previous_order.ship_country or 'US',
+                })
+                messages.info(request, f"Shipping information from Order #{previous_order.id} has been pre-filled. You can modify it if needed.")
+            except Order.DoesNotExist:
+                form = CheckoutForm()
+        else:
+            form = CheckoutForm()
 
-    # Get total balance for display
-    total_balance = get_driver_points_balance(driver)
+    # Get total balance for display (if not already calculated)
+    if 'total_balance' not in locals():
+        total_balance = get_driver_points_balance(driver)
     points_needed = max(0, total_points - total_balance)
     remaining_points = max(0, total_balance - total_points)
 
@@ -1329,6 +1666,7 @@ def checkout(request):
         "total_balance": total_balance,
         "points_needed": points_needed,
         "remaining_points": remaining_points,
+        "point_split_breakdown": point_split_breakdown,
     })
 
 
