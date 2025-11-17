@@ -507,6 +507,16 @@ def add_to_cart_from_catalog(request):
             .get("total") or 0
         )
 
+        # Calculate current cart total before adding
+        current_total = sum(
+            item.points_each * item.quantity
+            for item in CartItem.objects.filter(driver=request.user)
+        )
+
+        incoming_cost = max(1, quantity) * max(0, points)
+        if current_total + incoming_cost > user_points:
+            return JsonResponse({'error': 'Insufficient points.'}, status=400)
+
         # Add directly to cart without checking eBay availability
         cart_item, created = CartItem.objects.get_or_create(
             driver=request.user,
@@ -516,24 +526,11 @@ def add_to_cart_from_catalog(request):
                 'quantity': quantity
             }
         )
-        
+
         if not created:
-            # Update quantity if already exists
+            cart_item.points_each = points  # refresh price in case it changed
             cart_item.quantity += quantity
-            cart_item.save()
-        
-        # Calculate cart total
-        total_points = sum(
-            item.points_each * item.quantity 
-            for item in CartItem.objects.filter(driver=request.user)
-        )
-        
-        #Cost of items being added
-        incoming_cost = max(1, quantity) * max(0, points)
-        new_total = total_points + incoming_cost
-                
-        if new_total > user_points:
-            return JsonResponse({'error': 'Insufficient points.'}, status=400)
+            cart_item.save(update_fields=["points_each", "quantity"])
         
         total_points = sum(
             item.points_each * item.quantity
