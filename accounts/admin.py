@@ -11,6 +11,7 @@ from .models import PasswordPolicy
 from .models import ChatRoom, ChatMessage, MessageReadStatus
 from .models import SponsorPointsAccount, SponsorPointsTransaction
 from .models import BulkUploadLog
+from .models import ImpersonationLog
 
 
 # Register your models here.
@@ -152,3 +153,27 @@ class BulkUploadLogAdmin(admin.ModelAdmin):
     
     def has_add_permission(self, request):
         return False  # Prevent manual creation, only via upload
+
+@admin.register(ImpersonationLog)
+class ImpersonationLogAdmin(admin.ModelAdmin):
+    list_display = ("admin_user", "impersonated_user", "started_at", "ended_at", "duration_display", "ip_address")
+    list_filter = ("started_at", "ended_at")
+    search_fields = ("admin_user__username", "impersonated_user__username", "ip_address")
+    readonly_fields = ("admin_user", "impersonated_user", "started_at", "ended_at", "duration_seconds", "ip_address")
+    date_hierarchy = "started_at"
+    
+    @admin.display(description="Duration")
+    def duration_display(self, obj):
+        if obj.duration_seconds is None:
+            return "Active" if not obj.ended_at else "Unknown"
+        minutes, seconds = divmod(obj.duration_seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            return f"{minutes}m {seconds}s"
+        else:
+            return f"{seconds}s"
+    
+    def has_add_permission(self, request):
+        return False  # Prevent manual creation, only created via impersonation

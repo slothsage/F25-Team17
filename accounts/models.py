@@ -426,6 +426,33 @@ class DriverApplicationLog(models.Model):
     def __str__(self):
         return f"{self.driver} {self.status} @ {self.created_at:%Y-%m-%d}"
 
+# --- Impersonation Audit ---
+class ImpersonationLog(models.Model):
+    """Track admin impersonation sessions for security audit."""
+    admin_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name="impersonations_as_admin"
+    )
+    impersonated_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name="impersonations_received"
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True, help_text="Total duration in seconds")
+    ip_address = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        verbose_name = "Impersonation log"
+        verbose_name_plural = "Impersonation logs"
+
+    def __str__(self):
+        duration = f" ({self.duration_seconds}s)" if self.duration_seconds else ""
+        return f"{self.admin_user.username} → {self.impersonated_user.username} @ {self.started_at:%Y-%m-%d %H:%M}{duration}"
+
 # --- Support Tickets ---
 class SupportTicket(models.Model):
     """Driver support ticket for in-app help requests."""

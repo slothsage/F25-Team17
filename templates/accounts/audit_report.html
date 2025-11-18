@@ -11,6 +11,9 @@
         <option value="point_changes" {% if category == "point_changes" %}selected{% endif %}>Point changes</option>
         <option value="password_changes" {% if category == "password_changes" %}selected{% endif %}>Password changes</option>
         <option value="driver_applications" {% if category == "driver_applications" %}selected{% endif %}>Driver applications</option>
+        {% if is_admin %}
+        <option value="impersonations" {% if category == "impersonations" %}selected{% endif %}>Impersonations</option>
+        {% endif %}
       </select>
     </div>
 

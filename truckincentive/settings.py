@@ -86,19 +86,7 @@ TEMPLATES = [{
 WSGI_APPLICATION = "truckincentive.wsgi.application"
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "your_db_name"),
-        "USER": os.getenv("MYSQL_USER", "your_db_user"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", "your_db_password"),
-        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
-        "PORT": os.getenv("MYSQL_PORT", "3306"),
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "use_unicode": True,
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
-    }
+
 }
 
 PASSWORD_HASHERS = [

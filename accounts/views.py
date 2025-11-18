@@ -307,6 +307,42 @@ def audit_report(request):
                 rec.reason or "",
             ])
 
+    elif category == "impersonations":
+        from .models import ImpersonationLog
+        qs = ImpersonationLog.objects.filter(started_at__range=(start_dt, end_dt))
+
+        # Admin users can see all impersonations, sponsors see none (admin-only feature)
+        if not is_admin:
+            qs = qs.none()
+
+        # User ID filter (can filter by admin or impersonated user)
+        if user_id:
+            qs = qs.filter(Q(admin_user_id=user_id) | Q(impersonated_user_id=user_id))
+
+        qs = qs.select_related("admin_user", "impersonated_user").order_by("-started_at")
+        columns = ["Date", "Admin", "Impersonated User", "Duration", "IP Address"]
+        for rec in qs:
+            duration_str = ""
+            if rec.duration_seconds is not None:
+                minutes, seconds = divmod(rec.duration_seconds, 60)
+                hours, minutes = divmod(minutes, 60)
+                if hours > 0:
+                    duration_str = f"{hours}h {minutes}m {seconds}s"
+                elif minutes > 0:
+                    duration_str = f"{minutes}m {seconds}s"
+                else:
+                    duration_str = f"{seconds}s"
+            else:
+                duration_str = "Active" if not rec.ended_at else "Unknown"
+            
+            rows.append([
+                timezone.localtime(rec.started_at).strftime("%Y-%m-%d %H:%M"),
+                rec.admin_user.username if rec.admin_user_id else "",
+                rec.impersonated_user.username if rec.impersonated_user_id else "",
+                duration_str,
+                rec.ip_address or "",
+            ])
+
     context = {
         "title": "Audit Report",
         "is_admin": is_admin,
@@ -2397,13 +2433,26 @@ def view_as_driver(request, user_id):
     impersonate_started = timezone.now().isoformat()
     
     # Log the impersonation action (for the admin user)
-    from .models import Notification
+    from .models import Notification, ImpersonationLog
     Notification.objects.create(
         user=request.user,
         kind="system",
         title="Impersonation Started",
         body=f"You are now viewing as {target_user.username} ({target_user.get_full_name() or 'No name'})",
         url=""
+    )
+    
+    # Create impersonation log entry
+    def get_client_ip(req):
+        x_forwarded_for = req.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            return x_forwarded_for.split(",")[0]
+        return req.META.get("REMOTE_ADDR", "")
+    
+    impersonation_log = ImpersonationLog.objects.create(
+        admin_user=request.user,
+        impersonated_user=target_user,
+        ip_address=get_client_ip(request)
     )
     
     # Switch to the target user
@@ -2414,6 +2463,7 @@ def view_as_driver(request, user_id):
     request.session['impersonate_id'] = original_admin_id
     request.session['impersonate_username'] = original_admin_username
     request.session['impersonate_started'] = impersonate_started
+    request.session['impersonation_log_id'] = impersonation_log.id
     
     messages.info(request, f"You are now viewing as {target_user.username}. Click 'Exit View As' to return to your admin account.")
     return redirect("accounts:profile")
@@ -2444,13 +2494,26 @@ def view_as_sponsor(request, user_id):
     impersonate_started = timezone.now().isoformat()
     
     # Log the impersonation action (for the admin user)
-    from .models import Notification
+    from .models import Notification, ImpersonationLog
     Notification.objects.create(
         user=request.user,
         kind="system",
         title="Sponsor Impersonation Started",
         body=f"You are now viewing as sponsor {target_user.username} ({target_user.get_full_name() or 'No name'})",
         url=""
+    )
+    
+    # Create impersonation log entry
+    def get_client_ip(req):
+        x_forwarded_for = req.META.get("HTTP_X_FORWARDED_FOR")
+        if x_forwarded_for:
+            return x_forwarded_for.split(",")[0]
+        return req.META.get("REMOTE_ADDR", "")
+    
+    impersonation_log = ImpersonationLog.objects.create(
+        admin_user=request.user,
+        impersonated_user=target_user,
+        ip_address=get_client_ip(request)
     )
     
     # Switch to the target user
@@ -2461,6 +2524,7 @@ def view_as_sponsor(request, user_id):
     request.session['impersonate_id'] = original_admin_id
     request.session['impersonate_username'] = original_admin_username
     request.session['impersonate_started'] = impersonate_started
+    request.session['impersonation_log_id'] = impersonation_log.id
     
     messages.info(request, f"You are now viewing as sponsor {target_user.username}. Click 'Exit View As' to return to your admin account.")
     
@@ -2485,11 +2549,23 @@ def stop_impersonation(request):
     
     # Log the impersonation end
     impersonate_started = request.session.get('impersonate_started')
+    impersonation_log_id = request.session.get('impersonation_log_id')
     duration = None
     if impersonate_started:
         from datetime import datetime
         start_time = datetime.fromisoformat(impersonate_started)
         duration = timezone.now() - start_time
+        
+        # Update impersonation log with end time and duration
+        if impersonation_log_id:
+            from .models import ImpersonationLog
+            try:
+                log_entry = ImpersonationLog.objects.get(id=impersonation_log_id)
+                log_entry.ended_at = timezone.now()
+                log_entry.duration_seconds = int(duration.total_seconds())
+                log_entry.save()
+            except ImpersonationLog.DoesNotExist:
+                pass
     
     # Get the original admin user
     User = get_user_model()
@@ -2505,6 +2581,8 @@ def stop_impersonation(request):
     del request.session['impersonate_username']
     if 'impersonate_started' in request.session:
         del request.session['impersonate_started']
+    if 'impersonation_log_id' in request.session:
+        del request.session['impersonation_log_id']
     
     # Log back in as original admin
     from django.contrib.auth import login
