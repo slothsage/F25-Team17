@@ -6,152 +6,119 @@
 {% block content %}
 <div class="container-fluid mt-4 mb-5">
   <!-- Header Section -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
-        <div>
-          <h1 class="h2 mb-2 fw-bold">User Management</h1>
-          <p class="text-muted mb-0">Search and manage drivers, sponsors, and admin users</p>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a class="btn btn-outline-secondary" href="{% url 'accounts:login_activity' %}">
-            <i class="fas fa-history me-1"></i> Login Activity
-          </a>
-          <a class="btn btn-outline-primary" href="{% url 'accounts:admin_active_sessions' %}">
-            <i class="fas fa-users me-1"></i> Active Sessions
-          </a>
-          <a class="btn btn-outline-warning" href="{% url 'accounts:archived_sponsors' %}">
-            <i class="fas fa-archive me-1"></i> Archived Sponsors
-          </a>
-          <a class="btn btn-success" href="{% url 'accounts:bulk_upload_users' %}">
-            <i class="fas fa-upload me-1"></i> Bulk Upload
-          </a>
-          <a class="btn btn-info" href="{% url 'accounts:bulk_assign_sponsorship' %}">
-            <i class="fas fa-user-plus me-1"></i> Bulk Assign
-          </a>
-          <form method="get" action="{% url 'accounts:download_error_log' %}" class="d-inline">
-            <div class="input-group">
-              <input type="date" name="date" class="form-control" style="max-width: 160px;">
-              <button class="btn btn-danger" type="submit">
-                <i class="fas fa-download me-1"></i> Logs
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+  <div class="header-section mb-4">
+    <h1 class="page-title">User Management</h1>
+    <div class="action-bar">
+      <a href="{% url 'accounts:login_activity' %}">Login Activity</a>
+      <a href="{% url 'accounts:admin_active_sessions' %}">Active Sessions</a>
+      <a href="{% url 'accounts:archived_sponsors' %}">Archived Sponsors</a>
+      <a href="{% url 'accounts:bulk_upload_users' %}">Bulk Upload</a>
+      <a href="{% url 'accounts:bulk_assign_sponsorship' %}">Bulk Assign</a>
+      <form method="get" action="{% url 'accounts:download_error_log' %}">
+        <input type="date" name="date" placeholder="Select date">
+        <button type="submit">Logs</button>
+      </form>
     </div>
   </div>
 
   <!-- Label Management Bar -->
-  <div class="card shadow-sm mb-4 border-0">
-    <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div class="d-flex align-items-center gap-3">
-          <label for="label-filter" class="mb-0 fw-semibold">Filter by Label:</label>
-          <form method="get" class="d-flex align-items-center gap-2">
-            <select id="label-filter" name="label" class="form-select" style="width: 200px;" onchange="this.form.submit()">
-              <option value="">-- All Labels --</option>
-              {% for label in labels %}
-                <option value="{{ label.name }}" {% if label.name == selected_label %}selected{% endif %}>
-                  {{ label.name }}
-                </option>
-              {% endfor %}
-            </select>
-            {% if selected_label %}
-              <a href="?" class="btn btn-outline-danger btn-sm">
-                <i class="fas fa-times me-1"></i> Clear
-              </a>
-            {% endif %}
-          </form>
-        </div>
-        <div class="d-flex gap-2">
-          <a href="{% url 'accounts:manage_labels' %}" class="btn btn-outline-primary">
-            <i class="fas fa-tags me-1"></i> Manage Labels
-          </a>
-          <a href="{% url 'accounts:assign_labels' %}" class="btn btn-outline-success">
-            <i class="fas fa-tag me-1"></i> Assign Labels
-          </a>
-        </div>
-      </div>
+  <div class="label-section mb-4">
+    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+      <span style="font-weight: 500; color: #333;">Filter by Label:</span>
+      <form method="get" style="margin: 0;">
+        <select name="label" onchange="this.form.submit()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+          <option value="">-- All Labels --</option>
+          {% for label in labels %}
+            <option value="{{ label.name }}" {% if label.name == selected_label %}selected{% endif %}>
+              {{ label.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+      {% if selected_label %}
+        <a href="?" style="padding: 8px 16px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333;">Clear</a>
+      {% endif %}
+      <a href="{% url 'accounts:manage_labels' %}" style="padding: 8px 16px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333;">Manage Labels</a>
+      <a href="{% url 'accounts:assign_labels' %}" style="padding: 8px 16px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333;">Assign Labels</a>
     </div>
   </div>
 
   <!-- Search Cards -->
-  <div class="row g-4 mb-4">
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-primary text-white py-3">
-          <h6 class="mb-0 fw-semibold">
-            <i class="fas fa-user me-2"></i>Driver Search
-          </h6>
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+      <h5 class="mb-0 fw-bold">
+        <i class="fas fa-search me-2 text-primary"></i>Search Users
+      </h5>
+    </div>
+    <div class="card-body">
+      <div class="search-grid">
+        <!-- Driver Search -->
+        <div class="search-column">
+          <div class="search-section">
+            <h6 class="search-title text-primary mb-3">
+              <i class="fas fa-user me-2"></i>Driver Search
+            </h6>
+            <form method="get">
+              <div class="autocomplete mb-3" data-limit="6" data-endpoint="{% url 'accounts:api_driver_suggest' %}">
+                <input
+                  name="q"
+                  value="{{ q }}"
+                  class="form-control ac-input"
+                  placeholder="username, email, phone, id:123"
+                  autocomplete="off"
+                />
+                <div class="ac-panel" role="listbox" hidden></div>
+              </div>
+              <button class="btn btn-primary w-100" type="submit">
+                <i class="fas fa-search me-2"></i>Search Drivers
+              </button>
+            </form>
+          </div>
         </div>
-        <div class="card-body">
-          <form method="get">
-            <div class="autocomplete mb-3" data-limit="6" data-endpoint="{% url 'accounts:api_driver_suggest' %}">
+
+        <!-- Sponsor Search -->
+        <div class="search-column">
+          <div class="search-section">
+            <h6 class="search-title text-success mb-3">
+              <i class="fas fa-handshake me-2"></i>Sponsor Search
+            </h6>
+            <form method="get">
+              <div class="autocomplete mb-3" data-limit="6" data-endpoint="{% url 'accounts:api_sponsor_suggest' %}">
+                <input
+                  name="sponsor"
+                  value="{{ sponsor_q }}"
+                  class="form-control ac-input"
+                  placeholder="sponsor name, email"
+                  autocomplete="off"
+                />
+                <div class="ac-panel" role="listbox" hidden></div>
+              </div>
+              <button class="btn btn-success w-100" type="submit">
+                <i class="fas fa-search me-2"></i>Search Sponsors
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Admin Search -->
+        <div class="search-column">
+          <div class="search-section">
+            <h6 class="search-title text-info mb-3">
+              <i class="fas fa-user-shield me-2"></i>Admin Search
+            </h6>
+            <form method="get">
               <input
-                name="q"
-                value="{{ q }}"
-                class="form-control ac-input"
-                placeholder="username, email, phone, id:123"
+                name="admin"
+                value="{{ admin_q }}"
+                class="form-control mb-3"
+                placeholder="username, email, name"
                 autocomplete="off"
               />
-              <div class="ac-panel" role="listbox" hidden></div>
-            </div>
-            <button class="btn btn-primary w-100" type="submit">
-              <i class="fas fa-search me-2"></i>Search Drivers
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-success text-white py-3">
-          <h6 class="mb-0 fw-semibold">
-            <i class="fas fa-handshake me-2"></i>Sponsor Search
-          </h6>
-        </div>
-        <div class="card-body">
-          <form method="get">
-            <div class="autocomplete mb-3" data-limit="6" data-endpoint="{% url 'accounts:api_sponsor_suggest' %}">
-              <input
-                name="sponsor"
-                value="{{ sponsor_q }}"
-                class="form-control ac-input"
-                placeholder="sponsor name, email"
-                autocomplete="off"
-              />
-              <div class="ac-panel" role="listbox" hidden></div>
-            </div>
-            <button class="btn btn-success w-100" type="submit">
-              <i class="fas fa-search me-2"></i>Search Sponsors
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-4">
-      <div class="card shadow-sm border-0 h-100">
-        <div class="card-header bg-info text-white py-3">
-          <h6 class="mb-0 fw-semibold">
-            <i class="fas fa-user-shield me-2"></i>Admin Search
-          </h6>
-        </div>
-        <div class="card-body">
-          <form method="get">
-            <input
-              name="admin"
-              value="{{ admin_q }}"
-              class="form-control mb-3"
-              placeholder="username, email, name"
-              autocomplete="off"
-            />
-            <button class="btn btn-info w-100" type="submit">
-              <i class="fas fa-search me-2"></i>Search Admins
-            </button>
-          </form>
+              <button class="btn btn-info w-100" type="submit">
+                <i class="fas fa-search me-2"></i>Search Admins
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -205,7 +172,7 @@
     </div>
     <div id="drivers-section">
     <div class="card-body p-0">
-      <div class="table-responsive">
+      <div class="scrollable-table-container">
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light">
             <tr>
@@ -391,7 +358,7 @@
     </div>
     <div id="sponsors-section">
     <div class="card-body p-0">
-      <div class="table-responsive">
+      <div class="scrollable-table-container">
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light">
             <tr>
@@ -609,7 +576,7 @@
     </div>
     <div id="failed-logins-section">
     <div class="card-body p-0">
-      <div class="table-responsive">
+      <div class="scrollable-table-container">
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light">
             <tr>
@@ -837,6 +804,254 @@ document.addEventListener('DOMContentLoaded', function() {
 #legacy-sponsors-section,
 #failed-logins-section {
   transition: opacity 0.2s ease;
+}
+
+/* Scrollable table containers - show max 10 rows */
+.scrollable-table-container {
+  max-height: 600px; /* Approximately 10 rows */
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.scrollable-table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Make table header sticky when scrolling */
+.scrollable-table-container thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Simple Header Styling */
+.header-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.action-bar {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.action-bar a,
+.action-bar button {
+  padding: 0.5rem 1rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  color: #495057;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-bar a:hover,
+.action-bar button:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.action-bar form {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.action-bar input[type="date"] {
+  padding: 0.5rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+/* Label Section Styling */
+.label-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.label-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.label-filter-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.label-filter-group form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.label-filter-group select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #495057;
+  font-size: 0.875rem;
+  min-width: 200px;
+  cursor: pointer;
+}
+
+.label-filter-group select:focus {
+  outline: none;
+  border-color: #adb5bd;
+  background: white;
+}
+
+.label-filter-group .clear-btn {
+  padding: 0.5rem 1rem;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.label-filter-group .clear-btn:hover {
+  background: #bb2d3b;
+}
+
+.label-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.label-actions a {
+  padding: 0.5rem 1rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  color: #495057;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.label-actions a:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+/* Search section styling */
+.search-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.search-column {
+  min-width: 0; /* Prevent overflow */
+  display: flex;
+  flex-direction: column;
+}
+
+.search-section {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  background-color: #f8f9fa;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.search-title {
+  font-weight: 600;
+  font-size: 1rem;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #dee2e6;
+  height: 40px; /* Fixed height for alignment */
+  display: flex;
+  align-items: center;
+}
+
+.search-section form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.search-section .form-control,
+.search-section .ac-input {
+  height: 42px;
+  border: 2px solid #dee2e6;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+.search-section .autocomplete {
+  margin-bottom: 1rem;
+}
+
+.search-section .btn {
+  height: 42px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-top: auto; /* Push button to bottom */
+}
+
+/* Responsive: stack on smaller screens */
+@media (max-width: 991px) {
+  .search-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 {% endblock content %}

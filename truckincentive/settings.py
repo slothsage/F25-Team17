@@ -79,28 +79,15 @@ TEMPLATES = [{
         "accounts.context_processors.user_session_timeout",
         "accounts.context_processors.unread_counts",
         "accounts.context_processors.impersonation_status",
-        "accounts.context_processors.role_flags",
     ]},
 }]
 
 WSGI_APPLICATION = "truckincentive.wsgi.application"
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "your_db_name"),
-        "USER": os.getenv("MYSQL_USER", "your_db_user"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", "your_db_password"),
-        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
-        "PORT": os.getenv("MYSQL_PORT", "3306"),
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "use_unicode": True,
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
-    }
-}
 
+}
+ 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
@@ -129,20 +116,9 @@ LANGUAGES = [
     ('fr', 'Français'),
 ]
 
-# Email settings
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")          # e.g., team17.cpsc4910@gmail.com
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")  # 16-char Gmail App Password
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@demo.local")
-SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
-
 # Static files
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Media files
 MEDIA_URL = "/media/"
@@ -158,10 +134,14 @@ LOGOUT_REDIRECT_URL = "accounts:login"       # after logout
 SESSION_COOKIE_AGE = 5 * 60   # 5 minutes in seconds
 SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 
-EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "JacobRob-F25Team1-SBX-2df8ae938-510a37dd")
-EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "SBX-df8ae938df8a-57b0-43e2-a63b-f447")
-EBAY_SANDBOX = os.getenv("EBAY_SANDBOX", "True").lower() == "true"
-EBAY_MARKETPLACE = os.getenv("EBAY_MARKETPLACE", "EBAY_US")
+# Email prints to console for password reset demo
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "no-reply@demo.local"
+
+
+EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'
+EBAY_CLIENT_SECRET = 'SBX-df8ae938df8a-57b0-43e2-a63b-f447'
+EBAY_SANDBOX = True  # Set to False for production
 
 CACHES = {
     'default': {
@@ -169,5 +149,3 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
-
-REPORT_FEE_PER_DRIVER = 5.00  # Fee in dollars for each driver report generated
