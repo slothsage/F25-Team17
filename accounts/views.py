@@ -3192,28 +3192,73 @@ def deny_sponsorship(request, request_id):
 @login_required
 @require_POST
 def end_sponsorship(request, request_id):
-    """Allow either driver or sponsor to end a sponsorship relationship."""
-    sponsorship = get_object_or_404(SponsorshipRequest, id=request_id, status="approved")
+    """Allow either driver or sponsor to end a sponsorship relationship.
+
+    When a sponsorship is ended, the driver loses the points associated
+    with that specific sponsor, but keeps points from other sponsors.
+    """
+    sponsorship = get_object_or_404(
+        SponsorshipRequest,
+        id=request_id,
+        status="approved",
+    )
 
     # Only involved users can end the sponsorship
     if request.user not in [sponsorship.from_user, sponsorship.to_user]:
         messages.error(request, "You are not authorized to modify this sponsorship.")
         return redirect("accounts:sponsorship_center")
 
-    # Remove relationship in driver profile
-    driver = (
-        sponsorship.from_user.driver_profile
-        if hasattr(sponsorship.from_user, "driver_profile")
-        else sponsorship.to_user.driver_profile
-    )
-    sponsor = sponsorship.from_user if sponsorship.from_user.groups.filter(name="sponsor").exists() else sponsorship.to_user
+    # Work out which side is driver vs sponsor (users, not profiles)
+    if hasattr(sponsorship.from_user, "driver_profile"):
+        driver_user = sponsorship.from_user
+        sponsor_user = sponsorship.to_user
+    else:
+        driver_user = sponsorship.to_user
+        sponsor_user = sponsorship.from_user
 
-    driver.sponsors.remove(sponsor)
+    driver_profile = driver_user.driver_profile
 
-    # Optionally mark request as ended or delete
+    # Remove sponsor from driver's profile M2M
+    driver_profile.sponsors.remove(sponsor_user)
+
+    # ---- Remove this sponsor's points from the driver ----
+    # Only touch this one sponsor-driver pair; other sponsors stay intact.
+    with transaction.atomic():
+        wallets = (
+            SponsorPointsAccount.objects
+            .select_for_update()
+            .filter(driver=driver_user, sponsor=sponsor_user)
+        )
+
+        for wallet in wallets:
+            if wallet.balance > 0:
+                reason = (
+                    "Sponsorship ended; points from this sponsor have been removed."
+                )
+                try:
+                    # Negative delta equal to current balance → wallet goes to 0
+                    wallet.apply_points(
+                        -wallet.balance,
+                        reason=reason,
+                        created_by=request.user,
+                    )
+                except Exception as e:
+                    # Log but don't break the user flow
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "Failed to zero sponsor wallet on end_sponsorship: %s",
+                        e,
+                        exc_info=True,
+                    )
+    
     sponsorship.delete()
 
-    messages.success(request, f"Sponsorship between {sponsorship.from_user.username} and {sponsorship.to_user.username} has ended.")
+    messages.success(
+        request,
+        f"Sponsorship between {sponsor_user.username} and "
+        f"{driver_user.username} has ended and points for this sponsor were removed.",
+    )
     return redirect("accounts:sponsorship_center")
 
 
@@ -3296,9 +3341,10 @@ def sponsorship_center(request):
         # Current sponsored drivers (approved relationships)
         current_relationships = (
             SponsorshipRequest.objects.filter(
-                from_user=user, status="approved"
+                status="approved"
             )
-            .select_related("to_user")
+            .filter(Q(from_user=user) | Q(to_user=user))
+            .select_related("from_user", "to_user")
             .distinct()
         )
 
