@@ -1086,14 +1086,17 @@ def sponsor_driver_search(request):
 
     drivers_qs = (
         User.objects.filter(driver_profile__isnull=False, is_staff=False)
-        .exclude(groups__name="sponsor")
         .filter(
-            Q(driver_profile__sponsors=sponsor) |
-            Q(driver_profile__sponsor_name=sponsor.username)
+            # sponsor -> driver (sponsor sent the request)
+            Q(received_sponsorship_requests__from_user=sponsor,
+                received_sponsorship_requests__status="approved")
+            |
+            # driver -> sponsor (driver sent the request)
+            Q(sent_sponsorship_requests__to_user=sponsor,
+                sent_sponsorship_requests__status="approved")
         )
         .distinct()
     )
-
     if q:
         id_query = None
         if q.lower().startswith("id:"):
@@ -1103,21 +1106,18 @@ def sponsor_driver_search(request):
         elif q.isdigit():
             id_query = int(q)
 
+        filters = (
+            Q(username__icontains=q)
+            | Q(email__icontains=q)
+            | Q(driver_profile__first_name__icontains=q)
+            | Q(driver_profile__last_name__icontains=q)
+            | Q(driver_profile__phone__icontains=q)
+            | Q(driver_profile__address__icontains=q)
+        )
         if id_query is not None:
-            drivers_qs = drivers_qs.filter(
-                Q(pk=id_query) |
-                Q(username__icontains=q) |
-                Q(email__icontains=q) |
-                Q(driver_profile__phone__icontains=q) |
-                Q(driver_profile__address__icontains=q)
-            )
-        else:
-            drivers_qs = drivers_qs.filter(
-                Q(username__icontains=q) |
-                Q(email__icontains=q) |
-                Q(driver_profile__phone__icontains=q) |
-                Q(driver_profile__address__icontains=q)
-            )
+            filters |= Q(pk=id_query)
+        
+        drivers_qs = drivers_qs.filter(filters)
 
     # annotate balance from THIS sponsor's wallet
     wallet_subq = SponsorPointsAccount.objects.filter(
