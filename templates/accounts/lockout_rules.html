@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Account Lockout Rules{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+          <h3 class="mb-0">
+            <i class="fas fa-lock me-2"></i>Account Lockout Rules
+          </h3>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-4">
+            Configure automatic account lockout rules to protect against brute-force login attempts.
+          </p>
+
+          <form method="post">
+            {% csrf_token %}
+
+            <!-- Enable/Disable Lockout Policy -->
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                <input 
+                  class="form-check-input" 
+                  type="checkbox" 
+                  id="enabled" 
+                  name="enabled"
+                  {% if policy.enabled %}checked{% endif %}>
+                <label class="form-check-label fw-bold" for="enabled">
+                  Enable Account Lockout Policy
+                </label>
+                <div class="form-text">
+                  When enabled, accounts will be temporarily locked after too many failed login attempts.
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-4">
+
+            <!-- Max Failed Attempts -->
+            <div class="mb-4">
+              <label for="max_failed_attempts" class="form-label fw-bold">
+                Maximum Failed Login Attempts
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="max_failed_attempts" 
+                name="max_failed_attempts"
+                value="{{ policy.max_failed_attempts }}"
+                min="1"
+                max="20"
+                required>
+              <div class="form-text">
+                Number of failed login attempts allowed before the account is locked.
+                <br>Recommended: 3-5 attempts
+              </div>
+            </div>
+
+            <!-- Lockout Duration -->
+            <div class="mb-4">
+              <label for="lockout_duration_minutes" class="form-label fw-bold">
+                Lockout Duration (minutes)
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="lockout_duration_minutes" 
+                name="lockout_duration_minutes"
+                value="{{ policy.lockout_duration_minutes }}"
+                min="1"
+                max="1440"
+                required>
+              <div class="form-text">
+                How long (in minutes) the account remains locked after reaching max attempts.
+                <br>Recommended: 15-60 minutes (1440 = 24 hours)
+              </div>
+            </div>
+
+            <!-- Reset Counter Duration -->
+            <div class="mb-4">
+              <label for="reset_attempts_after_minutes" class="form-label fw-bold">
+                Reset Failed Attempts Counter (minutes)
+              </label>
+              <input 
+                type="number" 
+                class="form-control" 
+                id="reset_attempts_after_minutes" 
+                name="reset_attempts_after_minutes"
+                value="{{ policy.reset_attempts_after_minutes }}"
+                min="1"
+                max="1440"
+                required>
+              <div class="form-text">
+                Failed attempt counter resets after this many minutes of no failed attempts.
+                <br>Recommended: 30-120 minutes
+              </div>
+            </div>
+
+            <!-- Current Settings Summary -->
+            <div class="alert alert-info">
+              <h5 class="alert-heading">
+                <i class="fas fa-info-circle me-2"></i>Current Settings Summary
+              </h5>
+              <ul class="mb-0">
+                <li>
+                  Policy Status: 
+                  <strong>{% if policy.enabled %}Enabled ✓{% else %}Disabled ✗{% endif %}</strong>
+                </li>
+                <li>
+                  Lock account after <strong>{{ policy.max_failed_attempts }}</strong> failed attempts
+                </li>
+                <li>
+                  Keep locked for <strong>{{ policy.lockout_duration_minutes }}</strong> minutes
+                </li>
+                <li>
+                  Reset counter after <strong>{{ policy.reset_attempts_after_minutes }}</strong> minutes of inactivity
+                </li>
+              </ul>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2 justify-content-end">
+              <a href="{% url 'accounts:admin_user_search' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to User Management
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+        <div class="card-footer text-muted">
+          <small>
+            <i class="fas fa-clock me-1"></i>
+            Last updated: {{ policy.updated_at|date:"Y-m-d H:i" }}
+          </small>
+        </div>
+      </div>
+
+      <!-- Additional Information -->
+      <div class="card shadow mt-4">
+        <div class="card-header bg-light">
+          <h5 class="mb-0">
+            <i class="fas fa-question-circle me-2"></i>How It Works
+          </h5>
+        </div>
+        <div class="card-body">
+          <ol class="mb-0">
+            <li class="mb-2">
+              User attempts to log in with incorrect credentials.
+            </li>
+            <li class="mb-2">
+              System tracks failed attempts by username and IP address.
+            </li>
+            <li class="mb-2">
+              After reaching <strong>{{ policy.max_failed_attempts }}</strong> failed attempts, 
+              the account is locked for <strong>{{ policy.lockout_duration_minutes }}</strong> minutes.
+            </li>
+            <li class="mb-2">
+              During lockout, the user cannot attempt to log in (even with correct password).
+            </li>
+            <li class="mb-2">
+              After the lockout period expires, the user can try logging in again.
+            </li>
+            <li>
+              If there are no failed attempts for <strong>{{ policy.reset_attempts_after_minutes }}</strong> minutes, 
+              the failed attempt counter resets to zero.
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+  
+  .card {
+    border-radius: 8px;
+  }
+  
+  .card-header {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+  }
+</style>
+{% endblock %}

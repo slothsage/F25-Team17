@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from .models import DriverProfile, CustomLabel, SponsorProfile
 from .models import FailedLoginAttempt
-from .models import PasswordPolicy
+from .models import PasswordPolicy, LockoutPolicy
 from .models import ChatRoom, ChatMessage, MessageReadStatus
 from .models import SponsorPointsAccount, SponsorPointsTransaction
 from .models import BulkUploadLog
@@ -27,6 +27,24 @@ class PasswordPolicyAdmin(admin.ModelAdmin):
         "expiry_days",
         "updated_at",
     )
+
+@admin.register(LockoutPolicy)
+class LockoutPolicyAdmin(admin.ModelAdmin):
+    list_display = (
+        "max_failed_attempts",
+        "lockout_duration_minutes",
+        "reset_attempts_after_minutes",
+        "enabled",
+        "updated_at",
+    )
+    
+    def has_add_permission(self, request):
+        # Only allow one policy (singleton)
+        return not LockoutPolicy.objects.exists()
+    
+    def has_delete_permission(self, request, obj=None):
+        # Prevent deletion of the policy
+        return False
 
 
 # Get the user model Django is using (usually auth.User)

@@ -27,7 +27,7 @@ from django.utils.timezone import localtime
 from urllib3 import request
 
 from .forms import RegistrationForm  
-from .models import PasswordPolicy
+from .models import PasswordPolicy, LockoutPolicy
 from .models import DriverProfile, SponsorProfile
 from .models import ChatRoom, ChatMessage, MessageReadStatus
 from .models import Notification
@@ -581,6 +581,29 @@ def edit_policy(request):
         messages.success(request, "Password policy updated.")
         return redirect("accounts:edit_policy")
     return render(request, "accounts/policy_form.html", {"policy": policy})
+
+
+@staff_member_required
+def lockout_rules(request):
+    """Configure account lockout policy settings."""
+    from .models import LockoutPolicy
+    
+    policy = LockoutPolicy.get_policy()
+    
+    if request.method == "POST":
+        try:
+            policy.max_failed_attempts = int(request.POST.get("max_failed_attempts", 5))
+            policy.lockout_duration_minutes = int(request.POST.get("lockout_duration_minutes", 30))
+            policy.reset_attempts_after_minutes = int(request.POST.get("reset_attempts_after_minutes", 60))
+            policy.enabled = request.POST.get("enabled") == "on"
+            policy.save()
+            
+            messages.success(request, "Lockout policy updated successfully.")
+            return redirect("accounts:lockout_rules")
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Invalid input: {e}")
+    
+    return render(request, "accounts/lockout_rules.html", {"policy": policy})
 
 
 @staff_member_required
@@ -1212,10 +1235,91 @@ from django.contrib.auth.views import LoginView
 class FrontLoginView(LoginView):
     template_name = "registration/login.html"
 
+    def get(self, request, *args, **kwargs):
+        """Check if user is locked out before showing login form."""
+        username = request.GET.get('username', '')
+        if username and self.is_locked_out(username):
+            messages.error(request, "This account is temporarily locked due to too many failed login attempts. Please try again later.")
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        """Check lockout before processing login attempt."""
+        username = request.POST.get('username', '')
+        
+        # Check if user is locked out
+        if self.is_locked_out(username):
+            messages.error(request, "This account is temporarily locked due to too many failed login attempts. Please try again later.")
+            return self.form_invalid(self.get_form())
+        
+        return super().post(request, *args, **kwargs)
+
+    def is_locked_out(self, username):
+        """Check if the user is currently locked out based on LockoutPolicy."""
+        if not username:
+            return False
+            
+        policy = LockoutPolicy.get_policy()
+        
+        # If policy is disabled, no lockout
+        if not policy.enabled:
+            return False
+        
+        ip_address = self.get_client_ip()
+        now = timezone.now()
+        
+        # Get recent failed attempts (within reset window)
+        reset_window = now - timedelta(minutes=policy.reset_attempts_after_minutes)
+        recent_attempts = FailedLoginAttempt.objects.filter(
+            username=username,
+            ip_address=ip_address,
+            timestamp__gte=reset_window
+        ).order_by('-timestamp')
+        
+        attempt_count = recent_attempts.count()
+        
+        # If they've reached max attempts, check if lockout period has passed
+        if attempt_count >= policy.max_failed_attempts:
+            # Get the attempt that triggered the lockout (the Nth attempt)
+            lockout_trigger = recent_attempts[policy.max_failed_attempts - 1]
+            lockout_until = lockout_trigger.timestamp + timedelta(minutes=policy.lockout_duration_minutes)
+            
+            # Still locked out?
+            if now < lockout_until:
+                return True
+        
+        return False
+
     def form_invalid(self, form):
         username = self.request.POST.get("username", "")
         ip_address = self.get_client_ip()
+        
+        # Record the failed attempt
         FailedLoginAttempt.objects.create(username=username, ip_address=ip_address)
+        
+        # Check if this attempt triggers a lockout
+        policy = LockoutPolicy.get_policy()
+        if policy.enabled:
+            reset_window = timezone.now() - timedelta(minutes=policy.reset_attempts_after_minutes)
+            attempt_count = FailedLoginAttempt.objects.filter(
+                username=username,
+                ip_address=ip_address,
+                timestamp__gte=reset_window
+            ).count()
+            
+            if attempt_count >= policy.max_failed_attempts:
+                remaining_attempts = 0
+                messages.error(
+                    self.request,
+                    f"Account locked due to too many failed attempts. Please try again in {policy.lockout_duration_minutes} minutes."
+                )
+            else:
+                remaining_attempts = policy.max_failed_attempts - attempt_count
+                if remaining_attempts <= 2:  # Warn when getting close
+                    messages.warning(
+                        self.request,
+                        f"Invalid credentials. {remaining_attempts} attempt(s) remaining before lockout."
+                    )
+        
         return super().form_invalid(form)
 
     def get_client_ip(self):
@@ -1229,6 +1333,15 @@ class FrontLoginView(LoginView):
         # Exception: If TOTP MFA is enabled, we intercept here to require TOTP verification
         # Then override the redirect to be role-aware
         user = form.get_user()
+        
+        # Clear failed login attempts on successful login
+        username = self.request.POST.get("username", "")
+        ip_address = self.get_client_ip()
+        if username:
+            FailedLoginAttempt.objects.filter(
+                username=username,
+                ip_address=ip_address
+            ).delete()
 
         #pull or create MFA record for this user
         from .models import UserMFA
