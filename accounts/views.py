@@ -3227,3 +3227,37 @@ def bulk_assign_sponsorship(request):
         "sponsors": sponsors,
         "drivers": drivers,
     })
+
+
+@login_required
+def admin_manage_driver_sponsors(request, user_id):
+    admin = request.user
+    if not admin.is_staff:
+        return redirect("accounts:profile")
+
+    driver = get_object_or_404(User, id=user_id)
+    if not hasattr(driver, "driver_profile"):
+        messages.error(request, "Selected user is not a driver.")
+        return redirect("accounts:admin_user_search")
+
+    sponsor_users = User.objects.filter(groups__name="sponsor", is_active=True)
+
+    if request.method == "POST":
+        new_sponsor_ids = request.POST.getlist("sponsors")
+        driver.driver_profile.sponsors.set(new_sponsor_ids)
+        driver.driver_profile.save()
+
+        messages.success(request, "Sponsors updated successfully.")
+        return redirect("accounts:admin_user_search")
+
+    current_sponsors = driver.driver_profile.sponsors.all()
+
+    return render(
+        request,
+        "accounts/admin_manage_driver_sponsors.html",
+        {
+            "driver": driver,
+            "all_sponsors": sponsor_users,
+            "current_sponsors": current_sponsors,
+        },
+    )

@@ -252,11 +252,15 @@
                 {% endfor %}
               </td>
               <td>
-                {% if u.driver_profile.sponsor_name %}
-                  <span class="badge bg-info">{{ u.driver_profile.sponsor_name }}</span>
-                {% else %}
-                  <span class="text-muted small">No Sponsor</span>
-                {% endif %}
+                  {% if u.driver_profile.sponsors.all %}
+                      {% for s in u.driver_profile.sponsors.all %}
+                          <span class="badge info" style="margin-right:4px;">
+                              {{ s.username }}
+                          </span>
+                      {% endfor %}
+                  {% else %}
+                      <span class="muted">No Sponsors</span>
+                  {% endif %}
               </td>
               <td class="small">
                 {% if u.last_login %}
@@ -281,7 +285,7 @@
                       </form>
                     </li>
                     <li><a class="dropdown-item" href="{% url 'accounts:admin_profile_edit' u.id %}"><i class="fas fa-edit me-2"></i>Edit Profile</a></li>
-                    <li><a class="dropdown-item" href="{% url 'accounts:transfer_driver_sponsor' u.id %}"><i class="fas fa-exchange-alt me-2"></i>Transfer Sponsor</a></li>
+                    <li><a class="dropdown-item" href="{% url 'accounts:admin_manage_driver_sponsors' u.id %}"><i class="fas fa-users-cog me-2"></i>Manage Sponsors</a></li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                       <form method="post" action="{% url 'accounts:toggle_user_active' u.id %}" class="d-inline">

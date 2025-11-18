@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+<div class="container-main">
+
+    <header class="toolbar">
+        <div class="toolbar-left">
+            <h1 class="page-title">Manage Sponsors for {{ driver.username }}</h1>
+            <p class="page-subtitle">Add or remove multiple sponsors for this driver.</p>
+        </div>
+    </header>
+
+    <form method="post" class="card mt-md">
+        {% csrf_token %}
+        <div class="card-body">
+
+            <label class="fw-bold mb-sm">Select Sponsors</label>
+
+            <div class="d-flex gap-2 mb-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="select-all-sponsors">
+                    Select All
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="clear-all-sponsors">
+                    Clear All
+                </button>
+            </div>
+
+            <select name="sponsors"
+                    id="sponsors"
+                    multiple
+                    class="form-select"
+                    style="width: 400px; display:block;">
+                {% for sponsor in all_sponsors %}
+                    <option value="{{ sponsor.id }}"
+                        {% if sponsor in current_sponsors %}selected{% endif %}>
+                        {{ sponsor.username }} ({{ sponsor.email }})
+                    </option>
+                {% endfor %}
+            </select>
+
+            <div class="mt-md">
+                <button class="btn btn-primary">Save Changes</button>
+                <a class="btn btn-muted" href="{% url 'accounts:admin_user_search' %}">Back</a>
+            </div>
+
+        </div>
+    </form>
+
+</div>
+
+<!-- Load the multi-select checkbox JS -->
+<script src="{% static 'accounts/checkbox-multiselect.js' %}"></script>
+
+{% endblock %}

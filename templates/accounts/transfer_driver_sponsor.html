@@ -1,40 +1,82 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container-main">
-  <h1>Transfer Driver Sponsor</h1>
-  <p><strong>Driver:</strong> {{ driver.username }} ({{ driver.email }})</p>
-  <p><strong>Current Sponsor:</strong> {{ profile.sponsor_name|default:"None" }}</p>
 
-  <form method="post" class="stack gap-md">
+<div class="container-main">
+  <h1>Manage Sponsors for Driver</h1>
+
+  <p><strong>Driver:</strong> {{ driver.username }} ({{ driver.email }})</p>
+
+  <!-- Current Sponsors -->
+  <div class="card mt-md">
+    <div class="card-body">
+      <h3 class="card-title">Current Sponsors</h3>
+
+      {% if current_sponsors %}
+        <ul>
+          {% for s in current_sponsors %}
+            <li>{{ s.username }} ({{ s.email }})</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No sponsors assigned.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Multi-select Sponsor Management -->
+  <form method="post" class="stack gap-md mt-lg">
     {% csrf_token %}
-    <label for="sponsor_name">New Sponsor:</label>
-    <select name="sponsor_name" id="sponsor_name" class="input" required>
-      <option value="">-- Select Sponsor --</option>
+
+    <label for="sponsors">Select Sponsors (hold CTRL or CMD to choose multiple):</label>
+    <select 
+        name="sponsors" 
+        id="sponsors"
+        class="input"
+        multiple
+        size="10"
+        style="width: 100%;"
+    >
       {% for s in sponsor_users %}
-        <option value="{{ s.username }}" data-email="{{ s.email }}">{{ s.username }}</option>
+        <option 
+            value="{{ s.id }}"
+            data-email="{{ s.email }}"
+            {% if s in current_sponsors %}selected{% endif %}
+        >
+          {{ s.username }} ({{ s.email }})
+        </option>
       {% endfor %}
     </select>
 
-    <label for="sponsor_email">Sponsor Email (auto-filled):</label>
-    <input type="email" name="sponsor_email" id="sponsor_email" class="input" placeholder="Select sponsor to auto-fill email">
+    <!-- Optional auto-filled email field (kept from old page) -->
+    <label for="sponsor_email">Selected Sponsor Email:</label>
+    <input 
+        type="email" 
+        name="sponsor_email" 
+        id="sponsor_email" 
+        class="input" 
+        placeholder="Shows email for last selected sponsor"
+    >
 
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const select = document.getElementById("sponsor_name");
-      const emailInput = document.getElementById("sponsor_email");
+      document.addEventListener("DOMContentLoaded", function() {
+        const select = document.getElementById("sponsors");
+        const emailInput = document.getElementById("sponsor_email");
 
-      select.addEventListener("change", function() {
-        const selectedOption = select.options[select.selectedIndex];
-        const sponsorEmail = selectedOption.getAttribute("data-email");
-        emailInput.value = sponsorEmail || "";
+        select.addEventListener("change", function() {
+          const lastSelected = Array.from(select.selectedOptions).pop();
+          if (lastSelected) {
+            emailInput.value = lastSelected.getAttribute("data-email") || "";
+          }
+        });
       });
-    });
     </script>
 
     <div class="row-actions mt-md">
-      <button class="btn btn-primary" type="submit">Transfer</button>
-      <a href="{% url 'admin_user_search' %}" class="btn btn-muted">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save Changes</button>
+      <a href="{% url 'accounts:admin_user_search' %}" class="btn btn-muted">Cancel</a>
     </div>
+
   </form>
 </div>
+
 {% endblock %}
