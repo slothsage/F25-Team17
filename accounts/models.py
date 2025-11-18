@@ -137,6 +137,39 @@ class PasswordPolicy(models.Model):
         verbose_name = "Password policy"
         verbose_name_plural = "Password policies"
 
+class LockoutPolicy(models.Model):
+    """Account lockout policy configuration."""
+    max_failed_attempts = models.PositiveIntegerField(
+        default=5,
+        help_text="Maximum number of failed login attempts before lockout"
+    )
+    lockout_duration_minutes = models.PositiveIntegerField(
+        default=30,
+        help_text="How long (in minutes) the account remains locked after max attempts"
+    )
+    reset_attempts_after_minutes = models.PositiveIntegerField(
+        default=60,
+        help_text="Reset failed attempt counter after this many minutes of inactivity"
+    )
+    enabled = models.BooleanField(
+        default=True,
+        help_text="Enable/disable account lockout policy"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Lockout Policy: {self.max_failed_attempts} attempts, {self.lockout_duration_minutes}min lockout"
+
+    class Meta:
+        verbose_name = "Lockout policy"
+        verbose_name_plural = "Lockout policies"
+
+    @classmethod
+    def get_policy(cls):
+        """Get the active lockout policy (singleton pattern)."""
+        policy, _ = cls.objects.get_or_create(pk=1)
+        return policy
+
 # --- Security Questions --- 
 class SecurityQuestion(models.Model):
     """Predefined set of security questions."""

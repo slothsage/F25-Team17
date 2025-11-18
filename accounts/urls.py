@@ -75,6 +75,7 @@ urlpatterns = [
 
     # Admin-only password policy page 
     path("policy/", views.edit_policy, name="edit_policy"),
+    path("admin/lockout-rules/", views.lockout_rules, name="lockout_rules"),
 
     # Admin: login activity audit
     path("admin/login-activity/", views.login_activity, name="login_activity"),
