@@ -1055,17 +1055,31 @@ def sponsor_driver_search(request):
 
         driver = get_object_or_404(User, id=driver_id)
 
-        # ensure the driver is under THIS sponsor (supports both M2M and legacy name field)
+        # --- sponsorship checks ---
         prof = getattr(driver, "driver_profile", None)
+
+        # new M2M relationship
         is_m2m = bool(prof and prof.sponsors.filter(id=sponsor.id).exists())
+
+        # legacy string-based sponsor linkage
         is_legacy = bool(prof and prof.sponsor_name == sponsor.username)
-        if not (is_m2m or is_legacy):
+
+        # approved SponsorshipRequest in either direction
+        has_request = SponsorshipRequest.objects.filter(
+            status="approved"
+        ).filter(
+            Q(from_user=sponsor, to_user=driver) |
+            Q(from_user=driver, to_user=sponsor)
+        ).exists()
+        
+        if not (is_m2m or is_legacy or has_request):
             messages.error(request, "This driver is not under your sponsorship.")
             return redirect("accounts:sponsor_driver_search")
-
-        # lock wallet row and create if missing
+        
         wallet, _ = SponsorPointsAccount.objects.select_for_update().get_or_create(
-            sponsor=sponsor, driver=driver, defaults={"balance": 0}
+            sponsor=sponsor,
+            driver=driver,
+            defaults={"balance": 0},
         )
 
         if delta < 0 and wallet.balance < abs(delta):
@@ -1216,7 +1230,7 @@ def sponsor_award_points(request):
             if delta < 0 and wallet.balance < abs(delta):
                 messages.error(request, "Insufficient points to deduct.")
             else:
-                wallet.apply_points(delta, reason=reason, created_by=request.user)
+                wallet.apply_points(delta, reason=reason, awarded_by=request.user)
                 if delta > 0:
                     messages.success(request, f"Awarded {amount} points to {driver.username}.")
                 else:
