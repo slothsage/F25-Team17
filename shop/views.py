@@ -746,8 +746,41 @@ def catalog_search(request):
 
     context["points_balance"] = get_driver_points_balance(request.user)
 
+    # Get driver's sponsors to prioritize their catalog items
+    driver_profile = getattr(request.user, "driver_profile", None)
+    driver_sponsors = set()
+    driver_sponsors_list = []
+    if driver_profile:
+        # Get sponsors from ManyToMany relationship
+        driver_sponsors.update(driver_profile.sponsors.all())
+        driver_sponsors_list = list(driver_profile.sponsors.all())
+        # Also check legacy sponsor_name field
+        if driver_profile.sponsor_name:
+            from django.contrib.auth.models import User
+            try:
+                legacy_sponsor = User.objects.get(username=driver_profile.sponsor_name)
+                driver_sponsors.add(legacy_sponsor)
+                if legacy_sponsor not in driver_sponsors_list:
+                    driver_sponsors_list.append(legacy_sponsor)
+            except User.DoesNotExist:
+                pass
+    
+    # Get selected sponsor filter (if driver has multiple sponsors)
+    selected_sponsor_id = request.GET.get("sponsor_filter", "").strip()
+    selected_sponsor = None
+    if selected_sponsor_id and driver_sponsors_list:
+        try:
+            selected_sponsor = next((s for s in driver_sponsors_list if str(s.id) == selected_sponsor_id), None)
+        except (ValueError, TypeError):
+            pass
+    
+    # Add sponsor filter info to context
+    context["driver_sponsors"] = driver_sponsors_list
+    context["selected_sponsor"] = selected_sponsor
+    context["selected_sponsor_id"] = selected_sponsor_id
+
     # Get driver catalog items (always include these) - apply sorting
-    driver_catalog_items = DriverCatalogItem.objects.filter(is_active=True)
+    driver_catalog_items = DriverCatalogItem.objects.filter(is_active=True).select_related('added_by', 'source_sponsor_item__sponsor')
     
     # Apply sorting to driver catalog items
     if sort_by == "newest":
@@ -759,10 +792,12 @@ def catalog_search(request):
     elif sort_by == "points_high":
         driver_catalog_items = driver_catalog_items.order_by("-points_cost")
     
-    # Convert driver catalog items to product format
-    driver_products = []
+    # Convert driver catalog items to product format and separate by sponsor
+    sponsor_product_ids = set()  # Track IDs of sponsor products
+    sponsor_products = []
+    other_products = []
     for item in driver_catalog_items:
-        driver_products.append({
+        product = {
             "ebay_item_id": f"CATALOG-{item.id}",
             "name": item.name,
             "price_usd": float(item.price_usd),
@@ -775,7 +810,39 @@ def catalog_search(request):
             "view_url": item.product_url or "",
             "is_catalog_item": True,  # Flag to identify catalog items
             "created_at": item.created_at,  # Include created_at for sorting
-        })
+        }
+        
+        # Check if this item is from one of the driver's sponsors
+        is_from_sponsor = False
+        item_sponsor = None
+        if driver_sponsors:
+            # Check if added_by is a sponsor
+            if item.added_by and item.added_by in driver_sponsors:
+                is_from_sponsor = True
+                item_sponsor = item.added_by
+            # Check if source_sponsor_item's sponsor is a sponsor
+            elif item.source_sponsor_item and item.source_sponsor_item.sponsor in driver_sponsors:
+                is_from_sponsor = True
+                item_sponsor = item.source_sponsor_item.sponsor
+        
+        # If sponsor filter is selected, only include items from that sponsor
+        if selected_sponsor:
+            if item_sponsor and item_sponsor.id == selected_sponsor.id:
+                sponsor_products.append(product)
+                sponsor_product_ids.add(product["ebay_item_id"])
+            # Don't add to other_products if filtering by sponsor
+        elif is_from_sponsor:
+            sponsor_products.append(product)
+            sponsor_product_ids.add(product["ebay_item_id"])
+        else:
+            other_products.append(product)
+    
+    # Combine: sponsor products first, then other products
+    # If filtering by sponsor, only show that sponsor's products
+    if selected_sponsor:
+        driver_products = sponsor_products
+    else:
+        driver_products = sponsor_products + other_products
     
     # If no query, show random/default products + driver catalog items
     if not query:
@@ -821,21 +888,34 @@ def catalog_search(request):
 
             filtered = [p for p in all_products if _eligible(p)]
             
-            # Apply sorting to filtered products
+            # Separate sponsor items from other items before sorting
+            sponsor_filtered = [p for p in filtered if p.get("is_catalog_item") and p.get("ebay_item_id") in sponsor_product_ids]
+            other_filtered = [p for p in filtered if p not in sponsor_filtered]
+            
+            # Apply sorting to each group separately
             if sort_by == "newest":
-                # For catalog items, sort by created_at (newest first)
-                # For eBay items, we don't have created_at, so keep them as-is
-                filtered.sort(key=lambda p: (
+                sponsor_filtered.sort(key=lambda p: (
+                    p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now() - timedelta(days=365)
+                ), reverse=True)
+                other_filtered.sort(key=lambda p: (
                     p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now() - timedelta(days=365)
                 ), reverse=True)
             elif sort_by == "oldest":
-                filtered.sort(key=lambda p: (
+                sponsor_filtered.sort(key=lambda p: (
+                    p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now()
+                ), reverse=False)
+                other_filtered.sort(key=lambda p: (
                     p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now()
                 ), reverse=False)
             elif sort_by == "points_low":
-                filtered.sort(key=lambda p: p.get("price_points", 0))
+                sponsor_filtered.sort(key=lambda p: p.get("price_points", 0))
+                other_filtered.sort(key=lambda p: p.get("price_points", 0))
             elif sort_by == "points_high":
-                filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+                sponsor_filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+                other_filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+            
+            # Combine: sponsor items first, then others
+            filtered = sponsor_filtered + other_filtered
 
             context["results"] = {
                 "products": filtered[:20],  # Limit to 20 for default view
@@ -848,15 +928,26 @@ def catalog_search(request):
             # If eBay fails, still show driver catalog items
             filtered = [p for p in driver_products if p.get("price_points", 0) >= (min_points or 0) and (max_points is None or p.get("price_points", 0) <= max_points)]
             
-            # Apply sorting to filtered products
+            # Separate sponsor items from other items before sorting
+            sponsor_filtered = [p for p in filtered if p.get("is_catalog_item") and p.get("ebay_item_id") in sponsor_product_ids]
+            other_filtered = [p for p in filtered if p not in sponsor_filtered]
+            
+            # Apply sorting to each group separately
             if sort_by == "newest":
-                filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=True)
+                sponsor_filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=True)
+                other_filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=True)
             elif sort_by == "oldest":
-                filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=False)
+                sponsor_filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=False)
+                other_filtered.sort(key=lambda p: p.get("created_at", timezone.now()), reverse=False)
             elif sort_by == "points_low":
-                filtered.sort(key=lambda p: p.get("price_points", 0))
+                sponsor_filtered.sort(key=lambda p: p.get("price_points", 0))
+                other_filtered.sort(key=lambda p: p.get("price_points", 0))
             elif sort_by == "points_high":
-                filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+                sponsor_filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+                other_filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+            
+            # Combine: sponsor items first, then others
+            filtered = sponsor_filtered + other_filtered
             
             context["results"] = {
                 "products": filtered[:20],
@@ -908,21 +999,34 @@ def catalog_search(request):
 
         filtered = [p for p in all_products if _eligible(p)]
         
-        # Apply sorting to filtered products
+        # Separate sponsor items from other items before sorting
+        sponsor_filtered = [p for p in filtered if p.get("is_catalog_item") and p in sponsor_products]
+        other_filtered = [p for p in filtered if p not in sponsor_filtered]
+        
+        # Apply sorting to each group separately
         if sort_by == "newest":
-            # For catalog items, sort by created_at (newest first)
-            # For eBay items, we don't have created_at, so keep them as-is
-            filtered.sort(key=lambda p: (
+            sponsor_filtered.sort(key=lambda p: (
+                p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now() - timedelta(days=365)
+            ), reverse=True)
+            other_filtered.sort(key=lambda p: (
                 p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now() - timedelta(days=365)
             ), reverse=True)
         elif sort_by == "oldest":
-            filtered.sort(key=lambda p: (
+            sponsor_filtered.sort(key=lambda p: (
+                p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now()
+            ), reverse=False)
+            other_filtered.sort(key=lambda p: (
                 p.get("created_at", timezone.now()) if p.get("is_catalog_item") else timezone.now()
             ), reverse=False)
         elif sort_by == "points_low":
-            filtered.sort(key=lambda p: p.get("price_points", 0))
+            sponsor_filtered.sort(key=lambda p: p.get("price_points", 0))
+            other_filtered.sort(key=lambda p: p.get("price_points", 0))
         elif sort_by == "points_high":
-            filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+            sponsor_filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+            other_filtered.sort(key=lambda p: p.get("price_points", 0), reverse=True)
+        
+        # Combine: sponsor items first, then others
+        filtered = sponsor_filtered + other_filtered
         
         # Calculate total (driver catalog items + eBay results)
         total_count = len(matching_driver_items) if query else len(driver_products)
@@ -1773,3 +1877,136 @@ def sponsor_catalog_edit(request, item_id):
         "form": form,
         "item": item,
     })
+
+
+@login_required
+@user_passes_test(_is_sponsor)
+def sponsor_catalog_import(request):
+    """Search eBay products and import them into sponsor catalog."""
+    query = (request.GET.get("q") or "").strip()
+    category_id = (request.GET.get("cat") or "").strip()
+    page_num = request.GET.get("page", "1")
+    
+    try:
+        page_num = int(page_num)
+    except ValueError:
+        page_num = 1
+    
+    limit = 20
+    offset = (page_num - 1) * limit
+    
+    context = {
+        "query": query,
+        "category_id": category_id,
+        "category_choices": EBAY_CATEGORY_CHOICES,
+        "page": page_num,
+        "results": None,
+        "error": None,
+    }
+    
+    # Allow searching by category only (no query required)
+    # If category is selected but no query, use a generic search term that works with eBay API
+    search_query = query
+    has_category = category_id and category_id.lower() not in {"", "all", "0"}
+    
+    # If category is selected but no query, use a generic term to browse that category
+    if has_category and not query:
+        search_query = "item"  # Generic term that will be filtered by category
+    
+    # Perform search if we have a query or a valid category
+    if search_query or has_category:
+        try:
+            # Ensure we have a query for the API (required by eBay)
+            if not search_query:
+                search_query = "item"
+            
+            results = ebay_service.search_products(
+                search_query,
+                limit=limit,
+                offset=offset,
+                category_ids=category_id if has_category else None,
+            )
+            
+            products = [
+                ebay_service.format_product(item)
+                for item in results.get("itemSummaries", [])
+            ]
+            
+            context["results"] = {
+                "products": products,
+                "total": results.get("total", 0),
+                "has_next": results.get("next") is not None,
+                "has_prev": page_num > 1,
+            }
+        except Exception as e:
+            context["error"] = str(e)
+            context["results"] = {
+                "products": [],
+                "total": 0,
+                "has_next": False,
+                "has_prev": False,
+            }
+    
+    return render(request, "shop/sponsor_catalog_import.html", context)
+
+
+@login_required
+@user_passes_test(_is_sponsor)
+def sponsor_catalog_import_product(request):
+    """Import a product from eBay API into sponsor catalog."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        ebay_item_id = data.get("ebay_item_id")
+        
+        if not ebay_item_id:
+            return JsonResponse({"error": "Missing ebay_item_id"}, status=400)
+        
+        # Get product details from eBay
+        product_data = ebay_service.get_product_details(ebay_item_id)
+        formatted = ebay_service.format_product(product_data)
+        
+        # Check if already exists in sponsor catalog
+        sponsor = request.user
+        existing = SponsorCatalogItem.objects.filter(
+            sponsor=sponsor,
+            product_url=formatted.get("view_url", "")
+        ).first()
+        
+        if existing:
+            return JsonResponse({
+                "success": False,
+                "error": f"Product '{formatted['name']}' already exists in your catalog.",
+                "item_id": existing.id,
+            })
+        
+        # Calculate points cost from USD price
+        from .utils import get_points_per_usd
+        points_cost = int(formatted["price_usd"] * get_points_per_usd())
+        
+        # Create sponsor catalog item
+        sponsor_item = SponsorCatalogItem.objects.create(
+            sponsor=sponsor,
+            name=formatted["name"][:255],
+            description=formatted.get("description", "")[:1000] if formatted.get("description") else "",
+            price_usd=formatted["price_usd"],
+            points_cost=points_cost,
+            image_url=formatted.get("image_url", "")[:1000] if formatted.get("image_url") else "",
+            product_url=formatted.get("view_url", "")[:1000] if formatted.get("view_url") else "",
+            category=formatted.get("category", "")[:100] if formatted.get("category") else "",
+            is_active=True,
+        )
+        
+        return JsonResponse({
+            "success": True,
+            "message": f"Product '{formatted['name']}' imported successfully!",
+            "item_id": sponsor_item.id,
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error importing product: {e}", exc_info=True)
+        return JsonResponse({"error": str(e)}, status=500)

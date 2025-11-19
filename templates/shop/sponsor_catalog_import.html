@@ -1,0 +1,361 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Import Products from eBay - Sponsor Catalog{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">Import Products from eBay</h2>
+            <p class="text-muted mb-0">Search and import products from eBay into your sponsor catalog</p>
+        </div>
+        <a href="{% url 'shop:sponsor_catalog' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Catalog
+        </a>
+    </div>
+
+    {% if error %}
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Error:</strong> {{ error }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endif %}
+
+    <!-- Search Form -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <form method="GET" action="{% url 'shop:sponsor_catalog_import' %}" id="searchForm">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Search Products <small class="text-muted">(optional)</small></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input 
+                                type="text" 
+                                name="q" 
+                                class="form-control" 
+                                placeholder="Search for products on eBay... (leave empty to browse by category)"
+                                value="{{ query }}"
+                            >
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Category</label>
+                        <select name="cat" class="form-select" id="categorySelect">
+                            {% for cid, label in category_choices %}
+                                <option value="{{ cid }}" {% if category_id == cid %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results -->
+    {% if results %}
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    Search Results 
+                    {% if results.total %}
+                        <span class="badge bg-primary">{{ results.total }} found</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if results.products %}
+                    <div class="row g-4">
+                        {% for product in results.products %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="position-relative">
+                                        {% if product.image_url %}
+                                            <img src="{{ product.image_url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                                        {% else %}
+                                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                                                <i class="fas fa-image fa-3x text-muted"></i>
+                                            </div>
+                                        {% endif %}
+                                        <span class="badge bg-info position-absolute top-0 end-0 m-2">${{ product.price_usd|floatformat:2 }}</span>
+                                    </div>
+                                    <div class="card-body d-flex flex-column">
+                                        <h6 class="card-title">{{ product.name|truncatewords:10 }}</h6>
+                                        <p class="card-text text-muted small flex-grow-1">
+                                            {{ product.description|truncatewords:15|default:"No description available" }}
+                                        </p>
+                                        <div class="mb-2">
+                                            <small class="text-muted">
+                                                <strong>Category:</strong> {{ product.category|default:"Uncategorized" }}<br>
+                                                <strong>Condition:</strong> {{ product.condition|default:"Unknown" }}<br>
+                                                <strong>Points:</strong> {{ product.price_points }} pts
+                                            </small>
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                            <button 
+                                                class="btn btn-primary btn-sm import-product-btn" 
+                                                data-ebay-item-id="{{ product.ebay_item_id }}"
+                                                data-product-name="{{ product.name }}"
+                                            >
+                                                <i class="fas fa-download"></i> Import to Catalog
+                                            </button>
+                                            {% if product.view_url %}
+                                                <a href="{{ product.view_url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="fas fa-external-link-alt"></i> View on eBay
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if results.has_prev or results.has_next %}
+                        <nav aria-label="Search results pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if results.has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?q={{ query }}&cat={{ category_id }}&page={{ page|add:-1 }}">Previous</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Previous</span>
+                                    </li>
+                                {% endif %}
+                                
+                                <li class="page-item active">
+                                    <span class="page-link">Page {{ page }}</span>
+                                </li>
+                                
+                                {% if results.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?q={{ query }}&cat={{ category_id }}&page={{ page|add:1 }}">Next</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Next</span>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No products found. Try a different search term.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="card shadow-sm border-0">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5>Search for Products</h5>
+                <p class="text-muted">Select a category and click Search to browse products, or enter a search term to find specific items.</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Optional: Auto-submit when category changes (if you want this behavior)
+// Uncomment the code below if you want the form to auto-submit when category changes
+/*
+document.addEventListener('DOMContentLoaded', function() {
+    const categorySelect = document.getElementById('categorySelect');
+    const searchForm = document.getElementById('searchForm');
+    
+    if (categorySelect && searchForm) {
+        categorySelect.addEventListener('change', function() {
+            // Only auto-submit if there's no query or if user wants to browse by category
+            const queryInput = searchForm.querySelector('input[name="q"]');
+            if (!queryInput.value.trim()) {
+                searchForm.submit();
+            }
+        });
+    }
+});
+*/
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const importButtons = document.querySelectorAll('.import-product-btn');
+    
+    importButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const ebayItemId = this.getAttribute('data-ebay-item-id');
+            const productName = this.getAttribute('data-product-name');
+            const originalText = this.innerHTML;
+            
+            // Disable button and show loading
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+            
+            // Get CSRF token from cookies
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            const csrftoken = getCookie('csrftoken');
+            
+            // Make AJAX request
+            fetch('{% url "shop:sponsor_catalog_import_product" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    ebay_item_id: ebayItemId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Find the product card container (the col-md-6 col-lg-4 div)
+                const productCard = this.closest('.col-md-6, .col-lg-4');
+                
+                if (data.success) {
+                    // Remove any existing success/error messages for this product
+                    let sibling = productCard?.previousElementSibling;
+                    while (sibling) {
+                        if (sibling.classList && (
+                            sibling.classList.contains('import-success-alert') || 
+                            sibling.classList.contains('import-error-alert')
+                        )) {
+                            sibling.remove();
+                            break;
+                        }
+                        sibling = sibling.previousElementSibling;
+                    }
+                    
+                    // Create success message right above the product card
+                    const alertWrapper = document.createElement('div');
+                    alertWrapper.className = 'col-12 import-success-alert';
+                    alertWrapper.style.marginBottom = '1rem';
+                    
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success alert-dismissible fade show';
+                    alert.innerHTML = `
+                        <strong>Success!</strong> ${data.message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    alertWrapper.appendChild(alert);
+                    
+                    // Insert the alert right before the product card
+                    if (productCard && productCard.parentElement) {
+                        productCard.parentElement.insertBefore(alertWrapper, productCard);
+                    }
+                    
+                    // Auto-dismiss after 5 seconds
+                    setTimeout(() => {
+                        if (alertWrapper.parentElement) {
+                            alert.classList.remove('show');
+                            setTimeout(() => alertWrapper.remove(), 150);
+                        }
+                    }, 5000);
+                    
+                    // Change button to show imported
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-success');
+                    this.innerHTML = '<i class="fas fa-check"></i> Imported';
+                } else {
+                    // Remove any existing success/error messages for this product
+                    let sibling = productCard?.previousElementSibling;
+                    while (sibling) {
+                        if (sibling.classList && (
+                            sibling.classList.contains('import-success-alert') || 
+                            sibling.classList.contains('import-error-alert')
+                        )) {
+                            sibling.remove();
+                            break;
+                        }
+                        sibling = sibling.previousElementSibling;
+                    }
+                    
+                    const alertWrapper = document.createElement('div');
+                    alertWrapper.className = 'col-12 import-error-alert';
+                    alertWrapper.style.marginBottom = '1rem';
+                    
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-warning alert-dismissible fade show';
+                    alert.innerHTML = `
+                        <strong>Notice:</strong> ${data.error || 'Failed to import product'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    alertWrapper.appendChild(alert);
+                    
+                    if (productCard && productCard.parentElement) {
+                        productCard.parentElement.insertBefore(alertWrapper, productCard);
+                    }
+                    
+                    // Re-enable button
+                    this.disabled = false;
+                    this.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Find the product card container
+                const productCard = this.closest('.col-md-6, .col-lg-4');
+                
+                // Remove any existing success/error messages for this product
+                let sibling = productCard?.previousElementSibling;
+                while (sibling) {
+                    if (sibling.classList && (
+                        sibling.classList.contains('import-success-alert') || 
+                        sibling.classList.contains('import-error-alert')
+                    )) {
+                        sibling.remove();
+                        break;
+                    }
+                    sibling = sibling.previousElementSibling;
+                }
+                
+                const alertWrapper = document.createElement('div');
+                alertWrapper.className = 'col-12 import-error-alert';
+                alertWrapper.style.marginBottom = '1rem';
+                
+                const alert = document.createElement('div');
+                alert.className = 'alert alert-danger alert-dismissible fade show';
+                alert.innerHTML = `
+                    <strong>Error!</strong> Failed to import product. Please try again.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                alertWrapper.appendChild(alert);
+                
+                if (productCard && productCard.parentElement) {
+                    productCard.parentElement.insertBefore(alertWrapper, productCard);
+                }
+                
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = originalText;
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+

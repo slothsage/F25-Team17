@@ -42,4 +42,6 @@ urlpatterns += [
     # Sponsor Catalog
     path("sponsor/catalog/", views.sponsor_catalog, name="sponsor_catalog"),
     path("sponsor/catalog/<int:item_id>/edit/", views.sponsor_catalog_edit, name="sponsor_catalog_edit"),
+    path("sponsor/catalog/import/", views.sponsor_catalog_import, name="sponsor_catalog_import"),
+    path("sponsor/catalog/import/product/", views.sponsor_catalog_import_product, name="sponsor_catalog_import_product"),
 ]

@@ -2122,35 +2122,44 @@ def contact_sponsor(request):
             "error": "No sponsor contact information available.",
         })
 
-    # Try to get sponsor user from multiple sources
-    sponsor_user = None
-    sponsor_name = None
-
-    # First, check if there are sponsors via M2M relationship
-    if profile.sponsors.exists():
-        sponsor_user = profile.sponsors.first()  # Get the first sponsor
-        sponsor_name = sponsor_user.get_full_name() or sponsor_user.username
+    # Get all sponsors for this driver
+    driver_sponsors = list(profile.sponsors.all())
     
-    # If no sponsor from M2M, try to find by sponsor_name
-    if not sponsor_user and profile.sponsor_name:
+    # Also check legacy sponsor_name field
+    if profile.sponsor_name:
         try:
-            sponsor_user = User.objects.filter(
+            legacy_sponsor = User.objects.filter(
                 username=profile.sponsor_name,
                 groups__name="sponsor"
             ).first()
-            if sponsor_user:
-                sponsor_name = sponsor_user.get_full_name() or sponsor_user.username
-            else:
-                sponsor_name = profile.sponsor_name
+            if legacy_sponsor and legacy_sponsor not in driver_sponsors:
+                driver_sponsors.append(legacy_sponsor)
         except Exception:
-            sponsor_name = profile.sponsor_name
+            pass
 
-    # If we still don't have a sponsor user, show error
-    if not sponsor_user:
+    # If no sponsors, show error
+    if not driver_sponsors:
         return render(request, "accounts/contact_sponsor.html", {
             "error": "No sponsor contact information available.",
             "form": ContactSponsorForm(),
+            "driver_sponsors": [],
         })
+
+    # Get selected sponsor from request (POST or GET)
+    selected_sponsor_id = request.POST.get("sponsor_id") or request.GET.get("sponsor_id", "").strip()
+    sponsor_user = None
+    
+    if selected_sponsor_id:
+        try:
+            sponsor_user = next((s for s in driver_sponsors if str(s.id) == selected_sponsor_id), None)
+        except (ValueError, TypeError):
+            pass
+    
+    # If no sponsor selected or invalid, use first sponsor
+    if not sponsor_user and driver_sponsors:
+        sponsor_user = driver_sponsors[0]
+    
+    sponsor_name = sponsor_user.get_full_name() or sponsor_user.username if sponsor_user else None
 
     # Handle form submission
     if request.method == "POST":
@@ -2189,7 +2198,7 @@ def contact_sponsor(request):
                 )
                 
                 messages.success(request, f"Message sent to {sponsor_name}!")
-                return redirect("accounts:contact_sponsor")
+                return redirect(f"{reverse('accounts:contact_sponsor')}?sponsor_id={sponsor_user.id}")
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
@@ -2203,6 +2212,8 @@ def contact_sponsor(request):
         "form": form,
         "sponsor_name": sponsor_name or "Your Sponsor",
         "sponsor_user": sponsor_user,
+        "driver_sponsors": driver_sponsors,
+        "selected_sponsor_id": str(sponsor_user.id) if sponsor_user else "",
     })
 
 
@@ -2955,23 +2966,30 @@ def chat_rooms_list(request):
     if user.groups.filter(name="sponsor").exists():
         chat_rooms = ChatRoom.objects.filter(sponsor=user)
     
-    # If user is a driver, find chat rooms based on their sponsor
+    # If user is a driver, find chat rooms based on all their sponsors
     elif hasattr(user, "driver_profile"):
-        sponsor_name = user.driver_profile.sponsor_name
-        if sponsor_name:
+        profile = user.driver_profile
+        driver_sponsors = list(profile.sponsors.all())
+        
+        # Also check legacy sponsor_name field
+        if profile.sponsor_name:
             try:
-                sponsor = User.objects.get(
-                    username=sponsor_name,
+                legacy_sponsor = User.objects.filter(
+                    username=profile.sponsor_name,
                     groups__name="sponsor"
-                )
-                # Get or create chat room for this sponsor
-                chat_room, created = ChatRoom.objects.get_or_create(
-                    sponsor=sponsor,
-                    defaults={"name": f"{sponsor.username}'s Team Chat"}
-                )
-                chat_rooms = [chat_room]
-            except User.DoesNotExist:
+                ).first()
+                if legacy_sponsor and legacy_sponsor not in driver_sponsors:
+                    driver_sponsors.append(legacy_sponsor)
+            except Exception:
                 pass
+        
+        # Get or create chat room for each sponsor
+        for sponsor in driver_sponsors:
+            chat_room, created = ChatRoom.objects.get_or_create(
+                sponsor=sponsor,
+                defaults={"name": f"{sponsor.username}'s Team Chat"}
+            )
+            chat_rooms.append(chat_room)
     
     # Annotate each chat room with latest message and unread count
     for room in chat_rooms:
