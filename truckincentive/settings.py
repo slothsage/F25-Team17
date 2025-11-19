@@ -162,3 +162,5 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+# Settings file updated - ready for EC2 deployment
