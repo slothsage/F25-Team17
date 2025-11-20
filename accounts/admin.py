@@ -13,6 +13,10 @@ from .models import SponsorPointsAccount, SponsorPointsTransaction
 from .models import BulkUploadLog
 from .models import ImpersonationLog
 
+# Customize Django admin site titles
+admin.site.site_header = "Admin Overlook"
+admin.site.site_title = "Admin Overlook"
+admin.site.index_title = "Administration"
 
 # Register your models here.
 

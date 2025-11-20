@@ -19,7 +19,7 @@ from django.utils import timezone
 import datetime
 import os
 from datetime import timedelta
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from urllib.parse import quote
 from django.templatetags.static import static
 from django.utils.timezone import now
@@ -47,7 +47,7 @@ from django.db.models import Q
 from django import db as django_db
 from django.db import models
 from .models import LoginActivity
-from shop.models import Order
+from shop.models import Order, Wishlist, Wishlist
 from shop.utils import order_is_delayed
 from django.core.paginator import Paginator
 from django.http import HttpResponse
@@ -402,6 +402,113 @@ def profile(request):
         "has_goal": has_goal,
         "show_points": show_points,
     })
+
+@login_required
+def driver_dashboard(request):
+    """
+    Driver dashboard with customizable widget ordering.
+    Shows points, orders, and wishlist widgets that can be rearranged.
+    """
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        messages.error(request, "Dashboard is only available to drivers.")
+        return redirect("accounts:profile")
+    
+    profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+    
+    # Get widget order from profile, default to ['points', 'orders', 'wishlist', 'catalog']
+    widget_order = profile.widget_order if profile.widget_order else ['points', 'orders', 'wishlist', 'catalog']
+    
+    # Ensure all widgets are in the order (in case new widgets are added)
+    all_widgets = ['points', 'orders', 'wishlist', 'catalog']
+    for widget in all_widgets:
+        if widget not in widget_order:
+            widget_order.append(widget)
+    
+    # Get points data
+    from accounts.services import get_driver_points_balance
+    total_points = get_driver_points_balance(request.user)
+    progress_percentage = 0
+    points_remaining = 0
+    has_goal = False
+    if profile.points_goal and profile.points_goal > 0:
+        progress_percentage = min(100, int((total_points / profile.points_goal) * 100))
+        points_remaining = max(0, profile.points_goal - total_points)
+        has_goal = True
+    
+    # Get recent orders (last 5)
+    recent_orders = Order.objects.filter(driver=request.user).order_by("-placed_at")[:5]
+    
+    # Get wishlists with item counts
+    wishlists = Wishlist.objects.filter(user=request.user).annotate(
+        item_count=Count('items')
+    ).order_by("-updated_at")[:5]
+    
+    # Get catalog stats (active driver catalog items count)
+    from shop.models import DriverCatalogItem
+    catalog_item_count = DriverCatalogItem.objects.filter(is_active=True).count() or 0
+    
+    context = {
+        "total_points": total_points,
+        "points_goal": profile.points_goal,
+        "progress_percentage": progress_percentage,
+        "points_remaining": points_remaining,
+        "has_goal": has_goal,
+        "recent_orders": recent_orders,
+        "wishlists": wishlists,
+        "catalog_item_count": catalog_item_count,
+        "widget_order": widget_order,
+    }
+    
+    return render(request, "accounts/driver_dashboard.html", context)
+
+@login_required
+@require_POST
+def save_widget_order(request):
+    """
+    API endpoint to save widget order preference.
+    Expects JSON: {"widget_order": ["points", "orders", "wishlist"]}
+    """
+    # Only allow drivers
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        widget_order = data.get("widget_order", [])
+        
+        # Validate widget order
+        valid_widgets = ['points', 'orders', 'wishlist', 'catalog']
+        if not isinstance(widget_order, list):
+            return JsonResponse({"error": "widget_order must be a list"}, status=400)
+        
+        # Ensure all valid widgets are present
+        for widget in valid_widgets:
+            if widget not in widget_order:
+                widget_order.append(widget)
+        
+        # Remove any invalid widgets
+        widget_order = [w for w in widget_order if w in valid_widgets]
+        
+        # Save to profile
+        profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+        profile.widget_order = widget_order
+        profile.save()
+        
+        return JsonResponse({"success": True, "widget_order": widget_order})
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @login_required
 def profile_edit(request):

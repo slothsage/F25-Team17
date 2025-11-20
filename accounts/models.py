@@ -85,6 +85,13 @@ class DriverProfile(models.Model):
         help_text="Admin-assigned tags for categorizing users."
     )
     
+    # Dashboard widget order preference (JSON array of widget IDs)
+    widget_order = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Order of dashboard widgets (e.g., ['points', 'orders', 'wishlist'])"
+    )
+    
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
 
