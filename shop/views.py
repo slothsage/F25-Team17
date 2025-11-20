@@ -207,10 +207,26 @@ def order_list(request):
 
 @login_required
 def order_detail(request, order_id):
-    order = get_object_or_404(Order, id=order_id, driver=request.user)
+    # Allow drivers to view their own orders, sponsors to view their drivers' orders, and admins to view any order
+    try:
+        order = Order.objects.get(id=order_id)
+    except Order.DoesNotExist:
+        from django.http import Http404
+        raise Http404("No Order matches the given query.")
+    
+    # Check permissions
+    is_driver = order.driver == request.user
+    is_sponsor = _is_sponsor(request.user) and order.sponsor_name == request.user.username
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not (is_driver or is_sponsor or is_admin):
+        from django.http import Http404
+        raise Http404("No Order matches the given query.")
 
+    # Get shipping info - use driver's info if viewing as sponsor/admin
+    driver_user = order.driver
     shipping = {
-        "name":        getattr(order, "shipping_name",        "") or request.user.get_full_name() or request.user.username,
+        "name":        getattr(order, "shipping_name",        "") or driver_user.get_full_name() or driver_user.username,
         "address1":    getattr(order, "shipping_address1",    "") or "",
         "address2":    getattr(order, "shipping_address2",    "") or "",
         "city":        getattr(order, "shipping_city",        "") or "",
@@ -274,6 +290,9 @@ def order_detail(request, order_id):
         "is_delayed": is_delayed,
         "line_items": line_items,
         "total_points": total_points or getattr(order, "points_spent", 0),
+        "is_driver_view": is_driver,
+        "is_sponsor_view": is_sponsor,
+        "is_admin_view": is_admin,
     }
     return render(request, "shop/order_detail.html", context)
 
