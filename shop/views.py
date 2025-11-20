@@ -2010,3 +2010,86 @@ def sponsor_catalog_import_product(request):
         logger = logging.getLogger(__name__)
         logger.error(f"Error importing product: {e}", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
+
+
+@login_required
+@user_passes_test(_is_sponsor)
+def sponsor_orders(request):
+    """Sponsor view: Manage orders from their drivers."""
+    sponsor = request.user
+    
+    # Get all orders where this sponsor is the sponsor_name
+    orders = Order.objects.filter(sponsor_name=sponsor.username).select_related('driver').order_by('-placed_at')
+    
+    # Filtering
+    status_filter = request.GET.get('status', '').strip()
+    if status_filter:
+        orders = orders.filter(status=status_filter)
+    
+    driver_filter = request.GET.get('driver', '').strip()
+    if driver_filter:
+        orders = orders.filter(driver__username__icontains=driver_filter)
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(orders, 20)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'orders': page_obj,
+        'page_obj': page_obj,
+        'status_filter': status_filter,
+        'driver_filter': driver_filter,
+        'STATUS_CHOICES': Order.STATUS_CHOICES,
+    }
+    return render(request, 'shop/sponsor_orders.html', context)
+
+
+@login_required
+@user_passes_test(_is_sponsor)
+def sponsor_update_order(request, order_id):
+    """Sponsor view: Update order status and tracking number."""
+    sponsor = request.user
+    order = get_object_or_404(Order, id=order_id, sponsor_name=sponsor.username)
+    
+    if request.method == 'POST':
+        new_status = request.POST.get('status', '').strip()
+        tracking_number = request.POST.get('tracking_number', '').strip()
+        
+        if new_status in dict(Order.STATUS_CHOICES):
+            order.status = new_status
+            order.tracking_number = tracking_number
+            order.save(update_fields=['status', 'tracking_number', 'updated_at'])
+            
+            messages.success(request, f'Order #{order.id} updated successfully.')
+            
+            # Send notification to driver
+            try:
+                from accounts.notifications import send_in_app_notification
+                from django.urls import reverse
+                status_display = dict(Order.STATUS_CHOICES).get(new_status, new_status)
+                notification_text = f"Order #{order.id} status updated to {status_display}."
+                if tracking_number:
+                    notification_text += f" Tracking: {tracking_number}"
+                send_in_app_notification(
+                    order.driver,
+                    'orders',
+                    'Order Updated',
+                    notification_text,
+                    url=reverse('shop:order_detail', args=[order.id]),
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to send order update notification: {e}", exc_info=True)
+        else:
+            messages.error(request, 'Invalid status selected.')
+        
+        return redirect('shop:sponsor_orders')
+    
+    context = {
+        'order': order,
+        'STATUS_CHOICES': Order.STATUS_CHOICES,
+    }
+    return render(request, 'shop/sponsor_update_order.html', context)

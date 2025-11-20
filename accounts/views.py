@@ -1996,9 +1996,36 @@ def points_history(request):
         messages.error(request, "Points history is only available to drivers.")
         return redirect("accounts:profile")
     
-    rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
+    from django.utils.dateparse import parse_date
+    
+    rows = PointsLedger.objects.filter(user=request.user)
+    
+    # Date filtering
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+    
+    if date_from_str:
+        d = parse_date(date_from_str)
+        if d:
+            start_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.min.time()))
+            rows = rows.filter(created_at__gte=start_dt)
+    
+    if date_to_str:
+        d = parse_date(date_to_str)
+        if d:
+            end_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.max.time()))
+            rows = rows.filter(created_at__lte=end_dt)
+    
+    rows = rows.order_by("-created_at")
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
-    return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
+    
+    context = {
+        "rows": rows,
+        "balance": balance,
+        "date_from": date_from_str,
+        "date_to": date_to_str,
+    }
+    return render(request, "accounts/points_history.html", context)
 
 @login_required
 def points_history_download(request):
@@ -2011,8 +2038,28 @@ def points_history_download(request):
     if not is_driver or is_sponsor or is_admin:
         return HttpResponse("Points history download is only available to drivers.", status=403)
     
+    from django.utils.dateparse import parse_date
+    
     format_type = request.GET.get("format", "csv").lower()
-    rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
+    rows = PointsLedger.objects.filter(user=request.user)
+    
+    # Date filtering (same as points_history view)
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+    
+    if date_from_str:
+        d = parse_date(date_from_str)
+        if d:
+            start_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.min.time()))
+            rows = rows.filter(created_at__gte=start_dt)
+    
+    if date_to_str:
+        d = parse_date(date_to_str)
+        if d:
+            end_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.max.time()))
+            rows = rows.filter(created_at__lte=end_dt)
+    
+    rows = rows.order_by("-created_at")
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
     
     if format_type == "csv":

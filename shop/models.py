@@ -50,6 +50,7 @@ class Order(models.Model):
     ship_postal = models.CharField(max_length=20, blank=True)
     ship_country = models.CharField(max_length=2, default="US")
     expected_delivery_date = models.DateField(null=True, blank=True)
+    tracking_number = models.CharField(max_length=100, blank=True, help_text="Shipping tracking number")
 
     def can_mark_received(self):
         return self.status in ("shipped", "delivered") and self.status != "cancelled"

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import SponsorCatalogItem, DriverCatalogItem
+from .models import SponsorCatalogItem, DriverCatalogItem, Order
 from .models import PointsConfig
 
 # Register your models here.
@@ -26,3 +26,20 @@ class DriverCatalogItemAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "category", "created_at")
     search_fields = ("name", "description")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ("id", "driver", "sponsor_name", "status", "tracking_number", "points_spent", "placed_at")
+    list_filter = ("status", "placed_at", "sponsor_name")
+    search_fields = ("id", "driver__username", "sponsor_name", "tracking_number")
+    readonly_fields = ("placed_at", "updated_at")
+    fieldsets = (
+        ("Order Information", {
+            "fields": ("driver", "sponsor_name", "status", "points_spent", "placed_at", "updated_at")
+        }),
+        ("Shipping Information", {
+            "fields": ("tracking_number", "ship_name", "ship_line1", "ship_line2", "ship_city", "ship_state", "ship_postal", "ship_country", "expected_delivery_date")
+        }),
+    )
+    list_editable = ("status", "tracking_number")

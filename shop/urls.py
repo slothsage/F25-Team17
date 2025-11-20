@@ -44,4 +44,8 @@ urlpatterns += [
     path("sponsor/catalog/<int:item_id>/edit/", views.sponsor_catalog_edit, name="sponsor_catalog_edit"),
     path("sponsor/catalog/import/", views.sponsor_catalog_import, name="sponsor_catalog_import"),
     path("sponsor/catalog/import/product/", views.sponsor_catalog_import_product, name="sponsor_catalog_import_product"),
+    
+    # Sponsor Order Management
+    path("sponsor/orders/", views.sponsor_orders, name="sponsor_orders"),
+    path("sponsor/orders/<int:order_id>/update/", views.sponsor_update_order, name="sponsor_update_order"),
 ]
