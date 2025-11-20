@@ -155,6 +155,7 @@ urlpatterns = [
     path("points/", views.points_history, name="points_history"),
     path("points/download/", views.points_history_download, name="points_history_download"),
     path("points/goal/", views.points_goal_tracker, name="points_goal_tracker"),
+    path("security-log/", views.driver_security_log, name="driver_security_log"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
     path("my-sponsor/", views.my_sponsor, name="my_sponsor"),
 

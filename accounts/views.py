@@ -1517,6 +1517,104 @@ def login_activity(request):
     return render(request, "accounts/login_activity.html", {"page": page_obj, "user_q": user_q, "status": status})
 
 @login_required
+def driver_security_log(request):
+    """Driver view: Show their own login history with device information."""
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        messages.error(request, "Security log is only available to drivers.")
+        return redirect("accounts:profile")
+    
+    # Get only successful logins for the current user
+    login_activities = LoginActivity.objects.filter(
+        user=request.user,
+        successful=True
+    ).order_by("-created_at")
+    
+    # Parse user agents for device info
+    activities_with_device = []
+    for activity in login_activities:
+        device_info = _parse_user_agent(activity.user_agent)
+        activities_with_device.append({
+            'activity': activity,
+            'device': device_info,
+        })
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(activities_with_device, 25)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'activities': page_obj,
+    }
+    return render(request, 'accounts/driver_security_log.html', context)
+
+
+def _parse_user_agent(user_agent):
+    """Parse user agent string to extract device, browser, and OS info."""
+    if not user_agent:
+        return {'device': 'Unknown', 'browser': 'Unknown', 'os': 'Unknown'}
+    
+    ua_lower = user_agent.lower()
+    
+    # Detect OS
+    os_info = 'Unknown'
+    if 'windows' in ua_lower:
+        os_info = 'Windows'
+        if 'windows nt 10.0' in ua_lower:
+            os_info = 'Windows 10/11'
+        elif 'windows nt 6.3' in ua_lower:
+            os_info = 'Windows 8.1'
+        elif 'windows nt 6.2' in ua_lower:
+            os_info = 'Windows 8'
+        elif 'windows nt 6.1' in ua_lower:
+            os_info = 'Windows 7'
+    elif 'mac os x' in ua_lower or 'macintosh' in ua_lower:
+        os_info = 'macOS'
+    elif 'iphone' in ua_lower or 'ipad' in ua_lower:
+        os_info = 'iOS'
+    elif 'android' in ua_lower:
+        os_info = 'Android'
+    elif 'linux' in ua_lower:
+        os_info = 'Linux'
+    
+    # Detect device type
+    device = 'Desktop'
+    if 'mobile' in ua_lower or 'iphone' in ua_lower or 'android' in ua_lower:
+        device = 'Mobile'
+    elif 'tablet' in ua_lower or 'ipad' in ua_lower:
+        device = 'Tablet'
+    
+    # Detect browser
+    browser = 'Unknown'
+    if 'chrome' in ua_lower and 'edg' not in ua_lower:
+        browser = 'Chrome'
+    elif 'firefox' in ua_lower:
+        browser = 'Firefox'
+    elif 'safari' in ua_lower and 'chrome' not in ua_lower:
+        browser = 'Safari'
+    elif 'edg' in ua_lower:
+        browser = 'Edge'
+    elif 'opera' in ua_lower or 'opr' in ua_lower:
+        browser = 'Opera'
+    elif 'msie' in ua_lower or 'trident' in ua_lower:
+        browser = 'Internet Explorer'
+    
+    return {
+        'device': device,
+        'browser': browser,
+        'os': os_info,
+        'raw': user_agent[:100]  # Truncate for display
+    }
+
+
+@login_required
 def message_detail(request, pk: int):
     item = get_object_or_404(MessageRecipient.objects.select_related("message", "message__author"), 
                             pk=pk, user=request.user)
@@ -2019,11 +2117,35 @@ def points_history(request):
     rows = rows.order_by("-created_at")
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
     
+    # Calculate expiring points summary (from ALL points, not just filtered)
+    from django.utils import timezone
+    from datetime import timedelta
+    now = timezone.now()
+    expiring_soon_threshold = now + timedelta(days=30)  # Points expiring in next 30 days
+    
+    # Get all points for this user to calculate expiration summary
+    all_points = PointsLedger.objects.filter(user=request.user)
+    
+    # Get points that will expire soon (only positive deltas that haven't expired)
+    expiring_entries = [
+        r for r in all_points 
+        if r.delta > 0 and r.expires_at and r.expires_at > now and r.expires_at <= expiring_soon_threshold
+    ]
+    expiring_points = sum(r.delta for r in expiring_entries)
+    
+    # Get expired points (only positive deltas)
+    expired_entries = [r for r in all_points if r.delta > 0 and r.expires_at and r.expires_at <= now]
+    expired_points = sum(r.delta for r in expired_entries)
+    
     context = {
         "rows": rows,
         "balance": balance,
         "date_from": date_from_str,
         "date_to": date_to_str,
+        "expiring_soon_points": expiring_points,
+        "expiring_entries": expiring_entries[:10],  # Show top 10 expiring soon
+        "expired_points": expired_points,
+        "now": now,
     }
     return render(request, "accounts/points_history.html", context)
 

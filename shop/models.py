@@ -8,6 +8,7 @@ POINTS_CACHE_KEY = "points_per_usd:v1"
 
 class PointsConfig(models.Model):
     points_per_usd = models.PositiveIntegerField(default=100, help_text="How many points per $1")
+    points_expiry_days = models.PositiveIntegerField(default=0, help_text="Number of days until points expire (0 = never expires)")
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:
         verbose_name = "Points Configuration"
@@ -18,7 +19,7 @@ class PointsConfig(models.Model):
     
     @classmethod
     def get_solo(cls):
-        obj, _ = cls.objects.get_or_create(pk=1, defaults={"points_per_usd": 100})
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={"points_per_usd": 100, "points_expiry_days": 0})
         return obj
     
     def save(self, *args, **kwargs):

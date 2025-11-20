@@ -6,10 +6,23 @@ from .models import PointsConfig
 
 @admin.register(PointsConfig)
 class PointsConfigAdmin(admin.ModelAdmin):
-    list_display = ("points_per_usd", "updated_at")
+    list_display = ("__str__", "points_per_usd", "points_expiry_days_display", "updated_at")
+    fields = ("points_per_usd", "points_expiry_days", "updated_at")
+    readonly_fields = ("updated_at",)
+    list_display_links = ("__str__", "points_per_usd")  # Make both clickable
+    
+    def points_expiry_days_display(self, obj):
+        if obj.points_expiry_days == 0:
+            return "Never expires"
+        return f"{obj.points_expiry_days} days"
+    points_expiry_days_display.short_description = "Points Expiry"
 
     def has_add_permission(self, request):
         return not PointsConfig.objects.exists()
+    
+    def has_delete_permission(self, request, obj=None):
+        # Prevent deletion of the singleton
+        return False
 
 
 @admin.register(SponsorCatalogItem)

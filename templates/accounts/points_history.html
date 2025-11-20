@@ -29,6 +29,22 @@
     </div>
   {% endif %}
 
+  {% if expiring_soon_points > 0 or expired_points > 0 %}
+    <div style="margin-bottom: 1rem; padding: 1rem; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+      <h5 style="margin-top: 0; margin-bottom: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> Points Expiration Notice</h5>
+      {% if expired_points > 0 %}
+        <p style="margin: 0.25rem 0; color: #dc3545; font-weight: bold;">
+          <i class="fas fa-times-circle"></i> {{ expired_points }} points have expired
+        </p>
+      {% endif %}
+      {% if expiring_soon_points > 0 %}
+        <p style="margin: 0.25rem 0; color: #856404;">
+          <i class="fas fa-clock"></i> {{ expiring_soon_points }} points expiring in the next 30 days
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% if rows %}
     <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse;">
       <thead style="background-color: #f8f9fa;">
@@ -37,6 +53,7 @@
           <th>Change</th>
           <th>Reason</th>
           <th>Balance after</th>
+          <th>Expiring</th>
         </tr>
       </thead>
       <tbody>
@@ -46,13 +63,32 @@
             <td style="{% if r.delta >= 0 %}color: green;{% else %}color: red;{% endif %}">{% if r.delta >= 0 %}+{% endif %}{{ r.delta }}</td>
             <td>{{ r.reason|default:"—" }}</td>
             <td><strong>{{ r.balance_after }}</strong></td>
+            <td>
+              {% if r.delta > 0 and r.expires_at %}
+                {% with days_left=r.days_until_expiry %}
+                  {% if days_left == 0 %}
+                    <span style="color: red; font-weight: bold;">Expired</span>
+                  {% elif days_left <= 7 %}
+                    <span style="color: orange; font-weight: bold;">{{ r.expires_at|date:"M d, Y" }} ({{ days_left }} days)</span>
+                  {% elif days_left <= 30 %}
+                    <span style="color: #ffc107;">{{ r.expires_at|date:"M d, Y" }} ({{ days_left }} days)</span>
+                  {% else %}
+                    <span style="color: #6c757d;">{{ r.expires_at|date:"M d, Y" }} ({{ days_left }} days)</span>
+                  {% endif %}
+                {% endwith %}
+              {% elif r.delta > 0 %}
+                <span style="color: #28a745;">Never</span>
+              {% else %}
+                <span style="color: #6c757d;">—</span>
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
       </tbody>
       {% if balance is not None %}
       <tfoot style="background-color: #f8f9fa; font-weight: bold;">
         <tr>
-          <td colspan="3" style="text-align: right;">Total Balance:</td>
+          <td colspan="4" style="text-align: right;">Total Balance:</td>
           <td>{{ balance }}</td>
         </tr>
       </tfoot>

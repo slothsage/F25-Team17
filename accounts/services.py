@@ -14,12 +14,22 @@ def adjust_points(user, delta: int, reason: str = "") -> PointsLedger:
     total = PointsLedger.objects.filter(user=user).aggregate(s=Sum("delta"))["s"] or 0
     new_balance = total + delta
 
+    # Calculate expiration date if points are being added (delta > 0)
+    expires_at = None
+    if delta > 0:
+        from shop.models import PointsConfig
+        config = PointsConfig.get_solo()
+        if config.points_expiry_days > 0:
+            from datetime import timedelta
+            expires_at = timezone.now() + timedelta(days=config.points_expiry_days)
+
     # create ledger entry
     entry = PointsLedger.objects.create(
         user=user,
         delta=delta,
         reason=reason,
         balance_after=new_balance,
+        expires_at=expires_at,
     )
 
     # triggers the notification 
