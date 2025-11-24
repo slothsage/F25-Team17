@@ -19,7 +19,7 @@ from django.utils import timezone
 import datetime
 import os
 from datetime import timedelta
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from urllib.parse import quote
 from django.templatetags.static import static
 from django.utils.timezone import now
@@ -47,7 +47,7 @@ from django.db.models import Q
 from django import db as django_db
 from django.db import models
 from .models import LoginActivity
-from shop.models import Order
+from shop.models import Order, Wishlist, Wishlist
 from shop.utils import order_is_delayed
 from django.core.paginator import Paginator
 from django.http import HttpResponse
@@ -402,6 +402,113 @@ def profile(request):
         "has_goal": has_goal,
         "show_points": show_points,
     })
+
+@login_required
+def driver_dashboard(request):
+    """
+    Driver dashboard with customizable widget ordering.
+    Shows points, orders, and wishlist widgets that can be rearranged.
+    """
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        messages.error(request, "Dashboard is only available to drivers.")
+        return redirect("accounts:profile")
+    
+    profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+    
+    # Get widget order from profile, default to ['points', 'orders', 'wishlist', 'catalog']
+    widget_order = profile.widget_order if profile.widget_order else ['points', 'orders', 'wishlist', 'catalog']
+    
+    # Ensure all widgets are in the order (in case new widgets are added)
+    all_widgets = ['points', 'orders', 'wishlist', 'catalog']
+    for widget in all_widgets:
+        if widget not in widget_order:
+            widget_order.append(widget)
+    
+    # Get points data
+    from accounts.services import get_driver_points_balance
+    total_points = get_driver_points_balance(request.user)
+    progress_percentage = 0
+    points_remaining = 0
+    has_goal = False
+    if profile.points_goal and profile.points_goal > 0:
+        progress_percentage = min(100, int((total_points / profile.points_goal) * 100))
+        points_remaining = max(0, profile.points_goal - total_points)
+        has_goal = True
+    
+    # Get recent orders (last 5)
+    recent_orders = Order.objects.filter(driver=request.user).order_by("-placed_at")[:5]
+    
+    # Get wishlists with item counts
+    wishlists = Wishlist.objects.filter(user=request.user).annotate(
+        item_count=Count('items')
+    ).order_by("-updated_at")[:5]
+    
+    # Get catalog stats (active driver catalog items count)
+    from shop.models import DriverCatalogItem
+    catalog_item_count = DriverCatalogItem.objects.filter(is_active=True).count() or 0
+    
+    context = {
+        "total_points": total_points,
+        "points_goal": profile.points_goal,
+        "progress_percentage": progress_percentage,
+        "points_remaining": points_remaining,
+        "has_goal": has_goal,
+        "recent_orders": recent_orders,
+        "wishlists": wishlists,
+        "catalog_item_count": catalog_item_count,
+        "widget_order": widget_order,
+    }
+    
+    return render(request, "accounts/driver_dashboard.html", context)
+
+@login_required
+@require_POST
+def save_widget_order(request):
+    """
+    API endpoint to save widget order preference.
+    Expects JSON: {"widget_order": ["points", "orders", "wishlist"]}
+    """
+    # Only allow drivers
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        return JsonResponse({"error": "Unauthorized"}, status=403)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        widget_order = data.get("widget_order", [])
+        
+        # Validate widget order
+        valid_widgets = ['points', 'orders', 'wishlist', 'catalog']
+        if not isinstance(widget_order, list):
+            return JsonResponse({"error": "widget_order must be a list"}, status=400)
+        
+        # Ensure all valid widgets are present
+        for widget in valid_widgets:
+            if widget not in widget_order:
+                widget_order.append(widget)
+        
+        # Remove any invalid widgets
+        widget_order = [w for w in widget_order if w in valid_widgets]
+        
+        # Save to profile
+        profile, _ = DriverProfile.objects.get_or_create(user=request.user)
+        profile.widget_order = widget_order
+        profile.save()
+        
+        return JsonResponse({"success": True, "widget_order": widget_order})
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @login_required
 def profile_edit(request):
@@ -1517,6 +1624,104 @@ def login_activity(request):
     return render(request, "accounts/login_activity.html", {"page": page_obj, "user_q": user_q, "status": status})
 
 @login_required
+def driver_security_log(request):
+    """Driver view: Show their own login history with device information."""
+    # Only allow drivers (not sponsors or admins)
+    is_driver = hasattr(request.user, "driver_profile")
+    is_sponsor = request.user.groups.filter(name="sponsor").exists()
+    is_admin = request.user.is_staff or request.user.is_superuser
+    
+    if not is_driver or is_sponsor or is_admin:
+        messages.error(request, "Security log is only available to drivers.")
+        return redirect("accounts:profile")
+    
+    # Get only successful logins for the current user
+    login_activities = LoginActivity.objects.filter(
+        user=request.user,
+        successful=True
+    ).order_by("-created_at")
+    
+    # Parse user agents for device info
+    activities_with_device = []
+    for activity in login_activities:
+        device_info = _parse_user_agent(activity.user_agent)
+        activities_with_device.append({
+            'activity': activity,
+            'device': device_info,
+        })
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(activities_with_device, 25)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'activities': page_obj,
+    }
+    return render(request, 'accounts/driver_security_log.html', context)
+
+
+def _parse_user_agent(user_agent):
+    """Parse user agent string to extract device, browser, and OS info."""
+    if not user_agent:
+        return {'device': 'Unknown', 'browser': 'Unknown', 'os': 'Unknown'}
+    
+    ua_lower = user_agent.lower()
+    
+    # Detect OS
+    os_info = 'Unknown'
+    if 'windows' in ua_lower:
+        os_info = 'Windows'
+        if 'windows nt 10.0' in ua_lower:
+            os_info = 'Windows 10/11'
+        elif 'windows nt 6.3' in ua_lower:
+            os_info = 'Windows 8.1'
+        elif 'windows nt 6.2' in ua_lower:
+            os_info = 'Windows 8'
+        elif 'windows nt 6.1' in ua_lower:
+            os_info = 'Windows 7'
+    elif 'mac os x' in ua_lower or 'macintosh' in ua_lower:
+        os_info = 'macOS'
+    elif 'iphone' in ua_lower or 'ipad' in ua_lower:
+        os_info = 'iOS'
+    elif 'android' in ua_lower:
+        os_info = 'Android'
+    elif 'linux' in ua_lower:
+        os_info = 'Linux'
+    
+    # Detect device type
+    device = 'Desktop'
+    if 'mobile' in ua_lower or 'iphone' in ua_lower or 'android' in ua_lower:
+        device = 'Mobile'
+    elif 'tablet' in ua_lower or 'ipad' in ua_lower:
+        device = 'Tablet'
+    
+    # Detect browser
+    browser = 'Unknown'
+    if 'chrome' in ua_lower and 'edg' not in ua_lower:
+        browser = 'Chrome'
+    elif 'firefox' in ua_lower:
+        browser = 'Firefox'
+    elif 'safari' in ua_lower and 'chrome' not in ua_lower:
+        browser = 'Safari'
+    elif 'edg' in ua_lower:
+        browser = 'Edge'
+    elif 'opera' in ua_lower or 'opr' in ua_lower:
+        browser = 'Opera'
+    elif 'msie' in ua_lower or 'trident' in ua_lower:
+        browser = 'Internet Explorer'
+    
+    return {
+        'device': device,
+        'browser': browser,
+        'os': os_info,
+        'raw': user_agent[:100]  # Truncate for display
+    }
+
+
+@login_required
 def message_detail(request, pk: int):
     item = get_object_or_404(MessageRecipient.objects.select_related("message", "message__author"), 
                             pk=pk, user=request.user)
@@ -1996,9 +2201,60 @@ def points_history(request):
         messages.error(request, "Points history is only available to drivers.")
         return redirect("accounts:profile")
     
-    rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
+    from django.utils.dateparse import parse_date
+    
+    rows = PointsLedger.objects.filter(user=request.user)
+    
+    # Date filtering
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+    
+    if date_from_str:
+        d = parse_date(date_from_str)
+        if d:
+            start_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.min.time()))
+            rows = rows.filter(created_at__gte=start_dt)
+    
+    if date_to_str:
+        d = parse_date(date_to_str)
+        if d:
+            end_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.max.time()))
+            rows = rows.filter(created_at__lte=end_dt)
+    
+    rows = rows.order_by("-created_at")
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
-    return render(request, "accounts/points_history.html", {"rows": rows, "balance": balance})
+    
+    # Calculate expiring points summary (from ALL points, not just filtered)
+    from django.utils import timezone
+    from datetime import timedelta
+    now = timezone.now()
+    expiring_soon_threshold = now + timedelta(days=30)  # Points expiring in next 30 days
+    
+    # Get all points for this user to calculate expiration summary
+    all_points = PointsLedger.objects.filter(user=request.user)
+    
+    # Get points that will expire soon (only positive deltas that haven't expired)
+    expiring_entries = [
+        r for r in all_points 
+        if r.delta > 0 and r.expires_at and r.expires_at > now and r.expires_at <= expiring_soon_threshold
+    ]
+    expiring_points = sum(r.delta for r in expiring_entries)
+    
+    # Get expired points (only positive deltas)
+    expired_entries = [r for r in all_points if r.delta > 0 and r.expires_at and r.expires_at <= now]
+    expired_points = sum(r.delta for r in expired_entries)
+    
+    context = {
+        "rows": rows,
+        "balance": balance,
+        "date_from": date_from_str,
+        "date_to": date_to_str,
+        "expiring_soon_points": expiring_points,
+        "expiring_entries": expiring_entries[:10],  # Show top 10 expiring soon
+        "expired_points": expired_points,
+        "now": now,
+    }
+    return render(request, "accounts/points_history.html", context)
 
 @login_required
 def points_history_download(request):
@@ -2011,8 +2267,28 @@ def points_history_download(request):
     if not is_driver or is_sponsor or is_admin:
         return HttpResponse("Points history download is only available to drivers.", status=403)
     
+    from django.utils.dateparse import parse_date
+    
     format_type = request.GET.get("format", "csv").lower()
-    rows = PointsLedger.objects.filter(user=request.user).order_by("-created_at")
+    rows = PointsLedger.objects.filter(user=request.user)
+    
+    # Date filtering (same as points_history view)
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+    
+    if date_from_str:
+        d = parse_date(date_from_str)
+        if d:
+            start_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.min.time()))
+            rows = rows.filter(created_at__gte=start_dt)
+    
+    if date_to_str:
+        d = parse_date(date_to_str)
+        if d:
+            end_dt = timezone.make_aware(datetime.datetime.combine(d, datetime.datetime.max.time()))
+            rows = rows.filter(created_at__lte=end_dt)
+    
+    rows = rows.order_by("-created_at")
     balance = rows.aggregate(s=Sum("delta"))["s"] or 0
     
     if format_type == "csv":
@@ -2122,35 +2398,44 @@ def contact_sponsor(request):
             "error": "No sponsor contact information available.",
         })
 
-    # Try to get sponsor user from multiple sources
-    sponsor_user = None
-    sponsor_name = None
-
-    # First, check if there are sponsors via M2M relationship
-    if profile.sponsors.exists():
-        sponsor_user = profile.sponsors.first()  # Get the first sponsor
-        sponsor_name = sponsor_user.get_full_name() or sponsor_user.username
+    # Get all sponsors for this driver
+    driver_sponsors = list(profile.sponsors.all())
     
-    # If no sponsor from M2M, try to find by sponsor_name
-    if not sponsor_user and profile.sponsor_name:
+    # Also check legacy sponsor_name field
+    if profile.sponsor_name:
         try:
-            sponsor_user = User.objects.filter(
+            legacy_sponsor = User.objects.filter(
                 username=profile.sponsor_name,
                 groups__name="sponsor"
             ).first()
-            if sponsor_user:
-                sponsor_name = sponsor_user.get_full_name() or sponsor_user.username
-            else:
-                sponsor_name = profile.sponsor_name
+            if legacy_sponsor and legacy_sponsor not in driver_sponsors:
+                driver_sponsors.append(legacy_sponsor)
         except Exception:
-            sponsor_name = profile.sponsor_name
+            pass
 
-    # If we still don't have a sponsor user, show error
-    if not sponsor_user:
+    # If no sponsors, show error
+    if not driver_sponsors:
         return render(request, "accounts/contact_sponsor.html", {
             "error": "No sponsor contact information available.",
             "form": ContactSponsorForm(),
+            "driver_sponsors": [],
         })
+
+    # Get selected sponsor from request (POST or GET)
+    selected_sponsor_id = request.POST.get("sponsor_id") or request.GET.get("sponsor_id", "").strip()
+    sponsor_user = None
+    
+    if selected_sponsor_id:
+        try:
+            sponsor_user = next((s for s in driver_sponsors if str(s.id) == selected_sponsor_id), None)
+        except (ValueError, TypeError):
+            pass
+    
+    # If no sponsor selected or invalid, use first sponsor
+    if not sponsor_user and driver_sponsors:
+        sponsor_user = driver_sponsors[0]
+    
+    sponsor_name = sponsor_user.get_full_name() or sponsor_user.username if sponsor_user else None
 
     # Handle form submission
     if request.method == "POST":
@@ -2189,7 +2474,7 @@ def contact_sponsor(request):
                 )
                 
                 messages.success(request, f"Message sent to {sponsor_name}!")
-                return redirect("accounts:contact_sponsor")
+                return redirect(f"{reverse('accounts:contact_sponsor')}?sponsor_id={sponsor_user.id}")
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
@@ -2203,6 +2488,8 @@ def contact_sponsor(request):
         "form": form,
         "sponsor_name": sponsor_name or "Your Sponsor",
         "sponsor_user": sponsor_user,
+        "driver_sponsors": driver_sponsors,
+        "selected_sponsor_id": str(sponsor_user.id) if sponsor_user else "",
     })
 
 
@@ -2955,23 +3242,30 @@ def chat_rooms_list(request):
     if user.groups.filter(name="sponsor").exists():
         chat_rooms = ChatRoom.objects.filter(sponsor=user)
     
-    # If user is a driver, find chat rooms based on their sponsor
+    # If user is a driver, find chat rooms based on all their sponsors
     elif hasattr(user, "driver_profile"):
-        sponsor_name = user.driver_profile.sponsor_name
-        if sponsor_name:
+        profile = user.driver_profile
+        driver_sponsors = list(profile.sponsors.all())
+        
+        # Also check legacy sponsor_name field
+        if profile.sponsor_name:
             try:
-                sponsor = User.objects.get(
-                    username=sponsor_name,
+                legacy_sponsor = User.objects.filter(
+                    username=profile.sponsor_name,
                     groups__name="sponsor"
-                )
-                # Get or create chat room for this sponsor
-                chat_room, created = ChatRoom.objects.get_or_create(
-                    sponsor=sponsor,
-                    defaults={"name": f"{sponsor.username}'s Team Chat"}
-                )
-                chat_rooms = [chat_room]
-            except User.DoesNotExist:
+                ).first()
+                if legacy_sponsor and legacy_sponsor not in driver_sponsors:
+                    driver_sponsors.append(legacy_sponsor)
+            except Exception:
                 pass
+        
+        # Get or create chat room for each sponsor
+        for sponsor in driver_sponsors:
+            chat_room, created = ChatRoom.objects.get_or_create(
+                sponsor=sponsor,
+                defaults={"name": f"{sponsor.username}'s Team Chat"}
+            )
+            chat_rooms.append(chat_room)
     
     # Annotate each chat room with latest message and unread count
     for room in chat_rooms:

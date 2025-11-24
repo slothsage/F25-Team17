@@ -219,9 +219,11 @@
               <li><a class="dropdown-item" href="{% url 'accounts:profile_edit' %}">Edit Profile</a></li>
               <li><a class="dropdown-item" href="{% url 'accounts:password_change' %}">Change Password</a></li>
               
-              {% if is_driver %}
+              {% if is_driver and not is_sponsor and not is_admin %}
+                <li><a class="dropdown-item" href="{% url 'accounts:driver_dashboard' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
                 <li><a class="dropdown-item" href="{% url 'accounts:request_sponsor' %}">Request Sponsor</a></li>
                 <li><a class="dropdown-item" href="{% url 'accounts:driver_sponsorship_requests' %}">My Sponsorship Requests</a></li>
+                <li><a class="dropdown-item" href="{% url 'accounts:driver_security_log' %}"><i class="fas fa-shield-alt"></i> Security Log</a></li>
               {% endif %}
               {% if is_sponsor %}
                 <li class="nav-item">

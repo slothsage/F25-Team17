@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Security Log{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="fas fa-shield-alt"></i> Security Log</h1>
+    <a href="{% url 'accounts:profile' %}" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i> Back to Profile
+    </a>
+  </div>
+
+  <div class="alert alert-info">
+    <i class="fas fa-info-circle"></i> <strong>Security Information:</strong> This page shows your login history. 
+    Review it regularly to check for any suspicious activity. If you see any logins you don't recognize, 
+    change your password immediately and contact support.
+  </div>
+
+  {% if activities %}
+    <div class="table-responsive">
+      <table class="table table-striped table-hover" style="width: 100%;">
+        <thead class="table-light">
+          <tr>
+            <th>Date & Time</th>
+            <th>Device</th>
+            <th>Browser</th>
+            <th>Operating System</th>
+            <th>IP Address</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in activities %}
+            {% with activity=item.activity device=item.device %}
+            <tr>
+              <td>
+                <strong>{{ activity.created_at|date:"M d, Y" }}</strong><br>
+                <small class="text-muted">{{ activity.created_at|date:"g:i A" }}</small>
+              </td>
+              <td>
+                <i class="fas fa-{% if device.device == 'Mobile' %}mobile-alt{% elif device.device == 'Tablet' %}tablet-alt{% else %}desktop{% endif %}"></i>
+                {{ device.device }}
+              </td>
+              <td>
+                <i class="fab fa-{% if device.browser == 'Chrome' %}chrome{% elif device.browser == 'Firefox' %}firefox{% elif device.browser == 'Safari' %}safari{% elif device.browser == 'Edge' %}edge{% else %}internet-explorer{% endif %}"></i>
+                {{ device.browser }}
+              </td>
+              <td>
+                <i class="fab fa-{% if device.os == 'Windows' or 'Windows' in device.os %}windows{% elif device.os == 'macOS' %}apple{% elif device.os == 'Android' %}android{% elif device.os == 'iOS' %}apple{% elif device.os == 'Linux' %}linux{% else %}linux{% endif %}"></i>
+                {{ device.os }}
+              </td>
+              <td>
+                <code>{{ activity.ip_address|default:"—" }}</code>
+              </td>
+              <td>
+                <small class="text-muted">
+                  {% if activity.ip_address %}
+                    <i class="fas fa-map-marker-alt"></i> IP Location
+                  {% else %}
+                    —
+                  {% endif %}
+                </small>
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+      <nav aria-label="Security log pagination">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+            </li>
+          {% endif %}
+          
+          <li class="page-item active">
+            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          </li>
+          
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="alert alert-warning">
+      <i class="fas fa-exclamation-triangle"></i> No login history found. This may be your first login.
+    </div>
+  {% endif %}
+
+  <div class="mt-4">
+    <h5>Security Tips</h5>
+    <ul>
+      <li>Review your login history regularly for any suspicious activity</li>
+      <li>If you see logins from unfamiliar locations or devices, change your password immediately</li>
+      <li>Use strong, unique passwords and enable two-factor authentication if available</li>
+      <li>Never share your login credentials with anyone</li>
+      <li>Log out from shared or public computers</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+  .table th {
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+  }
+  .table td {
+    vertical-align: middle;
+  }
+  code {
+    background-color: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+</style>
+{% endblock %}
+

@@ -175,6 +175,21 @@
             {% endif %}
           </div>
 
+          {% if order.tracking_number %}
+          <div class="mb-3">
+            <h6 class="text-muted mb-2">Tracking Number</h6>
+            <p class="mb-0">
+              <strong class="fs-6 font-monospace">{{ order.tracking_number }}</strong>
+            </p>
+            <small class="text-muted">Use this number to track your shipment with the carrier</small>
+          </div>
+          {% elif order.status == "shipped" or order.status == "delivered" %}
+          <div class="mb-3">
+            <h6 class="text-muted mb-2">Tracking Number</h6>
+            <p class="text-muted mb-0"><small>Tracking number will be available soon</small></p>
+          </div>
+          {% endif %}
+
           <!-- Tracking Progress -->
           <div class="mt-4">
             <h6 class="text-muted mb-3">Order Progress</h6>
@@ -274,7 +289,7 @@
                     </p>
                   </div>
                   <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="closeModal(this)">
                       <i class="fas fa-times me-1"></i> Keep Order
                     </button>
                     <form method="post" action="{% url 'shop:cancel_order' order.id %}" class="d-inline">
@@ -397,4 +412,63 @@
   }
 }
 </style>
+
+<script>
+function closeModal(button) {
+  const modal = button.closest('.modal');
+  if (modal) {
+    // Try Bootstrap 5 method first
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      const bsModal = bootstrap.Modal.getInstance(modal);
+      if (bsModal) {
+        bsModal.hide();
+        // Also manually clean up to be sure
+        setTimeout(() => {
+          modal.classList.remove('show');
+          modal.setAttribute('aria-hidden', 'true');
+          modal.style.display = 'none';
+          document.body.classList.remove('modal-open');
+          const backdrop = document.querySelector('.modal-backdrop');
+          if (backdrop) backdrop.remove();
+          document.body.style.paddingRight = '';
+        }, 150);
+        return;
+      }
+    }
+    // Fallback: manual close
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.remove();
+    // Remove padding-right that Bootstrap adds
+    document.body.style.paddingRight = '';
+  }
+}
+
+// Ensure all modals are hidden on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Remove any lingering modal classes and backdrops
+  const modals = document.querySelectorAll('.modal');
+  modals.forEach(modal => {
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.style.display = 'none';
+  });
+  
+  // Remove any backdrop elements
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+  backdrops.forEach(backdrop => backdrop.remove());
+  
+  // Clean up body classes
+  document.body.classList.remove('modal-open');
+  document.body.style.paddingRight = '';
+  
+  // Clear any URL hash that might trigger a modal
+  if (window.location.hash && window.location.hash.startsWith('#cancelOrderModal')) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+});
+</script>
 {% endblock %}

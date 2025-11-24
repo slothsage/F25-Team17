@@ -10,10 +10,24 @@
     <p>{{ error }}</p>
     <p><a class="btn" href="{% url 'accounts:profile' %}">Back to Profile</a></p>
   {% elif sponsor_user %}
+    {% if driver_sponsors|length > 1 %}
+      <div style="margin-bottom: 1.5rem;">
+        <label for="sponsor-select"><strong>Select Sponsor:</strong></label>
+        <select id="sponsor-select" class="form-select" style="max-width: 400px; margin-top: 0.5rem;" onchange="window.location.href='{% url 'accounts:contact_sponsor' %}?sponsor_id=' + this.value">
+          {% for sponsor in driver_sponsors %}
+            <option value="{{ sponsor.id }}" {% if selected_sponsor_id == sponsor.id|stringformat:"s" %}selected{% endif %}>
+              {{ sponsor.get_full_name|default:sponsor.username }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+    
     <p>Send a message to: <strong>{{ sponsor_name|default:"Your Sponsor" }}</strong></p>
     
     <form method="post" style="max-width: 600px; margin-top: 1rem;">
       {% csrf_token %}
+      <input type="hidden" name="sponsor_id" value="{{ selected_sponsor_id }}">
       
       <div style="margin-bottom: 1rem;">
         <label for="{{ form.subject.id_for_label }}">{{ form.subject.label }}</label>

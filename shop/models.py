@@ -8,6 +8,7 @@ POINTS_CACHE_KEY = "points_per_usd:v1"
 
 class PointsConfig(models.Model):
     points_per_usd = models.PositiveIntegerField(default=100, help_text="How many points per $1")
+    points_expiry_days = models.PositiveIntegerField(default=0, help_text="Number of days until points expire (0 = never expires)")
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:
         verbose_name = "Points Configuration"
@@ -18,7 +19,7 @@ class PointsConfig(models.Model):
     
     @classmethod
     def get_solo(cls):
-        obj, _ = cls.objects.get_or_create(pk=1, defaults={"points_per_usd": 100})
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={"points_per_usd": 100, "points_expiry_days": 0})
         return obj
     
     def save(self, *args, **kwargs):
@@ -50,6 +51,7 @@ class Order(models.Model):
     ship_postal = models.CharField(max_length=20, blank=True)
     ship_country = models.CharField(max_length=2, default="US")
     expected_delivery_date = models.DateField(null=True, blank=True)
+    tracking_number = models.CharField(max_length=100, blank=True, help_text="Shipping tracking number")
 
     def can_mark_received(self):
         return self.status in ("shipped", "delivered") and self.status != "cancelled"

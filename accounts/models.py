@@ -85,6 +85,13 @@ class DriverProfile(models.Model):
         help_text="Admin-assigned tags for categorizing users."
     )
     
+    # Dashboard widget order preference (JSON array of widget IDs)
+    widget_order = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Order of dashboard widgets (e.g., ['points', 'orders', 'wishlist'])"
+    )
+    
     def __str__(self):
         return f"DriverProfile<{self.user.username}>"
 
@@ -301,6 +308,7 @@ class PointsLedger(models.Model):
     reason = models.CharField(max_length=255, blank=True)
     balance_after = models.IntegerField()  
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text="When these points expire (null = never expires)")
 
     class Meta:
         ordering = ["-created_at"]
@@ -308,6 +316,21 @@ class PointsLedger(models.Model):
     def __str__(self):
         sign = "+" if self.delta >= 0 else ""
         return f"{self.user} {sign}{self.delta} ({self.reason}) → {self.balance_after}"
+    
+    def is_expired(self):
+        """Check if these points have expired."""
+        if not self.expires_at:
+            return False
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+    
+    def days_until_expiry(self):
+        """Return number of days until expiration, or None if never expires."""
+        if not self.expires_at:
+            return None
+        from django.utils import timezone
+        delta = self.expires_at - timezone.now()
+        return max(0, delta.days)
     
 # --- x Sponsor points ---
 # --- Per-sponsor points ---
@@ -820,11 +843,23 @@ class SponsorPointsAccount(models.Model):
             f"{'Awarded' if delta > 0 else 'Spent'} via {self.sponsor.get_full_name() or self.sponsor.username}"
         )
         new_balance = prior_total + delta
+        
+        # Calculate expiration date if points are being added (delta > 0)
+        expires_at = None
+        if delta > 0:
+            from shop.models import PointsConfig
+            from django.utils import timezone
+            from datetime import timedelta
+            config = PointsConfig.get_solo()
+            if config.points_expiry_days > 0:
+                expires_at = timezone.now() + timedelta(days=config.points_expiry_days)
+        
         PointsLedger.objects.create(
             user=self.driver,
             delta=delta,
             reason=ledger_reason[:255],
             balance_after=new_balance,
+            expires_at=expires_at,
         )
         
         # Trigger notification for points update

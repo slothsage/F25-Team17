@@ -56,6 +56,7 @@
         <th style="text-align:left; padding:6px;">Placed</th>
         <th style="text-align:left; padding:6px;">Sponsor</th>
         <th style="text-align:left; padding:6px;">Status</th>
+        <th style="text-align:left; padding:6px;">Tracking</th>
         <th style="text-align:right; padding:6px;">Points</th>
         <th style="text-align:center; padding:6px;">Actions</th>
       </tr>
@@ -67,9 +68,19 @@
         <td style="padding:6px;">{{ o.placed_at|date:"Y-m-d H:i" }}</td>
         <td style="padding:6px;">{{ o.sponsor_name|default:"—" }}</td>
         <td style="padding:6px;">
-          <span class="badge {% if o.status == 'pending' %}bg-secondary{% elif o.status == 'confirmed' %}bg-info{% elif o.status == 'processing' %}bg-warning text-dark{% elif o.status == 'shipped' %}bg-primary{% elif o.status == 'delivered' %}bg-success{% elif o.status == 'cancelled' %}bg-danger{% endif %}">
+          <span class="badge {% if o.status == 'pending' %}bg-secondary{% elif o.status == 'confirmed' %}bg-info{% elif o.status == 'processing' %}bg-warning text-dark{% elif o.status == 'shipped' %}bg-primary{% elif o.status == 'delivered' %}bg-success{% elif o.status == 'cancelled' %}bg-danger{% endif %}" 
+                style="{% if o.status == 'pending' %}background-color: #6c757d !important; color: white;{% elif o.status == 'confirmed' %}background-color: #0dcaf0 !important; color: white;{% elif o.status == 'processing' %}background-color: #ffc107 !important; color: black;{% elif o.status == 'shipped' %}background-color: #0d6efd !important; color: white;{% elif o.status == 'delivered' %}background-color: #198754 !important; color: white;{% elif o.status == 'cancelled' %}background-color: #dc3545 !important; color: white;{% endif %} padding: 0.35em 0.65em; border-radius: 0.25rem; font-weight: 500;">
             {{ o.get_status_display }}
           </span>
+        </td>
+        <td style="padding:6px;">
+          {% if o.tracking_number %}
+            <span class="font-monospace" style="font-family: monospace; font-size: 0.9em;">{{ o.tracking_number }}</span>
+          {% elif o.status == 'shipped' or o.status == 'delivered' %}
+            <span class="text-muted" style="font-size: 0.85em;"><i class="fas fa-clock"></i> Pending</span>
+          {% else %}
+            <span class="text-muted" style="font-size: 0.85em;">—</span>
+          {% endif %}
         </td>
         <td style="text-align:right; padding:6px;">{{ o.points_spent }} pts</td>
         <td style="text-align:center; padding:6px;">
@@ -114,7 +125,7 @@
                     </p>
                   </div>
                   <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="closeModal(this)">
                       <i class="fas fa-times me-1"></i> Keep Order
                     </button>
                     <form method="post" action="{% url 'shop:cancel_order' o.id %}?redirect_to=shop:order_list" class="d-inline">
@@ -148,4 +159,63 @@
 {% else %}
   <p>No orders found.</p>
 {% endif %}
+
+<script>
+function closeModal(button) {
+  const modal = button.closest('.modal');
+  if (modal) {
+    // Try Bootstrap 5 method first
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      const bsModal = bootstrap.Modal.getInstance(modal);
+      if (bsModal) {
+        bsModal.hide();
+        // Also manually clean up to be sure
+        setTimeout(() => {
+          modal.classList.remove('show');
+          modal.setAttribute('aria-hidden', 'true');
+          modal.style.display = 'none';
+          document.body.classList.remove('modal-open');
+          const backdrop = document.querySelector('.modal-backdrop');
+          if (backdrop) backdrop.remove();
+          document.body.style.paddingRight = '';
+        }, 150);
+        return;
+      }
+    }
+    // Fallback: manual close
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.remove();
+    // Remove padding-right that Bootstrap adds
+    document.body.style.paddingRight = '';
+  }
+}
+
+// Ensure all modals are hidden on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Remove any lingering modal classes and backdrops
+  const modals = document.querySelectorAll('.modal');
+  modals.forEach(modal => {
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.style.display = 'none';
+  });
+  
+  // Remove any backdrop elements
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+  backdrops.forEach(backdrop => backdrop.remove());
+  
+  // Clean up body classes
+  document.body.classList.remove('modal-open');
+  document.body.style.paddingRight = '';
+  
+  // Clear any URL hash that might trigger a modal
+  if (window.location.hash && window.location.hash.startsWith('#cancelOrderModal')) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+});
+</script>
 {% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Update Order #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0"><i class="fas fa-edit"></i> Update Order #{{ order.id }}</h4>
+        </div>
+        <div class="card-body">
+          <!-- Order Info -->
+          <div class="mb-4">
+            <h5>Order Information</h5>
+            <table class="table table-sm">
+              <tr>
+                <th>Driver:</th>
+                <td>{{ order.driver.username }}</td>
+              </tr>
+              <tr>
+                <th>Placed:</th>
+                <td>{{ order.placed_at|date:"F d, Y g:i A" }}</td>
+              </tr>
+              <tr>
+                <th>Points:</th>
+                <td>{{ order.points_spent }} pts</td>
+              </tr>
+              <tr>
+                <th>Current Status:</th>
+                <td>
+                  <span class="badge {% if order.status == 'pending' %}bg-secondary{% elif order.status == 'confirmed' %}bg-info{% elif order.status == 'processing' %}bg-warning text-dark{% elif order.status == 'shipped' %}bg-primary{% elif order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% endif %}" 
+                        style="{% if order.status == 'pending' %}background-color: #6c757d !important; color: white;{% elif order.status == 'confirmed' %}background-color: #0dcaf0 !important; color: white;{% elif order.status == 'processing' %}background-color: #ffc107 !important; color: black;{% elif order.status == 'shipped' %}background-color: #0d6efd !important; color: white;{% elif order.status == 'delivered' %}background-color: #198754 !important; color: white;{% elif order.status == 'cancelled' %}background-color: #dc3545 !important; color: white;{% endif %} padding: 0.35em 0.65em; border-radius: 0.25rem; font-weight: 500;">
+                    {{ order.get_status_display }}
+                  </span>
+                </td>
+              </tr>
+              {% if order.tracking_number %}
+              <tr>
+                <th>Current Tracking:</th>
+                <td><span class="font-monospace">{{ order.tracking_number }}</span></td>
+              </tr>
+              {% endif %}
+            </table>
+          </div>
+
+          <!-- Update Form -->
+          <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+              <label for="status" class="form-label"><strong>Order Status</strong></label>
+              <select name="status" id="status" class="form-select" required>
+                {% for value, label in STATUS_CHOICES %}
+                  <option value="{{ value }}" {% if order.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-text text-muted">Update the order status to reflect its current state in the fulfillment process.</small>
+            </div>
+
+            <div class="mb-3">
+              <label for="tracking_number" class="form-label"><strong>Tracking Number</strong></label>
+              <input type="text" 
+                     name="tracking_number" 
+                     id="tracking_number" 
+                     class="form-control font-monospace" 
+                     value="{{ order.tracking_number|default:'' }}" 
+                     placeholder="e.g. 1Z999AA10123456784"
+                     maxlength="100">
+              <small class="form-text text-muted">Enter the shipping tracking number. This will be visible to the driver.</small>
+            </div>
+
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle"></i> <strong>Note:</strong> The driver will be notified when you update this order.
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Update Order
+              </button>
+              <a href="{% url 'shop:sponsor_orders' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

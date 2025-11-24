@@ -151,10 +151,10 @@ SESSION_SAVE_EVERY_REQUEST = True  # refresh session expiry on each request
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "no-reply@demo.local"
 
-
-EBAY_CLIENT_ID = 'JacobRob-F25Team1-SBX-2df8ae938-510a37dd'
-EBAY_CLIENT_SECRET = 'SBX-df8ae938df8a-57b0-43e2-a63b-f447'
-EBAY_SANDBOX = True  # Set to False for production
+# eBay API Configuration - Load from environment variables, fallback to defaults
+EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID", "")
+EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET", "")
+EBAY_SANDBOX = os.getenv("EBAY_SANDBOX", "False").lower() in ("true", "1", "yes")
 
 CACHES = {
     'default': {
@@ -162,3 +162,5 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+# Settings file updated - ready for EC2 deployment

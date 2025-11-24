@@ -2,33 +2,112 @@
 {% block content %}
   <h1>Points history</h1>
 
+  <!-- Date Filter Form -->
+  <form method="get" style="margin-bottom:1rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;">
+    <label>
+      From:
+      <input type="date" name="date_from" value="{{ date_from }}" placeholder="YYYY-MM-DD">
+    </label>
+
+    <label>
+      To:
+      <input type="date" name="date_to" value="{{ date_to }}" placeholder="YYYY-MM-DD">
+    </label>
+
+    <button type="submit" class="btn">Apply Filter</button>
+    {% if date_from or date_to %}
+      <a href="{% url 'accounts:points_history' %}" class="btn">Clear Filter</a>
+    {% endif %}
+  </form>
+
+  {% if date_from or date_to %}
+    <div style="margin-bottom: 1rem; padding: 0.5rem; background-color: #e7f3ff; border-left: 3px solid #007bff; border-radius: 4px;">
+      <strong>Filtered by:</strong>
+      {% if date_from %}From: {{ date_from }}{% endif %}
+      {% if date_from and date_to %} | {% endif %}
+      {% if date_to %}To: {{ date_to }}{% endif %}
+    </div>
+  {% endif %}
+
+  {% if expiring_soon_points > 0 or expired_points > 0 %}
+    <div style="margin-bottom: 1rem; padding: 1rem; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+      <h5 style="margin-top: 0; margin-bottom: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> Points Expiration Notice</h5>
+      {% if expired_points > 0 %}
+        <p style="margin: 0.25rem 0; color: #dc3545; font-weight: bold;">
+          <i class="fas fa-times-circle"></i> {{ expired_points }} points have expired
+        </p>
+      {% endif %}
+      {% if expiring_soon_points > 0 %}
+        <p style="margin: 0.25rem 0; color: #856404;">
+          <i class="fas fa-clock"></i> {{ expiring_soon_points }} points expiring in the next 30 days
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% if rows %}
-    <table border="1" cellpadding="6" cellspacing="0">
-      <thead>
+    <table border="1" cellpadding="6" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+      <thead style="background-color: #f8f9fa;">
         <tr>
           <th>When</th>
           <th>Change</th>
           <th>Reason</th>
           <th>Balance after</th>
+          <th>Expiring</th>
         </tr>
       </thead>
       <tbody>
         {% for r in rows %}
           <tr>
-            <td>{{ r.created_at }}</td>
-            <td>{% if r.delta >= 0 %}+{% endif %}{{ r.delta }}</td>
-            <td>{{ r.reason }}</td>
-            <td>{{ r.balance_after }}</td>
+            <td>{{ r.created_at|date:"Y-m-d H:i:s" }}</td>
+            <td style="{% if r.delta >= 0 %}color: green;{% else %}color: red;{% endif %}">{% if r.delta >= 0 %}+{% endif %}{{ r.delta }}</td>
+            <td>{{ r.reason|default:"—" }}</td>
+            <td><strong>{{ r.balance_after }}</strong></td>
+            <td>
+              {% if r.delta > 0 and r.expires_at %}
+                {% with days_left=r.days_until_expiry %}
+                  {% if days_left == 0 %}
+                    <span style="color: red; font-weight: bold;">Expired</span>
+                  {% elif days_left <= 7 %}
+                    <span style="color: orange; font-weight: bold;">{{ r.expires_at|date:"M d, Y" }} ({{ days_left }} days)</span>
+                  {% elif days_left <= 30 %}
+                    <span style="color: #ffc107;">{{ r.expires_at|date:"M d, Y" }} ({{ days_left }} days)</span>
+                  {% else %}
+                    <span style="color: #6c757d;">{{ r.expires_at|date:"M d, Y" }} ({{ days_left }} days)</span>
+                  {% endif %}
+                {% endwith %}
+              {% elif r.delta > 0 %}
+                <span style="color: #28a745;">Never</span>
+              {% else %}
+                <span style="color: #6c757d;">—</span>
+              {% endif %}
+            </td>
           </tr>
         {% endfor %}
       </tbody>
+      {% if balance is not None %}
+      <tfoot style="background-color: #f8f9fa; font-weight: bold;">
+        <tr>
+          <td colspan="4" style="text-align: right;">Total Balance:</td>
+          <td>{{ balance }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
     </table>
   {% else %}
-    <p>No points activity yet.</p>
+    <div style="padding: 2rem; text-align: center; background-color: #f8f9fa; border-radius: 4px;">
+      <p>{% if date_from or date_to %}No points activity found for the selected date range.{% else %}No points activity yet.{% endif %}</p>
+    </div>
   {% endif %}
 
   <div style="margin-top:1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
     <form method="get" action="{% url 'accounts:points_history_download' %}" style="display: flex; gap: 0.5rem; align-items: center;">
+      {% if date_from %}
+        <input type="hidden" name="date_from" value="{{ date_from }}">
+      {% endif %}
+      {% if date_to %}
+        <input type="hidden" name="date_to" value="{{ date_to }}">
+      {% endif %}
       <label for="format" style="font-weight: 600;">Download History:</label>
       <select name="format" id="format" class="btn" style="padding: 0.4rem 0.8rem;">
         <option value="csv">CSV</option>

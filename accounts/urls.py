@@ -136,6 +136,8 @@ urlpatterns = [
     # Driver profile
     path("", views.profile, name="profile"),
     path("profile/", views.profile, name="profile_detail"),  # For convenience
+    path("dashboard/", views.driver_dashboard, name="driver_dashboard"),
+    path("dashboard/save-widget-order/", views.save_widget_order, name="save_widget_order"),
     path("profile/edit/", views.profile_edit, name="profile_edit"),
     path("profile/picture/", views.profile_picture_edit, name="profile_picture_edit"),
     path("admin/users/<int:user_id>/edit-profile/", views.admin_profile_edit, name="admin_profile_edit"),
@@ -155,6 +157,7 @@ urlpatterns = [
     path("points/", views.points_history, name="points_history"),
     path("points/download/", views.points_history_download, name="points_history_download"),
     path("points/goal/", views.points_goal_tracker, name="points_goal_tracker"),
+    path("security-log/", views.driver_security_log, name="driver_security_log"),
     path("contact-sponsor/", views.contact_sponsor, name="contact_sponsor"),
     path("my-sponsor/", views.my_sponsor, name="my_sponsor"),
 
