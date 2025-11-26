@@ -10,7 +10,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.http import HttpResponse, HttpResponseBadRequest 
 from django.db.models import Sum, Count, Q
-from accounts.models import PointsLedger, DriverProfile
+from accounts.models import PointsLedger, DriverProfile, SponsorProfile, SponsorPointsTransaction
 from accounts.services import get_driver_points_balance
 from .models import PointsConfig
 from .forms import PointsConfigForm, CheckoutForm, SponsorCatalogItemForm
@@ -1411,6 +1411,9 @@ def report_driver_points(request):
     # --- Build Data Table ---
     columns = ["Date", "Driver", "Sponsor", "Δ Points", "Reason"]
     rows = []
+    total_credited = 0
+    total_debited = 0
+    total_fee_usd = 0.0
     for rec in qs:
         sponsor_name = getattr(getattr(rec.user, "driver_profile", None), "sponsor_name", "") or ""
         rows.append([
@@ -1503,6 +1506,115 @@ def report_sales_by_sponsor(request):
         "detail": "detail" if detail else "summary",
     }
     return _csv_or_render(request, filename, columns, rows, template, ctx)
+
+
+@login_required
+@user_passes_test(_staff_only)
+def report_fee_tracking(request):
+    """
+    Admin-only Fee Tracking report.
+    Shows, per sponsor, how many points were credited/debited and the
+    approximate fee value in USD over a date range, using each sponsor's
+    fee ratio (points_per_usd) or the global default.
+    """
+    start, end, start_dt, end_dt = _daterange_from_request(request, default_days=30)
+
+    sponsor_username = (request.GET.get("sponsor") or "").strip()
+
+    # Base queryset of sponsor point transactions in window
+    tx_qs = SponsorPointsTransaction.objects.filter(
+        created_at__range=(start_dt, end_dt)
+    ).select_related("wallet__sponsor")
+
+    if sponsor_username:
+        tx_qs = tx_qs.filter(wallet__sponsor__username=sponsor_username)
+
+    # Preload sponsor profiles + fee ratios
+    from shop.models import PointsConfig
+
+    global_ratio = PointsConfig.get_solo().points_per_usd
+    sponsor_ids = (
+        tx_qs.values_list("wallet__sponsor_id", flat=True).distinct()
+    )
+    profiles = {
+        sp.user_id: sp
+        for sp in SponsorProfile.objects.filter(user_id__in=sponsor_ids)
+    }
+
+    # Aggregate per sponsor in Python so we can apply per-sponsor ratio
+    per_sponsor = {}
+    for tx in tx_qs:
+        sponsor = tx.wallet.sponsor
+        sid = sponsor.id
+        profile = profiles.get(sid)
+        ratio = profile.get_points_per_usd() if profile else global_ratio
+
+        entry = per_sponsor.setdefault(
+            sid,
+            {
+                "sponsor": sponsor,
+                "points_credit": 0,
+                "points_debit": 0,
+                "ratio": ratio,
+            },
+        )
+
+        if tx.tx_type == "credit":
+            entry["points_credit"] += tx.amount
+        elif tx.tx_type == "debit":
+            entry["points_debit"] += tx.amount
+
+    # Build rows for display / CSV
+    columns = [
+        "Sponsor",
+        "Points Credited",
+        "Points Debited",
+        "Net Points",
+        "Fee Ratio (pts/USD)",
+        "Approx Fee $ (Credits)",
+    ]
+    rows = []
+    for data in sorted(per_sponsor.values(), key=lambda d: d["sponsor"].username.lower()):
+        sponsor = data["sponsor"]
+        credited = data["points_credit"]
+        debited = data["points_debit"]
+        net = credited - debited
+        ratio = data["ratio"] or global_ratio or 1
+        fee_usd = round(credited / ratio, 2) if ratio else 0.0
+        rows.append(
+            [
+                sponsor.username,
+                credited,
+                debited,
+                net,
+                ratio,
+                f"${fee_usd:,.2f}",
+            ]
+        )
+
+    # Sponsor dropdown options
+    sponsor_names = (
+        SponsorProfile.objects.select_related("user")
+        .order_by("user__username")
+        .values_list("user__username", flat=True)
+    )
+
+    ctx = {
+        "title": "Sponsor Fee Tracking",
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "sponsor": sponsor_username,
+        "sponsor_names": sponsor_names,
+    }
+
+    return _csv_or_render(
+        request,
+        f"fee_tracking_{start}_{end}",
+        columns,
+        rows,
+        "reports/report_fee_tracking.html",
+        ctx,
+    )
 
 @login_required
 @user_passes_test(_staff_only)

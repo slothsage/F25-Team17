@@ -28,10 +28,11 @@ urlpatterns = [
     path("favorites/add/", views.add_favorite, name="add_favorite"),
     path("favorites/remove/<str:product_id>/", views.remove_favorite, name="remove_favorite"),
     # Reports
-    path("reports/driver-points/",  views.report_driver_points, name="report_driver_points"),
+    path("reports/driver-points/",    views.report_driver_points, name="report_driver_points"),
     path("reports/sales-by-sponsor/", views.report_sales_by_sponsor, name="report_sales_by_sponsor"),
     path("reports/sales-by-driver/",  views.report_sales_by_driver, name="report_sales_by_driver"),
-    path("reports/invoices/",         views.report_invoices, name="report_invoices"),
+    path("reports/fee-tracking/",     views.report_fee_tracking,    name="report_fee_tracking"),
+    path("reports/invoices/",         views.report_invoices,        name="report_invoices"),
 ]
 
 

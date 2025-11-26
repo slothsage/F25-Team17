@@ -325,6 +325,7 @@
               {% if user.is_staff %}
                 <li><a class="dropdown-item" href="{% url 'shop:report_sales_by_sponsor' %}">Sales by Sponsor</a></li>
                 <li><a class="dropdown-item" href="{% url 'shop:report_sales_by_driver' %}">Sales by Driver</a></li>
+                <li><a class="dropdown-item" href="{% url 'shop:report_fee_tracking' %}">Fee Tracking</a></li>
                 <li><a class="dropdown-item" href="{% url 'shop:report_invoices' %}">Invoices</a></li>
               {% endif %}
             </ul>
