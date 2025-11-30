@@ -469,13 +469,35 @@
     (function () {
       const navToggle = document.getElementById('nav-toggle');
       const siteNav = document.querySelector('.site-nav');
+      const navCenter = document.querySelector('.nav-center');
       if (!navToggle || !siteNav) return;
 
+      // Open/close mobile menu
       navToggle.addEventListener('click', function () {
         const expanded = navToggle.getAttribute('aria-expanded') === 'true';
         navToggle.setAttribute('aria-expanded', String(!expanded));
         siteNav.classList.toggle('open');
       });
+      
+      // Close when clicking backdrop (the ::after pseudo-element)
+      siteNav.addEventListener('click', function(e) {
+        if (e.target === siteNav && siteNav.classList.contains('open')) {
+          navToggle.setAttribute('aria-expanded', 'false');
+          siteNav.classList.remove('open');
+        }
+      });
+      
+      // Close when clicking the X button (::before pseudo-element on nav-center)
+      if (navCenter) {
+        navCenter.addEventListener('click', function(e) {
+          const rect = navCenter.getBoundingClientRect();
+          // Check if click is in top-right corner where X button is
+          if (e.clientX > rect.right - 50 && e.clientY < rect.top + 50) {
+            navToggle.setAttribute('aria-expanded', 'false');
+            siteNav.classList.remove('open');
+          }
+        });
+      }
     })();
   </script>
   <script>
