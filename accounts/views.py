@@ -1573,7 +1573,8 @@ def message_delete(request, pk: int):
     item = get_object_or_404(MessageRecipient, pk=pk, user=request.user)
     item.delete()
     messages.success(request, "Message deleted.")
-    return redirect(request.META.get("HTTP_REFERER", "accounts:messages_inbox"))
+    return redirect("accounts:messages_inbox")
+    #return redirect(request.META.get("HTTP_REFERER", "accounts:messages_inbox"))
 
 @login_required
 @require_POST
