@@ -56,8 +56,8 @@
                         </select>
                     </div>
                     
-                    <!-- Sponsor Filter (only show if driver has multiple sponsors) -->
-                    {% if driver_sponsors|length > 1 %}
+                    <!-- Sponsor Filter (show if driver has any sponsors) -->
+                    {% if driver_sponsors|length > 0 %}
                     <div class="col-md-6 col-lg-2">
                         <label class="form-label text-uppercase small fw-semibold text-muted">Sponsor</label>
                         <select name="sponsor_filter" class="form-select" onchange="this.form.submit()">
@@ -72,7 +72,7 @@
                     {% endif %}
                     
                     <!-- Sort Options -->
-                    <div class="col-md-6 col-lg-{% if driver_sponsors|length > 1 %}2{% else %}3{% endif %}">
+                    <div class="col-md-6 col-lg-{% if driver_sponsors|length > 0 %}2{% else %}3{% endif %}">
                         <label class="form-label text-uppercase small fw-semibold text-muted">Sort By</label>
                         <select name="sort" class="form-select" onchange="this.form.submit()">
                             <option value="newest" {% if sort_by == "newest" %}selected{% endif %}>Newest First</option>
