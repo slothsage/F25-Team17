@@ -765,24 +765,28 @@ def catalog_search(request):
 
     context["points_balance"] = get_driver_points_balance(request.user)
 
-    # Get driver's sponsors to prioritize their catalog items
+    # Get driver's sponsors from approved sponsorship requests (same as Sponsorship Center)
+    from django.db.models import Q
+    from accounts.models import SponsorshipRequest
     driver_profile = getattr(request.user, "driver_profile", None)
     driver_sponsors = set()
     driver_sponsors_list = []
     if driver_profile:
-        # Get sponsors from ManyToMany relationship
-        driver_sponsors.update(driver_profile.sponsors.all())
-        driver_sponsors_list = list(driver_profile.sponsors.all())
-        # Also check legacy sponsor_name field
-        if driver_profile.sponsor_name:
-            from django.contrib.auth.models import User
-            try:
-                legacy_sponsor = User.objects.get(username=driver_profile.sponsor_name)
-                driver_sponsors.add(legacy_sponsor)
-                if legacy_sponsor not in driver_sponsors_list:
-                    driver_sponsors_list.append(legacy_sponsor)
-            except User.DoesNotExist:
-                pass
+        # Get sponsors from approved SponsorshipRequest records
+        approved_requests = SponsorshipRequest.objects.filter(
+            Q(from_user=request.user, status="approved") | Q(to_user=request.user, status="approved")
+        ).select_related("from_user", "to_user")
+        
+        for req in approved_requests:
+            # Get the sponsor (the other user who is a sponsor)
+            if req.from_user == request.user:
+                sponsor = req.to_user
+            else:
+                sponsor = req.from_user
+            
+            if sponsor.groups.filter(name="sponsor").exists():
+                driver_sponsors.add(sponsor)
+                driver_sponsors_list.append(sponsor)
     
     # Get selected sponsor filter (if driver has multiple sponsors)
     selected_sponsor_id = request.GET.get("sponsor_filter", "").strip()

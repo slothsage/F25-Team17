@@ -2398,20 +2398,22 @@ def contact_sponsor(request):
             "error": "No sponsor contact information available.",
         })
 
-    # Get all sponsors for this driver
-    driver_sponsors = list(profile.sponsors.all())
+    # Get all sponsors from approved sponsorship requests (same as Sponsorship Center)
+    from django.db.models import Q
+    approved_requests = SponsorshipRequest.objects.filter(
+        Q(from_user=request.user, status="approved") | Q(to_user=request.user, status="approved")
+    ).select_related("from_user", "to_user")
     
-    # Also check legacy sponsor_name field
-    if profile.sponsor_name:
-        try:
-            legacy_sponsor = User.objects.filter(
-                username=profile.sponsor_name,
-                groups__name="sponsor"
-            ).first()
-            if legacy_sponsor and legacy_sponsor not in driver_sponsors:
-                driver_sponsors.append(legacy_sponsor)
-        except Exception:
-            pass
+    driver_sponsors = []
+    for req in approved_requests:
+        # Get the sponsor (the other user who is a sponsor)
+        if req.from_user == request.user:
+            sponsor = req.to_user
+        else:
+            sponsor = req.from_user
+        
+        if sponsor.groups.filter(name="sponsor").exists():
+            driver_sponsors.append(sponsor)
 
     # If no sponsors, show error
     if not driver_sponsors:
@@ -3238,26 +3240,33 @@ def chat_rooms_list(request):
     user = request.user
     chat_rooms = []
     
-    # If user is a sponsor, show all chat rooms they own
-    if user.groups.filter(name="sponsor").exists():
-        chat_rooms = ChatRoom.objects.filter(sponsor=user)
+    # Get sponsors from approved sponsorship requests (same as Sponsorship Center)
+    from django.db.models import Q
+    approved_requests = SponsorshipRequest.objects.filter(
+        Q(from_user=user, status="approved") | Q(to_user=user, status="approved")
+    ).select_related("from_user", "to_user")
     
-    # If user is a driver, find chat rooms based on all their sponsors
+    # If user is a sponsor, show chat rooms for their drivers
+    if user.groups.filter(name="sponsor").exists():
+        # Get chat room for this sponsor
+        chat_room, created = ChatRoom.objects.get_or_create(
+            sponsor=user,
+            defaults={"name": f"{user.username}'s Team Chat"}
+        )
+        chat_rooms = [chat_room]
+    
+    # If user is a driver, find chat rooms based on approved sponsorships
     elif hasattr(user, "driver_profile"):
-        profile = user.driver_profile
-        driver_sponsors = list(profile.sponsors.all())
-        
-        # Also check legacy sponsor_name field
-        if profile.sponsor_name:
-            try:
-                legacy_sponsor = User.objects.filter(
-                    username=profile.sponsor_name,
-                    groups__name="sponsor"
-                ).first()
-                if legacy_sponsor and legacy_sponsor not in driver_sponsors:
-                    driver_sponsors.append(legacy_sponsor)
-            except Exception:
-                pass
+        driver_sponsors = []
+        for req in approved_requests:
+            # Get the sponsor (the other user who is a sponsor)
+            if req.from_user == user:
+                sponsor = req.to_user
+            else:
+                sponsor = req.from_user
+            
+            if sponsor.groups.filter(name="sponsor").exists():
+                driver_sponsors.append(sponsor)
         
         # Get or create chat room for each sponsor
         for sponsor in driver_sponsors:
@@ -3320,14 +3329,14 @@ def chat_room_detail(request, room_id):
             )
             # Update the chat room's updated_at timestamp
             chat_room.save()
-            messages.success(request, "Message sent!")
+            # Don't show success message - just reload to show new message
             return redirect("accounts:chat_room_detail", room_id=room_id)
         else:
             messages.error(request, "Message cannot be empty.")
     
     context = {
         "chat_room": chat_room,
-        "messages": chat_messages,
+        "chat_messages": chat_messages,
         "participants": participants,
         "is_sponsor": user.groups.filter(name="sponsor").exists(),
     }
@@ -3563,7 +3572,19 @@ def invite_driver(request):
         messages.error(request, "Only sponsors can invite drivers.")
         return redirect("accounts:profile")
 
-    # Only actual drivers (not sponsors, admins, or superusers)
+    # Get drivers who already have approved sponsorships with this sponsor
+    already_paired_driver_ids = SponsorshipRequest.objects.filter(
+        Q(from_user=request.user, status="approved") | Q(to_user=request.user, status="approved")
+    ).values_list('from_user_id', 'to_user_id')
+    
+    # Flatten the list of IDs and exclude current sponsor
+    excluded_ids = set()
+    for from_id, to_id in already_paired_driver_ids:
+        excluded_ids.add(from_id)
+        excluded_ids.add(to_id)
+    excluded_ids.discard(request.user.id)  # Remove current sponsor from exclusions
+    
+    # Only actual drivers (not sponsors, admins, or superusers) who are NOT already paired
     driver_users = (
         User.objects.filter(
             driver_profile__isnull=False,
@@ -3571,6 +3592,7 @@ def invite_driver(request):
             is_superuser=False
         )
         .exclude(groups__name="sponsor")
+        .exclude(id__in=excluded_ids)
         .order_by("username")
     )
 
@@ -3692,7 +3714,20 @@ def request_sponsor(request):
         messages.error(request, "Only drivers can send sponsorship requests.")
         return redirect("accounts:profile")
 
-    sponsor_users = User.objects.filter(groups__name="sponsor").order_by("username")
+    # Get sponsors who already have approved sponsorships with this driver
+    already_paired_sponsor_ids = SponsorshipRequest.objects.filter(
+        Q(from_user=request.user, status="approved") | Q(to_user=request.user, status="approved")
+    ).values_list('from_user_id', 'to_user_id')
+    
+    # Flatten the list of IDs and exclude current driver
+    excluded_ids = set()
+    for from_id, to_id in already_paired_sponsor_ids:
+        excluded_ids.add(from_id)
+        excluded_ids.add(to_id)
+    excluded_ids.discard(request.user.id)  # Remove current driver from exclusions
+    
+    # Get all sponsors who are NOT already paired with this driver
+    sponsor_users = User.objects.filter(groups__name="sponsor").exclude(id__in=excluded_ids).order_by("username")
 
     if request.method == "POST":
         sponsor_id = request.POST.get("sponsor_id")
@@ -3789,12 +3824,86 @@ def admin_manage_driver_sponsors(request, user_id):
 
     if request.method == "POST":
         new_sponsor_ids = request.POST.getlist("sponsors")
+        new_sponsors = User.objects.filter(id__in=new_sponsor_ids, groups__name="sponsor")
+        
+        # Get current sponsors before update
+        old_sponsors = set(driver.driver_profile.sponsors.all())
+        new_sponsors_set = set(new_sponsors)
+        
+        # Update the ManyToMany field
         driver.driver_profile.sponsors.set(new_sponsor_ids)
         driver.driver_profile.save()
+        
+        # Sync with SponsorshipRequest records
+        from django.db.models import Q
+        
+        # For each new sponsor, ensure there's an approved SponsorshipRequest
+        for sponsor in new_sponsors_set:
+            if sponsor not in old_sponsors:
+                # This is a newly added sponsor - create or update SponsorshipRequest
+                existing_request = SponsorshipRequest.objects.filter(
+                    Q(from_user=driver, to_user=sponsor) | Q(from_user=sponsor, to_user=driver)
+                ).first()
+                
+                if existing_request:
+                    # Update existing request to approved
+                    if existing_request.status != "approved":
+                        existing_request.status = "approved"
+                        existing_request.reviewed_at = timezone.now()
+                        existing_request.save()
+                else:
+                    # Create new approved sponsorship request (sponsor inviting driver)
+                    SponsorshipRequest.objects.create(
+                        from_user=sponsor,
+                        to_user=driver,
+                        request_type="sponsor_to_driver",
+                        status="approved",
+                        reviewed_at=timezone.now(),
+                        message="Added by admin"
+                    )
+        
+        # For removed sponsors, mark their SponsorshipRequest as ended
+        removed_sponsors = old_sponsors - new_sponsors_set
+        for sponsor in removed_sponsors:
+            existing_request = SponsorshipRequest.objects.filter(
+                Q(from_user=driver, to_user=sponsor) | Q(from_user=sponsor, to_user=driver),
+                status="approved"
+            ).first()
+            
+            if existing_request:
+                existing_request.status = "ended"
+                existing_request.reviewed_at = timezone.now()
+                existing_request.save()
 
         messages.success(request, "Sponsors updated successfully.")
         return redirect("accounts:admin_user_search")
 
+    # Get current sponsors from ManyToMany relationship
+    current_sponsors = driver.driver_profile.sponsors.all()
+    
+    # Also get sponsors from approved SponsorshipRequests (for verification)
+    from django.db.models import Q
+    approved_sponsorships = SponsorshipRequest.objects.filter(
+        Q(from_user=driver, status="approved") | Q(to_user=driver, status="approved")
+    ).select_related("from_user", "to_user")
+    
+    # Extract sponsor users from approved requests
+    sponsors_from_requests = []
+    for req in approved_sponsorships:
+        if req.from_user == driver:
+            other_user = req.to_user
+        else:
+            other_user = req.from_user
+        
+        if other_user.groups.filter(name="sponsor").exists():
+            sponsors_from_requests.append(other_user)
+    
+    # Debug: Sync any missing sponsors from approved requests to ManyToMany field
+    for sponsor in sponsors_from_requests:
+        if sponsor not in current_sponsors:
+            driver.driver_profile.sponsors.add(sponsor)
+    
+    # Refresh current_sponsors after sync
     current_sponsors = driver.driver_profile.sponsors.all()
 
     return render(

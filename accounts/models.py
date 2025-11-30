@@ -628,10 +628,24 @@ class ChatRoom(models.Model):
     
     def get_participants(self):
         """Get all participants in this chat room (sponsor + all drivers)"""
-        drivers = User.objects.filter(
-            driver_profile__sponsor_name=self.sponsor.username
-        )
-        return list(drivers) + [self.sponsor]
+        # Get drivers from approved sponsorship requests
+        from django.db.models import Q
+        approved_requests = SponsorshipRequest.objects.filter(
+            Q(from_user=self.sponsor, status="approved") | Q(to_user=self.sponsor, status="approved")
+        ).select_related("from_user", "to_user")
+        
+        drivers = []
+        for req in approved_requests:
+            # Get the driver (the other user who is a driver)
+            if req.from_user == self.sponsor:
+                other_user = req.to_user
+            else:
+                other_user = req.from_user
+            
+            if hasattr(other_user, "driver_profile"):
+                drivers.append(other_user)
+        
+        return drivers + [self.sponsor]
     
     def get_latest_message(self):
         """Get the most recent message in this chat room"""
@@ -744,12 +758,30 @@ class SponsorshipRequest(models.Model):
         self.status = "approved"
         self.reviewed_at = timezone.now()
         self.save()
+        
         # Identify which side is the driver vs sponsor
-        driver = self.to_user if hasattr(self.to_user, "driver_profile") else self.from_user
-        sponsor = self.from_user if self.from_user.groups.filter(name="sponsor").exists() else self.to_user
-        # Add sponsor to the driver's profile
-        driver.driver_profile.sponsors.add(sponsor)
-        driver.driver_profile.save()
+        # Check both users to determine roles
+        from_is_driver = hasattr(self.from_user, "driver_profile")
+        to_is_driver = hasattr(self.to_user, "driver_profile")
+        from_is_sponsor = self.from_user.groups.filter(name="sponsor").exists()
+        to_is_sponsor = self.to_user.groups.filter(name="sponsor").exists()
+        
+        # Determine driver and sponsor
+        if from_is_driver and to_is_sponsor:
+            driver = self.from_user
+            sponsor = self.to_user
+        elif to_is_driver and from_is_sponsor:
+            driver = self.to_user
+            sponsor = self.from_user
+        else:
+            # Fallback: if unclear, try to determine from any available info
+            driver = self.to_user if to_is_driver else self.from_user
+            sponsor = self.from_user if from_is_sponsor else self.to_user
+        
+        # Add sponsor to the driver's profile sponsors ManyToMany field
+        if hasattr(driver, "driver_profile") and sponsor:
+            driver.driver_profile.sponsors.add(sponsor)
+            driver.driver_profile.save()
 
     def deny(self):
         self.status = "denied"
