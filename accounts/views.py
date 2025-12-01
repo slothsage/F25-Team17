@@ -1738,12 +1738,12 @@ def create_driver(request):
     User = get_user_model()
 
     class DriverCreateForm(forms.Form):
-        username = forms.CharField(max_length=150)
-        email = forms.EmailField(required=False)
-        password1 = forms.CharField(widget=forms.PasswordInput, label="Password")
-        password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm Password")
-        phone = forms.CharField(max_length=20, required=False)
-        address = forms.CharField(max_length=255, required=False)
+        username = forms.CharField(max_length=150, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+        email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={'autocomplete': 'off'}))
+        password1 = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), label="Password")
+        password2 = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), label="Confirm Password")
+        phone = forms.CharField(max_length=20, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+        address = forms.CharField(max_length=255, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
 
         def clean_username(self):
             u = self.cleaned_data["username"]
@@ -1791,10 +1791,10 @@ def create_sponsor(request):
     User = get_user_model()
 
     class SponsorCreateForm(forms.Form):
-        username = forms.CharField(max_length=150)
-        email = forms.EmailField(required=False)
-        password1 = forms.CharField(widget=forms.PasswordInput, label="Password")
-        password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm Password")
+        username = forms.CharField(max_length=150, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+        email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={'autocomplete': 'off'}))
+        password1 = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), label="Password")
+        password2 = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), label="Confirm Password")
 
         def clean_username(self):
             u = self.cleaned_data["username"]
@@ -1837,6 +1837,69 @@ def create_sponsor(request):
         form = SponsorCreateForm()
 
     return render(request, "accounts/create_sponsor.html", {"form": form})
+
+
+@staff_member_required
+def create_admin(request):
+    """Admin-only page to create a new admin user (staff with admin privileges)."""
+    User = get_user_model()
+
+    class AdminCreateForm(forms.Form):
+        username = forms.CharField(max_length=150, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+        email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={'autocomplete': 'off'}))
+        password1 = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), label="Password")
+        password2 = forms.CharField(widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), label="Confirm Password")
+        first_name = forms.CharField(max_length=30, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+        last_name = forms.CharField(max_length=30, required=False, widget=forms.TextInput(attrs={'autocomplete': 'off'}))
+        is_superuser = forms.BooleanField(
+            required=False,
+            label="Superuser",
+            help_text="Grant full system access (superuser privileges)"
+        )
+
+        def clean_username(self):
+            u = self.cleaned_data["username"]
+            if User.objects.filter(username=u).exists():
+                raise forms.ValidationError("Username already exists")
+            return u
+
+        def clean(self):
+            cleaned = super().clean()
+            p1 = cleaned.get("password1")
+            p2 = cleaned.get("password2")
+            if p1 and p2 and p1 != p2:
+                raise forms.ValidationError("Passwords do not match")
+            return cleaned
+
+    if request.method == "POST":
+        form = AdminCreateForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data["username"]
+            email = form.cleaned_data["email"]
+            password = form.cleaned_data["password1"]
+            first_name = form.cleaned_data.get("first_name", "")
+            last_name = form.cleaned_data.get("last_name", "")
+            is_superuser = form.cleaned_data.get("is_superuser", False)
+
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
+            # Set as staff (admin)
+            user.is_staff = True
+            user.is_superuser = is_superuser
+            user.save()
+
+            messages.success(request, f"Admin account '{username}' created successfully.")
+            return redirect("admin_user_search")
+    else:
+        form = AdminCreateForm()
+
+    return render(request, "accounts/create_admin.html", {"form": form})
+
 
 @staff_member_required
 def bulk_upload_users(request):
