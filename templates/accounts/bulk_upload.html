@@ -16,21 +16,21 @@
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
                     <h5 class="mb-0">
-                        <i class="fas fa-file-csv me-2"></i>Upload CSV File
+                        <i class="fas fa-file-csv me-2"></i>Upload CSV or TXT File
                     </h5>
                 </div>
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data" id="uploadForm">
                         {% csrf_token %}
                         <div class="mb-4">
-                            <label for="file" class="form-label fw-bold">Select CSV File</label>
+                            <label for="file" class="form-label fw-bold">Select CSV or TXT File</label>
                             <div class="file-upload-area border rounded p-4 text-center" 
                                  style="background: #f8f9fa; border-style: dashed !important; cursor: pointer;"
                                  onclick="document.getElementById('file').click();">
                                 <input type="file" 
                                        name="file" 
                                        id="file" 
-                                       accept=".csv" 
+                                       accept=".csv,.txt" 
                                        class="form-control d-none" 
                                        required
                                        onchange="handleFileSelect(this)">
@@ -39,7 +39,7 @@
                                     <p class="mb-0 text-muted">
                                         <strong>Click to select a file</strong> or drag and drop
                                     </p>
-                                    <p class="text-muted small mt-2">CSV files only (.csv)</p>
+                                    <p class="text-muted small mt-2">CSV or TXT files only (.csv, .txt)</p>
                                 </div>
                                 <div id="fileSelected" style="display: none;">
                                     <i class="fas fa-file-csv fa-3x text-success mb-3"></i>
@@ -196,22 +196,27 @@
 
         <!-- Instructions & Recent Uploads Sidebar -->
         <div class="col-lg-4">
-            <!-- CSV Format Instructions -->
+            <!-- File Format Instructions -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-info text-white">
                     <h6 class="mb-0">
-                        <i class="fas fa-info-circle me-2"></i>CSV Format
+                        <i class="fas fa-info-circle me-2"></i>File Format (CSV or TXT)
                     </h6>
                 </div>
                 <div class="card-body">
-                    <p class="small mb-2">Required columns (in order):</p>
+                    <p class="small mb-2">Required columns (comma-separated, in order):</p>
                     <pre class="bg-light p-2 rounded small" style="font-size: 0.75rem;">username,email,password,user_type,phone,address,sponsor_name,sponsor_email</pre>
                     
                     <p class="small mt-3 mb-2"><strong>Example:</strong></p>
                     <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">driver1,driver1@example.com,Pass123!,driver,555-1234,"123 Main St",,
 sponsor1,sponsor1@example.com,Pass456!,sponsor,,,Acme Logistics,sponsor@acme.com</pre>
                     
-                    <div class="alert alert-warning small mt-3 mb-0">
+                    <div class="alert alert-info small mt-3 mb-2">
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Accepted formats:</strong> .csv or .txt files (comma-separated values)
+                    </div>
+                    
+                    <div class="alert alert-warning small mb-0">
                         <i class="fas fa-exclamation-triangle me-1"></i>
                         <strong>Note:</strong> user_type must be either "driver" or "sponsor"
                     </div>

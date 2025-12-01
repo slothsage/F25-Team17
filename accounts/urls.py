@@ -128,6 +128,8 @@ urlpatterns = [
     path("admin/bulk-upload/", views.bulk_upload_users, name="bulk_upload_users"),
     path("admin/bulk-upload/history/", views.bulk_upload_history, name="bulk_upload_history"),
     path("admin/bulk-upload/<int:upload_id>/", views.bulk_upload_detail, name="bulk_upload_detail"),
+    # Bulk delete users
+    path("admin/bulk-delete/", views.bulk_delete_users, name="bulk_delete_users"),
     # Bulk assign
     path("admin/bulk-assign/", views.bulk_assign_sponsorship, name="bulk_assign_sponsorship"),
     # Admin label management

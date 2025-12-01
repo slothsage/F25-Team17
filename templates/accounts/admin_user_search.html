@@ -173,12 +173,29 @@
       </div>
     </div>
     <div id="drivers-section">
+    <!-- Bulk Delete Form for Drivers -->
+    <form method="post" action="{% url 'accounts:bulk_delete_users' %}" id="bulk-delete-drivers-form" style="display: none;">
+      {% csrf_token %}
+      <div class="card-body border-bottom bg-light py-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <span id="drivers-selected-count" class="text-muted small">0 selected</span>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete the selected users? This action cannot be undone.');">
+            <i class="fas fa-trash me-1"></i>Delete Selected
+          </button>
+        </div>
+      </div>
+    </form>
     <div class="card-body p-0">
       <div class="scrollable-table-container">
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light">
             <tr>
-              <th style="width: 70px;" class="ps-3">ID</th>
+              <th style="width: 50px;" class="ps-3">
+                <input type="checkbox" id="select-all-drivers" onchange="toggleAllDrivers(this)">
+              </th>
+              <th style="width: 70px;">ID</th>
               <th>Username</th>
               <th>Email</th>
               <th>Phone</th>
@@ -208,7 +225,12 @@
           <tbody>
             {% for u in drivers %}
             <tr {% if not u.is_active %}class="table-danger"{% elif u.driver_profile.is_locked %}class="table-danger"{% elif u.driver_profile.is_suspended %}class="table-warning"{% endif %}>
-              <td class="text-muted small ps-3">{{ u.id }}</td>
+              <td class="ps-3">
+                {% if u != request.user and not u.is_staff and not u.is_superuser %}
+                  <input type="checkbox" class="driver-checkbox" name="user_ids" form="bulk-delete-drivers-form" value="{{ u.id }}" onchange="updateDriverSelection()">
+                {% endif %}
+              </td>
+              <td class="text-muted small">{{ u.id }}</td>
               <td><strong>{{ u.username }}</strong></td>
               <td class="small">{{ u.email|truncatechars:30 }}</td>
               <td class="small">{{ u.driver_profile.phone|default:"—" }}</td>
@@ -363,12 +385,29 @@
       </div>
     </div>
     <div id="sponsors-section">
+    <!-- Bulk Delete Form for Sponsors -->
+    <form method="post" action="{% url 'accounts:bulk_delete_users' %}" id="bulk-delete-sponsors-form" style="display: none;">
+      {% csrf_token %}
+      <div class="card-body border-bottom bg-light py-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <span id="sponsors-selected-count" class="text-muted small">0 selected</span>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete the selected users? This action cannot be undone.');">
+            <i class="fas fa-trash me-1"></i>Delete Selected
+          </button>
+        </div>
+      </div>
+    </form>
     <div class="card-body p-0">
       <div class="scrollable-table-container">
         <table class="table table-hover mb-0 align-middle">
           <thead class="table-light">
             <tr>
-              <th class="ps-3">Username</th>
+              <th style="width: 50px;" class="ps-3">
+                <input type="checkbox" id="select-all-sponsors" onchange="toggleAllSponsors(this)">
+              </th>
+              <th>Username</th>
               <th>Email</th>
               <th>Status</th>
               <th style="width: 180px;" class="pe-3">Actions</th>
@@ -377,7 +416,12 @@
           <tbody>
             {% for s in sponsor_users %}
             <tr {% if not s.is_active %}class="table-danger"{% endif %}>
-              <td class="ps-3"><strong>{{ s.username }}</strong></td>
+              <td class="ps-3">
+                {% if s != request.user and not s.is_staff and not s.is_superuser %}
+                  <input type="checkbox" class="sponsor-checkbox" name="user_ids" form="bulk-delete-sponsors-form" value="{{ s.id }}" onchange="updateSponsorSelection()">
+                {% endif %}
+              </td>
+              <td><strong>{{ s.username }}</strong></td>
               <td class="small">{{ s.email|truncatechars:40 }}</td>
               <td>
                 {% if s.is_active %}
@@ -718,6 +762,75 @@ document.addEventListener('DOMContentLoaded', function() {
     input.addEventListener('blur', () => setTimeout(clearPanel, 100));
   });
 })();
+
+// Bulk Delete Functions
+function toggleAllDrivers(checkbox) {
+  const checkboxes = document.querySelectorAll('.driver-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+  updateDriverSelection();
+}
+
+function toggleAllSponsors(checkbox) {
+  const checkboxes = document.querySelectorAll('.sponsor-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+  updateSponsorSelection();
+}
+
+function updateDriverSelection() {
+  const checkboxes = document.querySelectorAll('.driver-checkbox:checked');
+  const count = checkboxes.length;
+  const form = document.getElementById('bulk-delete-drivers-form');
+  const countSpan = document.getElementById('drivers-selected-count');
+  
+  if (countSpan) {
+    countSpan.textContent = count + ' selected';
+  }
+  
+  if (form) {
+    form.style.display = count > 0 ? 'block' : 'none';
+  }
+  
+  // Update select all checkbox
+  const selectAll = document.getElementById('select-all-drivers');
+  if (selectAll) {
+    const allCheckboxes = document.querySelectorAll('.driver-checkbox');
+    selectAll.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+    selectAll.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
+  }
+}
+
+function updateSponsorSelection() {
+  const checkboxes = document.querySelectorAll('.sponsor-checkbox:checked');
+  const count = checkboxes.length;
+  const form = document.getElementById('bulk-delete-sponsors-form');
+  const countSpan = document.getElementById('sponsors-selected-count');
+  
+  if (countSpan) {
+    countSpan.textContent = count + ' selected';
+  }
+  
+  if (form) {
+    form.style.display = count > 0 ? 'block' : 'none';
+  }
+  
+  // Update select all checkbox
+  const selectAll = document.getElementById('select-all-sponsors');
+  if (selectAll) {
+    const allCheckboxes = document.querySelectorAll('.sponsor-checkbox');
+    selectAll.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+    selectAll.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  updateDriverSelection();
+  updateSponsorSelection();
+});
 </script>
 
 <style>

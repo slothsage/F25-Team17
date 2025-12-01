@@ -80,6 +80,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 
 import csv
+import secrets
 from io import StringIO, TextIOWrapper
 from django.contrib.auth.models import Group
 from django.views.decorators.http import require_POST
@@ -1931,8 +1932,8 @@ def create_admin(request):
 @staff_member_required
 def bulk_upload_users(request):
     """
-    Admin-only view to bulk upload users (drivers or sponsors) from a CSV file.
-    CSV format:
+    Admin-only view to bulk upload users (drivers or sponsors) from a CSV or TXT file.
+    File format (comma-separated):
     username,email,password,user_type,phone,address,sponsor_name,sponsor_email
     """
     upload_log = None
@@ -1940,15 +1941,50 @@ def bulk_upload_users(request):
     
     if request.method == "POST":
         csv_file = request.FILES.get("file")
-        if not csv_file or not csv_file.name.endswith(".csv"):
-            messages.error(request, "Please upload a valid .csv file.")
+        if not csv_file or not (csv_file.name.endswith(".csv") or csv_file.name.endswith(".txt")):
+            messages.error(request, "Please upload a valid .csv or .txt file.")
             return render(request, "accounts/bulk_upload.html", {
                 "upload_log": upload_log,
                 "results": results,
             })
 
         file_data = TextIOWrapper(csv_file.file, encoding="utf-8")
-        reader = csv.DictReader(file_data)
+        
+        # Read first line to detect delimiter and format
+        first_line = file_data.readline()
+        if not first_line or not first_line.strip():
+            messages.error(request, "The uploaded file appears to be empty.")
+            return render(request, "accounts/bulk_upload.html", {
+                "upload_log": upload_log,
+                "results": results,
+            })
+        
+        file_data.seek(0)  # Reset to beginning
+        
+        # Detect delimiter (pipe, comma, tab, or semicolon)
+        delimiter = ","
+        if "|" in first_line:
+            delimiter = "|"
+        elif "\t" in first_line:
+            delimiter = "\t"
+        elif ";" in first_line and "," not in first_line:
+            delimiter = ";"
+        
+        # Check if file uses prefix format (O|, D|, S|)
+        first_line_parts = [part.strip() for part in first_line.strip().split(delimiter) if part.strip()]
+        uses_prefix_format = len(first_line_parts) > 0 and first_line_parts[0] in ["O", "D", "S"]
+        
+        # Check if first line looks like headers or data
+        has_headers = not uses_prefix_format and any(header.lower() in ["username", "email", "password", "user_type"] for header in first_line_parts)
+        
+        if has_headers:
+            reader = csv.DictReader(file_data, delimiter=delimiter)
+        else:
+            # No headers - use positional columns or prefix format
+            reader = csv.reader(file_data, delimiter=delimiter)
+            # Skip first row if it looks like headers but wasn't detected
+            if not uses_prefix_format and len(first_line_parts) > 0 and first_line_parts[0].lower() in ["username", "user", "name"]:
+                next(reader, None)  # Skip header row
 
         created_count = 0
         skipped_count = 0
@@ -1959,17 +1995,266 @@ def bulk_upload_users(request):
         total_rows = 0
 
         with transaction.atomic():
-            for row in reader:
+            # Track organizations/sponsors to create first
+            organizations = {}  # org_name -> sponsor_user
+            
+            for row_data in reader:
                 total_rows += 1
-                username = row.get("username", "").strip()
-                email = row.get("email", "").strip()
-                password = row.get("password", "").strip()
-                user_type = row.get("user_type", "").strip().lower()
+                
+                # Handle prefix format (O|, D|, S|)
+                if uses_prefix_format:
+                    if len(row_data) < 2:
+                        skipped_count += 1
+                        error_count += 1
+                        error_msg = f"Row {total_rows}: Invalid format - not enough columns. Raw data: {row_data}"
+                        errors.append(error_msg)
+                        skipped_users.append(f"Row {total_rows}")
+                        continue
+                    
+                    prefix = row_data[0].strip().upper()
+                    
+                    if prefix == "O":
+                        # Organization/Sponsor: O|OrganizationName
+                        if len(row_data) < 2:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Organization line missing name. Raw data: {row_data}"
+                            errors.append(error_msg)
+                            continue
+                        
+                        org_name = row_data[1].strip()
+                        if not org_name:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Organization name is empty"
+                            errors.append(error_msg)
+                            continue
+                        
+                        # Create sponsor for organization if it doesn't exist
+                        if org_name not in organizations:
+                            sponsor_username = org_name.lower().replace(" ", "").replace("-", "")
+                            sponsor_email = f"{sponsor_username}@organization.com"
+                            
+                            # Check if sponsor already exists
+                            if User.objects.filter(username=sponsor_username).exists():
+                                existing_user = User.objects.get(username=sponsor_username)
+                                if existing_user.groups.filter(name="sponsor").exists():
+                                    organizations[org_name] = existing_user
+                                    continue
+                                else:
+                                    skipped_count += 1
+                                    error_count += 1
+                                    error_msg = f"Row {total_rows}: Username '{sponsor_username}' exists but is not a sponsor"
+                                    errors.append(error_msg)
+                                    continue
+                            
+                            try:
+                                # Generate password
+                                password = secrets.token_urlsafe(12)
+                                
+                                sponsor_user = User.objects.create_user(
+                                    username=sponsor_username,
+                                    email=sponsor_email,
+                                    password=password
+                                )
+                                sponsor_user.is_active = True
+                                sponsor_user.save()
+                                
+                                sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
+                                sponsor_user.groups.add(sponsor_group)
+                                
+                                organizations[org_name] = sponsor_user
+                                created_count += 1
+                                created_users.append(sponsor_username)
+                            except Exception as e:
+                                skipped_count += 1
+                                error_count += 1
+                                error_msg = f"Row {total_rows}: Error creating sponsor for organization '{org_name}': {str(e)}"
+                                errors.append(error_msg)
+                                continue
+                        
+                        continue  # Skip to next row
+                    
+                    elif prefix == "S":
+                        # Sponsor: S|Organization|First|Last|Email
+                        if len(row_data) < 5:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Sponsor line needs at least 5 columns (S|Organization|First|Last|Email). Found: {len(row_data)}"
+                            errors.append(error_msg)
+                            skipped_users.append(f"Row {total_rows}")
+                            continue
+                        
+                        org_name = row_data[1].strip()
+                        first_name = row_data[2].strip()
+                        last_name = row_data[3].strip()
+                        email = row_data[4].strip()
+                        
+                        if not email:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Sponsor email is required"
+                            errors.append(error_msg)
+                            skipped_users.append(f"Row {total_rows}")
+                            continue
+                        
+                        # Generate username from email or name
+                        username = email.split("@")[0] if "@" in email else f"{first_name}{last_name}".lower().replace(" ", "")
+                        if User.objects.filter(username=username).exists():
+                            username = f"{username}{total_rows}"
+                        
+                        # Generate password
+                        password = secrets.token_urlsafe(12)
+                        
+                        try:
+                            sponsor_user = User.objects.create_user(
+                                username=username,
+                                email=email,
+                                password=password
+                            )
+                            sponsor_user.is_active = True
+                            sponsor_user.save()
+                            
+                            sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
+                            sponsor_user.groups.add(sponsor_group)
+                            
+                            # Link to organization if specified
+                            if org_name and org_name in organizations:
+                                # Could link here if needed
+                                pass
+                            
+                            created_count += 1
+                            created_users.append(username)
+                        except Exception as e:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Error creating sponsor '{username}': {str(e)}"
+                            errors.append(error_msg)
+                            skipped_users.append(username)
+                            continue
+                        
+                        continue  # Skip to next row
+                    
+                    elif prefix == "D":
+                        # Driver: D|Organization|First|Last|Email or D|Organization|First|Type|Email
+                        if len(row_data) < 5:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Driver line needs at least 5 columns (D|Organization|First|Last|Email). Found: {len(row_data)}"
+                            errors.append(error_msg)
+                            skipped_users.append(f"Row {total_rows}")
+                            continue
+                        
+                        org_name = row_data[1].strip()
+                        first_name = row_data[2].strip()
+                        last_name_or_type = row_data[3].strip()
+                        email = row_data[4].strip()
+                        
+                        if not email:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Driver email is required"
+                            errors.append(error_msg)
+                            skipped_users.append(f"Row {total_rows}")
+                            continue
+                        
+                        # Determine if 3rd field is last name or type
+                        # If it's "Driver" or "Sponsor", treat 4th as email and skip last name
+                        if last_name_or_type.lower() in ["driver", "sponsor"]:
+                            # Format: D|Organization|First|Driver|Email
+                            last_name = ""
+                        else:
+                            # Format: D|Organization|First|Last|Email
+                            last_name = last_name_or_type
+                        
+                        # Generate username from email or name
+                        username = email.split("@")[0] if "@" in email else f"{first_name}{last_name}".lower().replace(" ", "")
+                        if User.objects.filter(username=username).exists():
+                            username = f"{username}{total_rows}"
+                        
+                        # Generate password
+                        password = secrets.token_urlsafe(12)
+                        
+                        try:
+                            driver_user = User.objects.create_user(
+                                username=username,
+                                email=email,
+                                password=password
+                            )
+                            driver_user.is_active = True
+                            driver_user.save()
+                            
+                            # Create driver profile
+                            DriverProfile.objects.create(
+                                user=driver_user,
+                                first_name=first_name,
+                                last_name=last_name
+                            )
+                            
+                            # Link to organization sponsor if exists
+                            if org_name and org_name in organizations:
+                                sponsor_user = organizations[org_name]
+                                driver_profile = driver_user.driver_profile
+                                driver_profile.sponsors.add(sponsor_user)
+                                driver_profile.sponsor_name = sponsor_user.username
+                                driver_profile.save()
+                            
+                            created_count += 1
+                            created_users.append(username)
+                        except Exception as e:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Error creating driver '{username}': {str(e)}"
+                            errors.append(error_msg)
+                            skipped_users.append(username)
+                            continue
+                        
+                        continue  # Skip to next row
+                    
+                    else:
+                        skipped_count += 1
+                        error_count += 1
+                        error_msg = f"Row {total_rows}: Unknown prefix '{prefix}'. Expected O, D, or S. Raw data: {row_data[:3]}"
+                        errors.append(error_msg)
+                        skipped_users.append(f"Row {total_rows}")
+                        continue
+                
+                # Handle standard CSV format (with or without headers)
+                if has_headers and isinstance(row_data, dict):
+                    row = row_data
+                    username = row.get("username", "").strip()
+                    email = row.get("email", "").strip()
+                    password = row.get("password", "").strip()
+                    user_type = row.get("user_type", "").strip().lower()
+                    phone = row.get("phone", "").strip()
+                    address = row.get("address", "").strip()
+                    sponsor_name = row.get("sponsor_name", "").strip()
+                    sponsor_email = row.get("sponsor_email", "").strip()
+                else:
+                    # Positional: username,email,password,user_type,phone,address,sponsor_name,sponsor_email
+                    if len(row_data) < 4:
+                        skipped_count += 1
+                        error_count += 1
+                        error_msg = f"Row {total_rows}: Not enough columns (expected at least 4: username,email,password,user_type). Found: {len(row_data)} columns. Raw data: {row_data[:3]}"
+                        errors.append(error_msg)
+                        skipped_users.append(f"Row {total_rows}")
+                        continue
+                    
+                    username = row_data[0].strip() if len(row_data) > 0 else ""
+                    email = row_data[1].strip() if len(row_data) > 1 else ""
+                    password = row_data[2].strip() if len(row_data) > 2 else ""
+                    user_type = row_data[3].strip().lower() if len(row_data) > 3 else ""
+                    phone = row_data[4].strip() if len(row_data) > 4 else ""
+                    address = row_data[5].strip() if len(row_data) > 5 else ""
+                    sponsor_name = row_data[6].strip() if len(row_data) > 6 else ""
+                    sponsor_email = row_data[7].strip() if len(row_data) > 7 else ""
 
                 if not username or not password or not email or user_type not in ["driver", "sponsor"]:
                     skipped_count += 1
                     error_count += 1
-                    error_msg = f"Row {total_rows}: Invalid data for user {username or '(missing username)'} - missing required fields or invalid user_type"
+                    # Show what was actually read for debugging
+                    row_preview = f"username='{username}', email='{email}', user_type='{user_type}'" if username or email else f"Raw row data: {row_data[:4] if not has_headers else list(row_data.values())[:4]}"
+                    error_msg = f"Row {total_rows}: Invalid data - missing required fields or invalid user_type. {row_preview}"
                     errors.append(error_msg)
                     skipped_users.append(username or f"Row {total_rows}")
                     continue
@@ -1990,8 +2275,6 @@ def bulk_upload_users(request):
 
                     # Handle driver creation
                     if user_type == "driver":
-                        phone = row.get("phone", "").strip()
-                        address = row.get("address", "").strip()
                         DriverProfile.objects.create(user=user, phone=phone, address=address)
 
                     # Handle sponsor group
@@ -2074,6 +2357,61 @@ def bulk_upload_detail(request, upload_id):
     return render(request, "accounts/bulk_upload_detail.html", {
         "upload_log": upload_log,
     })
+
+
+@staff_member_required
+@require_POST
+def bulk_delete_users(request):
+    """
+    Admin-only view to bulk delete users.
+    Accepts POST with 'user_ids' list of user IDs to delete.
+    """
+    user_ids = request.POST.getlist("user_ids")
+    
+    if not user_ids:
+        messages.error(request, "No users selected for deletion.")
+        return redirect("accounts:admin_user_search")
+    
+    # Prevent deleting yourself or other admins
+    deleted_count = 0
+    skipped_count = 0
+    errors = []
+    
+    for user_id in user_ids:
+        try:
+            user = User.objects.get(pk=user_id)
+            
+            # Safety checks
+            if user == request.user:
+                skipped_count += 1
+                errors.append(f"Cannot delete yourself ({user.username})")
+                continue
+            
+            if user.is_staff or user.is_superuser:
+                skipped_count += 1
+                errors.append(f"Cannot delete admin user ({user.username})")
+                continue
+            
+            # Delete the user (this will cascade delete related objects)
+            username = user.username
+            user.delete()
+            deleted_count += 1
+            
+        except User.DoesNotExist:
+            skipped_count += 1
+            errors.append(f"User with ID {user_id} not found")
+        except Exception as e:
+            skipped_count += 1
+            errors.append(f"Error deleting user ID {user_id}: {str(e)}")
+    
+    if deleted_count > 0:
+        messages.success(request, f"Successfully deleted {deleted_count} user(s).")
+    if skipped_count > 0:
+        messages.warning(request, f"Skipped {skipped_count} user(s). See details below.")
+        for error in errors[:10]:  # Show first 10 errors
+            messages.warning(request, error)
+    
+    return redirect("accounts:admin_user_search")
 
 
 @staff_member_required
