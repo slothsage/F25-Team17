@@ -41,10 +41,39 @@ def order_is_delayed(order, now=None, grace_hours=24):
     deadline = promised + timedelta(hours=grace_hours)
     return now > deadline
 
-def get_points_per_usd():
+def get_points_per_usd(user=None):
+    if user is not None:
+        try:
+            from accounts.models import SponsorProfile  # local import to avoid circulars
+            # Only sponsors will actually have a SponsorProfile; others will drop through
+            profile = SponsorProfile.objects.filter(user=user).first()
+            if profile and profile.points_per_usd is not None:
+                return profile.points_per_usd
+        except Exception:
+            # During migrations or if accounts isn't ready, just fall back to global
+            pass
+
+    # Global default path (same as before, using cache)
     val = cache.get(POINTS_CACHE_KEY)
     if val is not None:
         return val
     val = PointsConfig.get_solo().points_per_usd
     cache.set(POINTS_CACHE_KEY, val, 300)  # 5 minutes
     return val
+
+def get_points_per_usd_for_sponsor(sponsor_user):
+    """
+    Return the points-per-USD ratio for a specific sponsor user.
+    Falls back to the global default if they don't have a profile or
+    have not set a custom ratio.
+    """
+    from accounts.models import SponsorProfile  # local import to avoid circular
+
+    try:
+        profile = sponsor_user.sponsor_profile
+    except SponsorProfile.DoesNotExist:
+        return get_points_per_usd()
+
+    # SponsorProfile already has get_points_per_usd() that falls back
+    # to the global PointsConfig if the field is blank.
+    return profile.get_points_per_usd()

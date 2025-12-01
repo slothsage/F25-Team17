@@ -1091,15 +1091,42 @@ def sponsor_fee_ratio(request, user_id):
     if request.method == "POST":
         form = SponsorFeeRatioForm(request.POST, instance=sponsor_profile)
         if form.is_valid():
-            form.save()
-            ratio_display = sponsor_profile.points_per_usd if sponsor_profile.points_per_usd else f"Global default ({global_default})"
+            # Save the new ratio
+            sponsor_profile = form.save()
+            new_ratio = sponsor_profile.get_points_per_usd()
+
+            # --- Recalculate catalog items for this sponsor ---
+            from shop.models import SponsorCatalogItem, DriverCatalogItem
+
+            # 1) Sponsor's own catalog
+            sponsor_items = SponsorCatalogItem.objects.filter(sponsor=sponsor_user)
+            for item in sponsor_items:
+                item.points_cost = int(item.price_usd * new_ratio)
+                item.save(update_fields=["points_cost"])
+
+            # 2) Driver catalog items that came from this sponsor's catalog
+            driver_items = DriverCatalogItem.objects.filter(
+                source_sponsor_item__sponsor=sponsor_user
+            )
+            for d_item in driver_items:
+                d_item.points_cost = int(d_item.price_usd * new_ratio)
+                d_item.save(update_fields=["points_cost"])
+            # --- end recalculation ---
+
+            ratio_display = (
+                sponsor_profile.points_per_usd
+                if sponsor_profile.points_per_usd
+                else f"Global default ({global_default})"
+            )
             messages.success(
                 request,
-                f"Fee ratio updated for {sponsor_user.username}. Points per USD: {ratio_display}"
+                f"Fee ratio updated for {sponsor_user.username}. "
+                f"Points per USD: {ratio_display}. "
+                f"Updated {sponsor_items.count()} sponsor items and {driver_items.count()} driver items."
             )
             return redirect("accounts:sponsor_fee_ratio", user_id=user_id)
-    else:
-        form = SponsorFeeRatioForm(instance=sponsor_profile)
+        else:
+            form = SponsorFeeRatioForm(instance=sponsor_profile)
     
     context = {
         "sponsor_user": sponsor_user,

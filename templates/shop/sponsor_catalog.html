@@ -23,6 +23,56 @@
         </div>
     </div>
 
+    <!-- Point Conversion Rate (Sponsor-specific) -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title mb-1">Point Conversion Rate</h5>
+                    <p class="card-text mb-1">
+                        Current rate:
+                        <strong>{{ current_points_per_usd|default:10 }} points</strong>
+                        per <strong>$1</strong>.
+                    </p>
+                    <small class="text-muted">
+                        This rate is used to calculate item point costs for you and your drivers.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <form method="POST" action="{% url 'shop:sponsor_catalog' %}" class="row g-2 align-items-end">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_ratio">
+                        <div class="col-7 col-md-8">
+                            <label for="id_points_per_usd" class="form-label mb-1">
+                                Set new rate (points per $1)
+                            </label>
+                            <input
+                                type="number"
+                                name="points_per_usd"
+                                id="id_points_per_usd"
+                                class="form-control"
+                                min="1"
+                                step="1"
+                                value="{{ current_points_per_usd|default_if_none:'' }}"
+                                required
+                            >
+                        </div>
+                        <div class="col-5 col-md-4">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                Update Rate
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
