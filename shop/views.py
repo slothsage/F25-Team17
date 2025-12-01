@@ -26,7 +26,9 @@ from xhtml2pdf import pisa
 import json
 import csv
 from accounts.models import SponsorPointsAccount
-
+from decimal import Decimal
+from .utils import get_points_per_usd, get_points_per_usd_for_sponsor
+from accounts.models import SponsorProfile
 
 # A tiny editable set of eBay category IDs (Browse API uses numeric IDs)
 EBAY_CATEGORY_CHOICES = [
@@ -796,6 +798,14 @@ def catalog_search(request):
             selected_sponsor = next((s for s in driver_sponsors_list if str(s.id) == selected_sponsor_id), None)
         except (ValueError, TypeError):
             pass
+
+    sponsor_points_per_usd = None
+    if selected_sponsor is not None:
+        try:
+            sponsor_profile = SponsorProfile.objects.get(user=selected_sponsor)
+            sponsor_points_per_usd = sponsor_profile.get_points_per_usd()
+        except SponsorProfile.DoesNotExist:
+            sponsor_points_per_usd = None 
     
     # Add sponsor filter info to context
     context["driver_sponsors"] = driver_sponsors_list
@@ -882,7 +892,7 @@ def catalog_search(request):
             )
 
             ebay_products = [
-                ebay_service.format_product(item)
+                ebay_service.format_product(item, points_per_usd=sponsor_points_per_usd)
                 for item in results.get("itemSummaries", [])
             ]
 
@@ -1002,7 +1012,7 @@ def catalog_search(request):
         )
 
         ebay_products = [
-            ebay_service.format_product(item)
+            ebay_service.format_product(item, points_per_usd=sponsor_points_per_usd)
             for item in results.get("itemSummaries", [])
         ]
         
@@ -1919,6 +1929,11 @@ def _is_sponsor(user):
 def sponsor_catalog(request):
     """Sponsor catalog management - view and manage sponsor-only items."""
     sponsor = request.user
+
+    # Get or create this sponsor's profile (holds points_per_usd)
+    sponsor_profile, _ = SponsorProfile.objects.get_or_create(user=sponsor)
+    current_points_per_usd = sponsor_profile.get_points_per_usd()
+
     # Only show items that are NOT yet in the driver catalog
     items = SponsorCatalogItem.objects.filter(
         sponsor=sponsor
@@ -1929,6 +1944,48 @@ def sponsor_catalog(request):
     # Handle form submission
     if request.method == "POST":
         action = request.POST.get("action")
+        
+        # 🔹 New: update conversion ratio from this page
+        if action == "update_ratio":
+            new_ratio_raw = (request.POST.get("points_per_usd") or "").strip()
+            try:
+                new_ratio = int(new_ratio_raw)
+                if new_ratio < 1:
+                    raise ValueError("Must be >= 1")
+            except Exception:
+                messages.error(
+                    request,
+                    "Conversion rate must be a positive whole number (points per $1)."
+                )
+                return redirect("shop:sponsor_catalog")
+
+            old_ratio = sponsor_profile.points_per_usd
+            sponsor_profile.points_per_usd = new_ratio
+            sponsor_profile.save(update_fields=["points_per_usd"])
+
+            # Recalculate points for ALL sponsor catalog items for this sponsor
+            sponsor_items = SponsorCatalogItem.objects.filter(sponsor=sponsor)
+            for item in sponsor_items:
+                # price_usd is a Decimal; ensure multiplication is correct
+                item.points_cost = int(item.price_usd * Decimal(new_ratio))
+                item.save(update_fields=["points_cost"])
+
+            # Also update any driver catalog items that came from those sponsor items
+            driver_items = DriverCatalogItem.objects.filter(
+                source_sponsor_item__sponsor=sponsor
+            )
+            for d_item in driver_items:
+                # If price_usd is populated, recalc points
+                if d_item.price_usd is not None:
+                    d_item.points_cost = int(d_item.price_usd * Decimal(new_ratio))
+                    d_item.save(update_fields=["points_cost"])
+
+            messages.success(
+                request,
+                f"Conversion rate updated to {new_ratio} points per $1. "
+                "Catalog point values have been recalculated."
+            )
+            return redirect("shop:sponsor_catalog")
         
         if action == "add":
             form = SponsorCatalogItemForm(request.POST)
@@ -1988,6 +2045,7 @@ def sponsor_catalog(request):
     context = {
         "items": items,
         "form": form,
+        "current_points_per_usd": current_points_per_usd,
     }
     return render(request, "shop/sponsor_catalog.html", context)
 
@@ -2118,8 +2176,11 @@ def sponsor_catalog_import_product(request):
             })
         
         # Calculate points cost from USD price
-        from .utils import get_points_per_usd
-        points_cost = int(formatted["price_usd"] * get_points_per_usd())
+        from accounts.models import SponsorProfile
+        sponsor = request.user
+        sponsor_profile, _ = SponsorProfile.objects.get_or_create(user=sponsor)
+        points_per_usd = sponsor_profile.get_points_per_usd()
+        points_cost = int(formatted["price_usd"] * get_points_per_usd(request.user))
         
         # Create sponsor catalog item
         sponsor_item = SponsorCatalogItem.objects.create(

@@ -234,7 +234,7 @@ class EbayService:
 
     # ------------------------- formatting ----------------------
 
-    def format_product(self, ebay_item: Dict[str, Any]) -> Dict[str, Any]:
+    def format_product(self, ebay_item: Dict[str, Any], points_per_usd: Optional[int] = None,) -> Dict[str, Any]:
         """
         Normalize Browse item_summary into fields our UI expects.
         """
@@ -243,6 +243,9 @@ class EbayService:
             price_value = float(ebay_item.get("price", {}).get("value", 0))
         except (TypeError, ValueError):
             price_value = 0.0
+
+        if points_per_usd is None:
+            points_per_usd = get_points_per_usd()
 
         # image
         image_url = ""
@@ -263,7 +266,7 @@ class EbayService:
             "ebay_item_id": ebay_item.get("itemId", ""),
             "name": ebay_item.get("title", "Unknown Product"),
             "price_usd": price_value,
-            "price_points": int(price_value * get_points_per_usd()),
+            "price_points": int(price_value * points_per_usd),
             "description": ebay_item.get("shortDescription", ebay_item.get("title", "")),
             "image_url": image_url,
             "category": category_name,
