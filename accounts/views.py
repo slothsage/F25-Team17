@@ -1929,13 +1929,17 @@ def create_admin(request):
     return render(request, "accounts/create_admin.html", {"form": form})
 
 
-@staff_member_required
+@login_required
+@user_passes_test(lambda u: u.is_staff or u.groups.filter(name="sponsor").exists())
 def bulk_upload_users(request):
     """
-    Admin-only view to bulk upload users (drivers or sponsors) from a CSV or TXT file.
+    Admin or Sponsor view to bulk upload users from a CSV or TXT file.
+    - Admins can create drivers or sponsors
+    - Sponsors can only create drivers (automatically linked to them)
     File format (comma-separated):
     username,email,password,user_type,phone,address,sponsor_name,sponsor_email
     """
+    is_sponsor_user = request.user.groups.filter(name="sponsor").exists() and not request.user.is_staff
     upload_log = None
     results = None
     
@@ -2013,8 +2017,17 @@ def bulk_upload_users(request):
                     
                     prefix = row_data[0].strip().upper()
                     
+                    # Sponsors can only create drivers (D|), not organizations (O|) or sponsors (S|)
+                    if is_sponsor_user and prefix in ["O", "S"]:
+                        skipped_count += 1
+                        error_count += 1
+                        error_msg = f"Row {total_rows}: Sponsors can only create drivers (D| prefix). Cannot create organizations (O|) or sponsors (S|)."
+                        errors.append(error_msg)
+                        skipped_users.append(f"Row {total_rows}")
+                        continue
+                    
                     if prefix == "O":
-                        # Organization/Sponsor: O|OrganizationName
+                        # Organization/Sponsor: O|OrganizationName (Admin only)
                         if len(row_data) < 2:
                             skipped_count += 1
                             error_count += 1
@@ -2076,7 +2089,15 @@ def bulk_upload_users(request):
                         continue  # Skip to next row
                     
                     elif prefix == "S":
-                        # Sponsor: S|Organization|First|Last|Email
+                        # Sponsor: S|Organization|First|Last|Email (Admin only)
+                        if is_sponsor_user:
+                            skipped_count += 1
+                            error_count += 1
+                            error_msg = f"Row {total_rows}: Sponsors cannot create other sponsors. Only admins can create sponsors."
+                            errors.append(error_msg)
+                            skipped_users.append(f"Row {total_rows}")
+                            continue
+                        
                         if len(row_data) < 5:
                             skipped_count += 1
                             error_count += 1
@@ -2185,18 +2206,22 @@ def bulk_upload_users(request):
                             driver_user.save()
                             
                             # Create driver profile
-                            DriverProfile.objects.create(
+                            driver_profile = DriverProfile.objects.create(
                                 user=driver_user,
                                 first_name=first_name,
                                 last_name=last_name
                             )
                             
-                            # Link to organization sponsor if exists
+                            # Link to organization sponsor if exists, OR auto-link to current sponsor if sponsor is uploading
                             if org_name and org_name in organizations:
                                 sponsor_user = organizations[org_name]
-                                driver_profile = driver_user.driver_profile
                                 driver_profile.sponsors.add(sponsor_user)
                                 driver_profile.sponsor_name = sponsor_user.username
+                                driver_profile.save()
+                            elif is_sponsor_user:
+                                # Auto-link to the sponsor who is uploading
+                                driver_profile.sponsors.add(request.user)
+                                driver_profile.sponsor_name = request.user.username
                                 driver_profile.save()
                             
                             created_count += 1
@@ -2249,6 +2274,15 @@ def bulk_upload_users(request):
                     sponsor_name = row_data[6].strip() if len(row_data) > 6 else ""
                     sponsor_email = row_data[7].strip() if len(row_data) > 7 else ""
 
+                # Sponsors can only create drivers
+                if is_sponsor_user and user_type == "sponsor":
+                    skipped_count += 1
+                    error_count += 1
+                    error_msg = f"Row {total_rows}: Sponsors can only create drivers, not other sponsors or admins."
+                    errors.append(error_msg)
+                    skipped_users.append(username or f"Row {total_rows}")
+                    continue
+                
                 if not username or not password or not email or user_type not in ["driver", "sponsor"]:
                     skipped_count += 1
                     error_count += 1
@@ -2275,9 +2309,15 @@ def bulk_upload_users(request):
 
                     # Handle driver creation
                     if user_type == "driver":
-                        DriverProfile.objects.create(user=user, phone=phone, address=address)
+                        driver_profile = DriverProfile.objects.create(user=user, phone=phone, address=address)
+                        
+                        # Auto-link to sponsor if sponsor is uploading
+                        if is_sponsor_user:
+                            driver_profile.sponsors.add(request.user)
+                            driver_profile.sponsor_name = request.user.username
+                            driver_profile.save()
 
-                    # Handle sponsor group
+                    # Handle sponsor group (admin only)
                     elif user_type == "sponsor":
                         sponsor_group, _ = Group.objects.get_or_create(name="sponsor")
                         user.groups.add(sponsor_group)
@@ -2324,20 +2364,31 @@ def bulk_upload_users(request):
         if skipped_count > 0:
             messages.warning(request, f"⚠️ {skipped_count} row(s) were skipped. See details below.")
 
-    # Get recent upload history
-    recent_uploads = BulkUploadLog.objects.all()[:10]
+    # Get recent upload history (only show user's own uploads if sponsor)
+    if is_sponsor_user:
+        recent_uploads = BulkUploadLog.objects.filter(uploaded_by=request.user)[:10]
+    else:
+        recent_uploads = BulkUploadLog.objects.all()[:10]
     
     return render(request, "accounts/bulk_upload.html", {
         "upload_log": upload_log,
         "results": results,
         "recent_uploads": recent_uploads,
+        "is_sponsor_user": is_sponsor_user,
     })
 
 
-@staff_member_required
+@login_required
+@user_passes_test(lambda u: u.is_staff or u.groups.filter(name="sponsor").exists())
 def bulk_upload_history(request):
     """View upload history and details of past uploads."""
-    uploads = BulkUploadLog.objects.all().order_by("-created_at")
+    is_sponsor_user = request.user.groups.filter(name="sponsor").exists() and not request.user.is_staff
+    
+    # Sponsors only see their own uploads, admins see all
+    if is_sponsor_user:
+        uploads = BulkUploadLog.objects.filter(uploaded_by=request.user).order_by("-created_at")
+    else:
+        uploads = BulkUploadLog.objects.all().order_by("-created_at")
     
     # Pagination
     paginator = Paginator(uploads, 20)
@@ -2346,16 +2397,25 @@ def bulk_upload_history(request):
     
     return render(request, "accounts/bulk_upload_history.html", {
         "page_obj": page_obj,
+        "is_sponsor_user": is_sponsor_user,
     })
 
 
-@staff_member_required
+@login_required
+@user_passes_test(lambda u: u.is_staff or u.groups.filter(name="sponsor").exists())
 def bulk_upload_detail(request, upload_id):
     """View detailed results of a specific upload."""
-    upload_log = get_object_or_404(BulkUploadLog, id=upload_id)
+    is_sponsor_user = request.user.groups.filter(name="sponsor").exists() and not request.user.is_staff
+    
+    # Sponsors can only view their own uploads
+    if is_sponsor_user:
+        upload_log = get_object_or_404(BulkUploadLog, id=upload_id, uploaded_by=request.user)
+    else:
+        upload_log = get_object_or_404(BulkUploadLog, id=upload_id)
     
     return render(request, "accounts/bulk_upload_detail.html", {
         "upload_log": upload_log,
+        "is_sponsor_user": is_sponsor_user,
     })
 
 

@@ -3,12 +3,19 @@
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="mb-0">
-            <i class="fas fa-upload me-2"></i>Bulk Upload Users
+            <i class="fas fa-upload me-2"></i>Bulk Upload {% if is_sponsor_user %}Drivers{% else %}Users{% endif %}
         </h1>
         <a href="{% url 'accounts:bulk_upload_history' %}" class="btn btn-outline-secondary">
             <i class="fas fa-history me-1"></i>View Upload History
         </a>
     </div>
+    
+    {% if is_sponsor_user %}
+    <div class="alert alert-info mb-4">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Sponsor Upload:</strong> You can only upload drivers. All drivers you create will be automatically linked to your sponsor account.
+    </div>
+    {% endif %}
 
     <div class="row">
         <!-- Upload Form Section -->
@@ -58,9 +65,15 @@
                             <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
                                 <i class="fas fa-upload me-2"></i>Upload & Process
                             </button>
+                            {% if is_sponsor_user %}
+                            <a href="{% url 'accounts:sponsor_driver_search' %}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            {% else %}
                             <a href="{% url 'admin_user_search' %}" class="btn btn-secondary btn-lg">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </a>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -204,22 +217,44 @@
                     </h6>
                 </div>
                 <div class="card-body">
-                    <p class="small mb-2">Required columns (comma-separated, in order):</p>
-                    <pre class="bg-light p-2 rounded small" style="font-size: 0.75rem;">username,email,password,user_type,phone,address,sponsor_name,sponsor_email</pre>
-                    
-                    <p class="small mt-3 mb-2"><strong>Example:</strong></p>
-                    <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">driver1,driver1@example.com,Pass123!,driver,555-1234,"123 Main St",,
+                    {% if is_sponsor_user %}
+                        <p class="small mb-2"><strong>For Sponsors:</strong> You can use the prefix format or standard CSV format. All drivers will be automatically linked to your account.</p>
+                        <p class="small mb-2"><strong>Prefix Format (Recommended):</strong></p>
+                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">D|First|Last|Email
+D|John|Doe|john@example.com
+D|Jane|Smith|jane@example.com</pre>
+                        <p class="small mt-3 mb-2"><strong>Standard CSV Format:</strong></p>
+                        <pre class="bg-light p-2 rounded small" style="font-size: 0.75rem;">username,email,password,user_type,phone,address</pre>
+                        <p class="small mt-2 mb-2"><strong>Example:</strong></p>
+                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">driver1,driver1@example.com,Pass123!,driver,555-1234,"123 Main St"
+driver2,driver2@example.com,Pass456!,driver,555-5678,"456 Oak Ave"</pre>
+                        <div class="alert alert-warning small mt-3 mb-0">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <strong>Note:</strong> user_type must be "driver" (sponsors cannot create other sponsors)
+                        </div>
+                    {% else %}
+                        <p class="small mb-2">Required columns (comma-separated, in order):</p>
+                        <pre class="bg-light p-2 rounded small" style="font-size: 0.75rem;">username,email,password,user_type,phone,address,sponsor_name,sponsor_email</pre>
+                        
+                        <p class="small mt-3 mb-2"><strong>Prefix Format (Alternative):</strong></p>
+                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">O|OrganizationName
+D|Organization|First|Last|Email
+S|Organization|First|Last|Email</pre>
+                        
+                        <p class="small mt-3 mb-2"><strong>Standard CSV Example:</strong></p>
+                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">driver1,driver1@example.com,Pass123!,driver,555-1234,"123 Main St",,
 sponsor1,sponsor1@example.com,Pass456!,sponsor,,,Acme Logistics,sponsor@acme.com</pre>
-                    
-                    <div class="alert alert-info small mt-3 mb-2">
-                        <i class="fas fa-info-circle me-1"></i>
-                        <strong>Accepted formats:</strong> .csv or .txt files (comma-separated values)
-                    </div>
-                    
-                    <div class="alert alert-warning small mb-0">
-                        <i class="fas fa-exclamation-triangle me-1"></i>
-                        <strong>Note:</strong> user_type must be either "driver" or "sponsor"
-                    </div>
+                        
+                        <div class="alert alert-info small mt-3 mb-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Accepted formats:</strong> .csv or .txt files (comma-separated or pipe-delimited)
+                        </div>
+                        
+                        <div class="alert alert-warning small mb-0">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            <strong>Note:</strong> user_type must be either "driver" or "sponsor"
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
