@@ -3785,6 +3785,43 @@ class PasswordResetConfirmNotifyView(PasswordResetConfirmView):
         return response
 
 
+def simple_password_reset(request):
+    """Custom password reset that shows the link directly on the page (no email needed)"""
+    from django.contrib.auth.forms import PasswordResetForm
+    
+    if request.method == 'POST':
+        form = PasswordResetForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            User = get_user_model()
+            # Handle case where multiple users might have the same email
+            users = User.objects.filter(email=email, is_active=True)
+            if users.exists():
+                # Get the first active user (or you could generate links for all)
+                user = users.first()
+                # Generate reset token
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+                # Build the reset URL
+                reset_url = request.build_absolute_uri(
+                    reverse('accounts:password_reset_confirm', args=[uid, token])
+                )
+                return render(request, 'registration/password_reset_done.html', {
+                    'reset_url': reset_url,
+                    'email': email,
+                })
+            else:
+                # Still show success message (security best practice)
+                return render(request, 'registration/password_reset_done.html', {
+                    'reset_url': None,
+                    'email': email,
+                })
+    else:
+        form = PasswordResetForm()
+    
+    return render(request, 'registration/password_reset_form.html', {'form': form})
+
+
 # ============================================================================
 # CHAT ROOM VIEWS
 # ============================================================================
