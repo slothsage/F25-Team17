@@ -82,6 +82,7 @@ urlpatterns = [
 
     # Sponsor-facing driver search
     path("sponsor/drivers/", views.sponsor_driver_search, name="sponsor_driver_search"),
+    path("sponsor/drivers/<int:driver_id>/profile/", views.sponsor_view_driver_profile, name="sponsor_view_driver_profile"),
 
     # Sponsor archiving (admin only)
     path("admin/sponsors/archived/", views.archived_sponsors, name="archived_sponsors"),

@@ -1345,6 +1345,72 @@ def sponsor_driver_search(request):
     )
 
 @login_required
+def sponsor_view_driver_profile(request, driver_id):
+    """
+    Allow sponsors to view their drivers' profiles.
+    """
+    sponsor = request.user
+    
+    # Check if user is a sponsor
+    if not (sponsor.is_superuser or sponsor.groups.filter(name="sponsor").exists()):
+        messages.error(request, "Access denied. Only sponsors can view driver profiles.")
+        return redirect("accounts:profile")
+    
+    # Get the driver
+    driver = get_object_or_404(User, id=driver_id)
+    driver_profile = getattr(driver, "driver_profile", None)
+    
+    if not driver_profile:
+        messages.error(request, "This user does not have a driver profile.")
+        return redirect("accounts:sponsor_driver_search")
+    
+    # Check sponsorship relationship (same logic as sponsor_driver_search)
+    is_m2m = bool(driver_profile.sponsors.filter(id=sponsor.id).exists())
+    is_legacy = bool(driver_profile.sponsor_name == sponsor.username)
+    has_request = SponsorshipRequest.objects.filter(
+        status="approved"
+    ).filter(
+        Q(from_user=sponsor, to_user=driver) |
+        Q(from_user=driver, to_user=sponsor)
+    ).exists()
+    
+    if not (is_m2m or is_legacy or has_request):
+        messages.error(request, "This driver is not under your sponsorship.")
+        return redirect("accounts:sponsor_driver_search")
+    
+    # Get points balance from this sponsor's wallet
+    try:
+        wallet = SponsorPointsAccount.objects.get(sponsor=sponsor, driver=driver)
+        sponsor_points_balance = wallet.balance
+    except SponsorPointsAccount.DoesNotExist:
+        sponsor_points_balance = 0
+    
+    # Get total points balance across all sponsors
+    from accounts.services import get_driver_points_balance
+    total_points = get_driver_points_balance(driver)
+    
+    # Calculate goal progress if applicable
+    progress_percentage = 0
+    points_remaining = 0
+    has_goal = False
+    if driver_profile.points_goal and driver_profile.points_goal > 0:
+        progress_percentage = min(100, int((total_points / driver_profile.points_goal) * 100))
+        points_remaining = max(0, driver_profile.points_goal - total_points)
+        has_goal = True
+    
+    return render(request, "accounts/sponsor_view_driver_profile.html", {
+        "driver": driver,
+        "driver_profile": driver_profile,
+        "sponsor": sponsor,
+        "sponsor_points_balance": sponsor_points_balance,
+        "total_points": total_points,
+        "points_goal": driver_profile.points_goal,
+        "progress_percentage": progress_percentage,
+        "points_remaining": points_remaining,
+        "has_goal": has_goal,
+    })
+
+@login_required
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, driver=request.user)
     is_delayed = order_is_delayed(order)

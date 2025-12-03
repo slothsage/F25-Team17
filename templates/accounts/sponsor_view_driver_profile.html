@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Driver Profile - {{ driver.username }}{% endblock title %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">
+                <i class="fas fa-user me-2"></i>Driver Profile
+            </h1>
+            <p class="text-muted mb-0">Viewing profile for {{ driver.username }}</p>
+        </div>
+        <a href="{% url 'accounts:sponsor_driver_search' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Drivers
+        </a>
+    </div>
+
+    <!-- Points Summary Card -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="points-circle text-white">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div>
+                            <p class="text-uppercase text-muted mb-1 small">Points from {{ sponsor.username }}</p>
+                            <p class="h3 mb-0 fw-bold">{{ sponsor_points_balance|default:0 }} <span class="fs-6 text-muted">pts</span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="points-circle text-white" style="background: #28a745;">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div>
+                            <p class="text-uppercase text-muted mb-1 small">Total Points (All Sponsors)</p>
+                            <p class="h3 mb-0 fw-bold">{{ total_points|default:0 }} <span class="fs-6 text-muted">pts</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if has_goal %}
+            <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #dee2e6;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 600; font-size: 0.9rem;">Goal: {{ points_goal|floatformat:0 }} points</span>
+                    <span style="font-weight: 600; color: #007bff; font-size: 0.9rem;">{{ progress_percentage }}%</span>
+                </div>
+                
+                <div style="background: #e9ecef; border-radius: 0.5rem; height: 1.5rem; position: relative; overflow: hidden; border: 1px solid #dee2e6;">
+                    <div style="
+                        background: {% if progress_percentage >= 100 %}linear-gradient(90deg, #28a745 0%, #20c997 100%);
+                        {% elif progress_percentage >= 75 %}linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+                        {% elif progress_percentage >= 50 %}linear-gradient(90deg, #17a2b8 0%, #138496 100%);
+                        {% elif progress_percentage >= 25 %}linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+                        {% else %}linear-gradient(90deg, #dc3545 0%, #c82333 100%);{% endif %}
+                        height: 100%;
+                        width: {{ progress_percentage }}%;
+                        transition: width 0.3s ease;
+                        border-radius: 0.5rem;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-weight: bold;
+                        font-size: 0.75rem;
+                    ">
+                        {% if progress_percentage > 15 %}{{ progress_percentage }}%{% endif %}
+                    </div>
+                </div>
+                
+                {% if progress_percentage >= 100 %}
+                <p style="margin-top: 0.5rem; margin-bottom: 0; color: #28a745; font-weight: 600; font-size: 0.9rem;">
+                    🎉 Goal achieved! Driver has {{ total_points|floatformat:0 }} points!
+                </p>
+                {% else %}
+                <p style="margin-top: 0.5rem; margin-bottom: 0; color: #6c757d; font-size: 0.85rem;">
+                    {{ points_remaining|floatformat:0 }} points remaining
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <style>
+    .points-circle {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: #0d6efd;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        box-shadow: inset 0 0 10px rgba(255,255,255,0.25);
+    }
+    </style>
+
+    <!-- Profile Information Card -->
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle me-2"></i>Profile Information
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-4 text-center mb-3 mb-md-0">
+                    {% if driver_profile.image %}
+                    <img src="{{ driver_profile.image.url }}" alt="Profile photo" 
+                         style="width:150px;height:150px;object-fit:cover;border-radius:75px;border:2px solid #ddd;">
+                    {% else %}
+                    <div style="width:150px;height:150px;background-color:#f0f0f0;border-radius:75px;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;margin:0 auto;">
+                        <span style="color:#999;font-size:14px;">No photo</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-8">
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Username:</strong></p>
+                            <p class="text-muted">{{ driver.username }}</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Email:</strong></p>
+                            <p class="text-muted">{{ driver.email }}</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Name:</strong></p>
+                            <p class="text-muted">
+                                {{ driver_profile.first_name }} {{ driver_profile.last_name|default:"" }}
+                                {% if not driver_profile.first_name and not driver_profile.last_name %}
+                                    <span class="text-muted fst-italic">Not provided</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Phone:</strong></p>
+                            <p class="text-muted">{{ driver_profile.phone|default:"—" }}</p>
+                        </div>
+                        <div class="col-12">
+                            <p class="mb-1"><strong>Address:</strong></p>
+                            <p class="text-muted">
+                                {% if driver_profile.address %}
+                                    {{ driver_profile.address }}
+                                    {% if driver_profile.city or driver_profile.state or driver_profile.zip_code %}
+                                        <br>
+                                        {{ driver_profile.city }}{% if driver_profile.city and driver_profile.state %},{% endif %}
+                                        {{ driver_profile.state }} {{ driver_profile.zip_code }}
+                                    {% endif %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                        </div>
+                        {% if driver_profile.description %}
+                        <div class="col-12">
+                            <p class="mb-1"><strong>Description:</strong></p>
+                            <p class="text-muted">{{ driver_profile.description }}</p>
+                        </div>
+                        {% endif %}
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Account Status:</strong></p>
+                            <p>
+                                {% if not driver.is_active %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% elif driver_profile.is_locked %}
+                                    <span class="badge bg-danger">Locked</span>
+                                {% elif driver_profile.is_suspended %}
+                                    <span class="badge bg-warning text-dark">Suspended</span>
+                                {% else %}
+                                    <span class="badge bg-success">Active</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Last Login:</strong></p>
+                            <p class="text-muted">
+                                {% if driver.last_login %}
+                                    {{ driver.last_login|date:"M d, Y g:i A" }}
+                                    <br><small class="text-muted">{{ driver.last_login|timesince }} ago</small>
+                                {% else %}
+                                    <span class="badge bg-secondary">Never</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-bottom py-3">
+            <h5 class="mb-0">
+                <i class="fas fa-bolt me-2"></i>Quick Actions
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{% url 'accounts:sponsor_driver_search' %}?q={{ driver.username }}" class="btn btn-primary">
+                    <i class="fas fa-search me-1"></i>Search This Driver
+                </a>
+                <a href="{% url 'accounts:sponsor_driver_search' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-list me-1"></i>View All Drivers
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+

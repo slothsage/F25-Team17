@@ -95,32 +95,37 @@
                 {% endif %}
               </td>
               <td class="pe-3">
-                <form method="post" class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
-                  {% csrf_token %}
-                  <input type="hidden" name="driver_id" value="{{ u.id }}">
-                  <input
-                    type="number"
-                    name="amount"
-                    min="1"
-                    step="1"
-                    placeholder="Points"
-                    required
-                    class="form-control form-control-sm"
-                    style="width: 90px;"
-                  />
-                  <input
-                    type="text"
-                    name="reason"
-                    placeholder="Reason (optional)"
-                    class="form-control form-control-sm flex-grow-1"
-                  />
-                  <button class="btn btn-sm btn-outline-success" name="action" value="award" type="submit">
-                    <i class="fas fa-plus me-1"></i>Award
-                  </button>
-                  <button class="btn btn-sm btn-outline-danger" name="action" value="deduct" type="submit">
-                    <i class="fas fa-minus me-1"></i>Deduct
-                  </button>
-                </form>
+                <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
+                  <a href="{% url 'accounts:sponsor_view_driver_profile' u.id %}" class="btn btn-sm btn-outline-primary" title="View Profile">
+                    <i class="fas fa-user me-1"></i>View Profile
+                  </a>
+                  <form method="post" class="d-flex flex-wrap gap-2 align-items-center">
+                    {% csrf_token %}
+                    <input type="hidden" name="driver_id" value="{{ u.id }}">
+                    <input
+                      type="number"
+                      name="amount"
+                      min="1"
+                      step="1"
+                      placeholder="Points"
+                      required
+                      class="form-control form-control-sm"
+                      style="width: 90px;"
+                    />
+                    <input
+                      type="text"
+                      name="reason"
+                      placeholder="Reason (optional)"
+                      class="form-control form-control-sm flex-grow-1"
+                    />
+                    <button class="btn btn-sm btn-outline-success" name="action" value="award" type="submit">
+                      <i class="fas fa-plus me-1"></i>Award
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" name="action" value="deduct" type="submit">
+                      <i class="fas fa-minus me-1"></i>Deduct
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
             {% empty %}
