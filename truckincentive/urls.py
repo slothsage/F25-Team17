@@ -2,9 +2,12 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
+from django.views.generic import RedirectView
 from accounts import views as accounts_views
 
 urlpatterns = [
+    # Redirect root URL to About page
+    path("", RedirectView.as_view(url="/about/", permanent=False), name="home"),
     # our custom admin landing/search
     path("admin/", accounts_views.admin_user_search, name="admin_user_search"),
     path("admin/create-driver/", accounts_views.create_driver, name="create_driver"),
