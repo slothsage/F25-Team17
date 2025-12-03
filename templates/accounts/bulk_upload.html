@@ -8,7 +8,18 @@
     {% if is_sponsor_user %}
     <div class="alert alert-info mb-4">
         <i class="fas fa-info-circle me-2"></i>
-        <strong>Sponsor Upload:</strong> You can only upload drivers. All drivers you create will be automatically linked to your sponsor account.
+        <strong>Sponsor Upload:</strong> You can upload drivers (D) and sponsors (S). All users you create will be automatically linked to your sponsor organization. Format: D||first|last|email or S||first|last|email (note: omit organization name).
+    </div>
+    {% endif %}
+
+    {% if results and results.errors %}
+    <div class="alert alert-warning mb-4">
+        <h5><i class="fas fa-exclamation-triangle me-2"></i>Upload Errors</h5>
+        <ul class="mb-0">
+            {% for error in results.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
     </div>
     {% endif %}
 
