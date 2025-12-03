@@ -1,14 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="mb-0">
-            <i class="fas fa-upload me-2"></i>Bulk Upload {% if is_sponsor_user %}Drivers{% else %}Users{% endif %}
-        </h1>
-        <a href="{% url 'accounts:bulk_upload_history' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-history me-1"></i>View Upload History
-        </a>
-    </div>
+    <h1 class="mb-4">
+        <i class="fas fa-upload me-2"></i>Bulk Upload {% if is_sponsor_user %}Drivers{% else %}Users{% endif %}
+    </h1>
     
     {% if is_sponsor_user %}
     <div class="alert alert-info mb-4">
@@ -17,280 +12,62 @@
     </div>
     {% endif %}
 
-    <div class="row">
-        <!-- Upload Form Section -->
-        <div class="col-lg-8">
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-file-csv me-2"></i>Upload CSV or TXT File
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data" id="uploadForm">
-                        {% csrf_token %}
-                        <div class="mb-4">
-                            <label for="file" class="form-label fw-bold">Select CSV or TXT File</label>
-                            <div class="file-upload-area border rounded p-4 text-center" 
-                                 style="background: #f8f9fa; border-style: dashed !important; cursor: pointer;"
-                                 onclick="document.getElementById('file').click();">
-                                <input type="file" 
-                                       name="file" 
-                                       id="file" 
-                                       accept=".csv,.txt" 
-                                       class="form-control d-none" 
-                                       required
-                                       onchange="handleFileSelect(this)">
-                                <div id="filePlaceholder">
-                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                    <p class="mb-0 text-muted">
-                                        <strong>Click to select a file</strong> or drag and drop
-                                    </p>
-                                    <p class="text-muted small mt-2">CSV or TXT files only (.csv, .txt)</p>
-                                </div>
-                                <div id="fileSelected" style="display: none;">
-                                    <i class="fas fa-file-csv fa-3x text-success mb-3"></i>
-                                    <p class="mb-0">
-                                        <strong id="fileName"></strong>
-                                    </p>
-                                    <p class="text-muted small mt-2" id="fileSize"></p>
-                                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="clearFile()">
-                                        <i class="fas fa-times me-1"></i>Remove
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
-                                <i class="fas fa-upload me-2"></i>Upload & Process
-                            </button>
-                            {% if is_sponsor_user %}
-                            <a href="{% url 'accounts:sponsor_driver_search' %}" class="btn btn-secondary btn-lg">
-                                <i class="fas fa-times me-2"></i>Cancel
-                            </a>
-                            {% else %}
-                            <a href="{% url 'admin_user_search' %}" class="btn btn-secondary btn-lg">
-                                <i class="fas fa-times me-2"></i>Cancel
-                            </a>
-                            {% endif %}
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Results Section -->
-            {% if results %}
-            <div class="card shadow-sm mb-4">
-                <div class="card-header {% if results.success_rate >= 80 %}bg-success{% elif results.success_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %} text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-chart-bar me-2"></i>Upload Results
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <!-- Summary Stats -->
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <div class="text-center p-3 bg-light rounded">
-                                <h3 class="mb-0 text-primary">{{ results.total_rows }}</h3>
-                                <small class="text-muted">Total Rows</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center p-3 bg-light rounded">
-                                <h3 class="mb-0 text-success">{{ results.created_count }}</h3>
-                                <small class="text-muted">Created</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center p-3 bg-light rounded">
-                                <h3 class="mb-0 text-warning">{{ results.skipped_count }}</h3>
-                                <small class="text-muted">Skipped</small>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="text-center p-3 bg-light rounded">
-                                <h3 class="mb-0 text-info">{{ results.success_rate }}%</h3>
-                                <small class="text-muted">Success Rate</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Upload Progress</span>
-                            <span>{{ results.success_rate }}%</span>
-                        </div>
-                        <div class="progress" style="height: 25px;">
-                            <div class="progress-bar {% if results.success_rate >= 80 %}bg-success{% elif results.success_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}" 
-                                 role="progressbar" 
-                                 style="width: {{ results.success_rate }}%"
-                                 aria-valuenow="{{ results.success_rate }}" 
-                                 aria-valuemin="0" 
-                                 aria-valuemax="100">
-                                {{ results.success_rate }}%
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Created Users -->
-                    {% if results.created_users %}
-                    <div class="mb-4">
-                        <h6 class="text-success">
-                            <i class="fas fa-check-circle me-2"></i>Successfully Created ({{ results.created_count }})
-                        </h6>
-                        <div class="bg-light p-3 rounded" style="max-height: 200px; overflow-y: auto;">
-                            <div class="d-flex flex-wrap gap-2">
-                                {% for username in results.created_users %}
-                                <span class="badge bg-success">{{ username }}</span>
-                                {% endfor %}
-                                {% if results.has_more_created %}
-                                <span class="badge bg-secondary">... and {{ results.created_count|add:"-50" }} more</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Skipped Users -->
-                    {% if results.skipped_users %}
-                    <div class="mb-4">
-                        <h6 class="text-warning">
-                            <i class="fas fa-exclamation-triangle me-2"></i>Skipped Users ({{ results.skipped_count }})
-                        </h6>
-                        <div class="bg-light p-3 rounded" style="max-height: 200px; overflow-y: auto;">
-                            <div class="d-flex flex-wrap gap-2">
-                                {% for username in results.skipped_users %}
-                                <span class="badge bg-warning text-dark">{{ username }}</span>
-                                {% endfor %}
-                                {% if results.has_more_skipped %}
-                                <span class="badge bg-secondary">... and {{ results.skipped_count|add:"-50" }} more</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Errors -->
-                    {% if results.errors %}
-                    <div class="mb-4">
-                        <h6 class="text-danger">
-                            <i class="fas fa-exclamation-circle me-2"></i>Errors ({{ results.error_count }})
-                        </h6>
-                        <div class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
-                            <ul class="list-unstyled mb-0">
-                                {% for error in results.errors %}
-                                <li class="text-danger small mb-2">
-                                    <i class="fas fa-times-circle me-1"></i>{{ error }}
-                                </li>
-                                {% endfor %}
-                                {% if results.has_more_errors %}
-                                <li class="text-muted small">
-                                    <i class="fas fa-ellipsis-h me-1"></i>... and {{ results.error_count|add:"-20" }} more errors
-                                </li>
-                                {% endif %}
-                            </ul>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if upload_log %}
-                    <div class="mt-3">
-                        <a href="{% url 'accounts:bulk_upload_detail' upload_log.id %}" class="btn btn-outline-primary">
-                            <i class="fas fa-info-circle me-1"></i>View Full Details
-                        </a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
+    <div class="card shadow-sm mb-4" style="max-width: 600px;">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-file-csv me-2"></i>Upload CSV or TXT File
+            </h5>
         </div>
-
-        <!-- Instructions & Recent Uploads Sidebar -->
-        <div class="col-lg-4">
-            <!-- File Format Instructions -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header bg-info text-white">
-                    <h6 class="mb-0">
-                        <i class="fas fa-info-circle me-2"></i>File Format (CSV or TXT)
-                    </h6>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" id="uploadForm">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="file" class="form-label fw-bold">Select CSV or TXT File</label>
+                    <div class="file-upload-area border rounded p-4 text-center" 
+                         style="background: #f8f9fa; border-style: dashed !important; cursor: pointer;"
+                         onclick="document.getElementById('file').click();">
+                        <input type="file" 
+                               name="file" 
+                               id="file" 
+                               accept=".csv,.txt" 
+                               class="form-control d-none" 
+                               required
+                               onchange="handleFileSelect(this)">
+                        <div id="filePlaceholder">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                            <p class="mb-0 text-muted">
+                                <strong>Click to select a file</strong> or drag and drop
+                            </p>
+                            <p class="text-muted small mt-2">CSV or TXT files only (.csv, .txt)</p>
+                        </div>
+                        <div id="fileSelected" style="display: none;">
+                            <i class="fas fa-file-csv fa-3x text-success mb-3"></i>
+                            <p class="mb-0">
+                                <strong id="fileName"></strong>
+                            </p>
+                            <p class="text-muted small mt-2" id="fileSize"></p>
+                            <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="clearFile()">
+                                <i class="fas fa-times me-1"></i>Remove
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body">
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn">
+                        <i class="fas fa-upload me-2"></i>Upload & Process
+                    </button>
                     {% if is_sponsor_user %}
-                        <p class="small mb-2"><strong>For Sponsors:</strong> You can use the prefix format or standard CSV format. All drivers will be automatically linked to your account.</p>
-                        <p class="small mb-2"><strong>Prefix Format (Recommended):</strong></p>
-                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">D|First|Last|Email
-D|John|Doe|john@example.com
-D|Jane|Smith|jane@example.com</pre>
-                        <p class="small mt-3 mb-2"><strong>Standard CSV Format:</strong></p>
-                        <pre class="bg-light p-2 rounded small" style="font-size: 0.75rem;">username,email,password,user_type,phone,address</pre>
-                        <p class="small mt-2 mb-2"><strong>Example:</strong></p>
-                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">driver1,driver1@example.com,Pass123!,driver,555-1234,"123 Main St"
-driver2,driver2@example.com,Pass456!,driver,555-5678,"456 Oak Ave"</pre>
-                        <div class="alert alert-warning small mt-3 mb-0">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            <strong>Note:</strong> user_type must be "driver" (sponsors cannot create other sponsors)
-                        </div>
+                    <a href="{% url 'accounts:sponsor_driver_search' %}" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </a>
                     {% else %}
-                        <p class="small mb-2">Required columns (comma-separated, in order):</p>
-                        <pre class="bg-light p-2 rounded small" style="font-size: 0.75rem;">username,email,password,user_type,phone,address,sponsor_name,sponsor_email</pre>
-                        
-                        <p class="small mt-3 mb-2"><strong>Prefix Format (Alternative):</strong></p>
-                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">O|OrganizationName
-D|Organization|First|Last|Email
-S|Organization|First|Last|Email</pre>
-                        
-                        <p class="small mt-3 mb-2"><strong>Standard CSV Example:</strong></p>
-                        <pre class="bg-light p-2 rounded small" style="font-size: 0.7rem; max-height: 150px; overflow-y: auto;">driver1,driver1@example.com,Pass123!,driver,555-1234,"123 Main St",,
-sponsor1,sponsor1@example.com,Pass456!,sponsor,,,Acme Logistics,sponsor@acme.com</pre>
-                        
-                        <div class="alert alert-info small mt-3 mb-2">
-                            <i class="fas fa-info-circle me-1"></i>
-                            <strong>Accepted formats:</strong> .csv or .txt files (comma-separated or pipe-delimited)
-                        </div>
-                        
-                        <div class="alert alert-warning small mb-0">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            <strong>Note:</strong> user_type must be either "driver" or "sponsor"
-                        </div>
+                    <a href="{% url 'admin_user_search' %}" class="btn btn-secondary btn-lg">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </a>
                     {% endif %}
                 </div>
-            </div>
-
-            <!-- Recent Uploads -->
-            {% if recent_uploads %}
-            <div class="card shadow-sm">
-                <div class="card-header bg-secondary text-white">
-                    <h6 class="mb-0">
-                        <i class="fas fa-history me-2"></i>Recent Uploads
-                    </h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for upload in recent_uploads %}
-                        <a href="{% url 'accounts:bulk_upload_detail' upload.id %}" 
-                           class="list-group-item list-group-item-action">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div>
-                                    <h6 class="mb-1 small">{{ upload.filename|truncatechars:25 }}</h6>
-                                    <small class="text-muted">{{ upload.created_at|date:"M d, Y H:i" }}</small>
-                                </div>
-                                <span class="badge {% if upload.success_rate >= 80 %}bg-success{% elif upload.success_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}">
-                                    {{ upload.created_count }}/{{ upload.total_rows }}
-                                </span>
-                            </div>
-                        </a>
-                        {% endfor %}
-                    </div>
-                    <div class="card-footer text-center">
-                        <a href="{% url 'accounts:bulk_upload_history' %}" class="btn btn-sm btn-outline-primary">
-                            View All History
-                        </a>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
+            </form>
         </div>
     </div>
 </div>

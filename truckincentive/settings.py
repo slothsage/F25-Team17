@@ -10,7 +10,7 @@ LOCAL_PATHS = [BASE_DIR / "local"]
 load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "insecure-dev-key")
-DEBUG = True
+DEBUG = False
 ALLOWED_HOSTS = ["*"]
 
 LOGGING = {
