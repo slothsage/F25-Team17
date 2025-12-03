@@ -201,23 +201,7 @@
               <th>Phone</th>
               <th>Address</th>
               <th>Labels</th>
-              <th>
-                {% with current_q=request.GET.q|default:"" current_label=request.GET.label|default:"" %}
-                  {% if request.GET.sort == "sponsor_asc" %}
-                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_desc" class="text-decoration-none text-dark">
-                      Sponsor <i class="fas fa-sort-down"></i>
-                    </a>
-                  {% elif request.GET.sort == "sponsor_desc" %}
-                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="text-decoration-none text-dark">
-                      Sponsor <i class="fas fa-sort-up"></i>
-                    </a>
-                  {% else %}
-                    <a href="?q={{ current_q }}&label={{ current_label }}&sort=sponsor_asc" class="text-decoration-none text-muted">
-                      Sponsor <i class="fas fa-sort"></i>
-                    </a>
-                  {% endif %}
-                {% endwith %}
-              </th>
+              <th>Sponsor</th>
               <th>Last Login</th>
               <th style="width: 180px;" class="pe-3">Actions</th>
             </tr>
@@ -245,12 +229,12 @@
               <td>
                   {% if u.driver_profile.sponsors.all %}
                       {% for s in u.driver_profile.sponsors.all %}
-                          <span class="badge info" style="margin-right:4px;">
+                          <span class="badge" style="background-color: #e9ecef; color: #212529; margin-right: 4px; text-decoration: none; cursor: default; border: 1px solid #dee2e6;">
                               {{ s.username }}
                           </span>
                       {% endfor %}
                   {% else %}
-                      <span class="muted">No Sponsors</span>
+                      <span class="text-muted">No Sponsors</span>
                   {% endif %}
               </td>
               <td class="small">
@@ -1002,20 +986,6 @@ document.addEventListener('DOMContentLoaded', function() {
   border-color: #adb5bd;
 }
 
-.btn-create-user {
-  padding: 0.5rem 1rem !important;
-  background: #0066cc !important;
-  border: 1px solid #0052a3 !important;
-  border-radius: 6px !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-}
-
-.btn-create-user:hover {
-  background: #0052a3 !important;
-  border-color: #003d7a !important;
-}
-
 .action-bar form {
   display: flex;
   gap: 0.5rem;
@@ -1185,6 +1155,18 @@ document.addEventListener('DOMContentLoaded', function() {
   .search-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Remove hyperlink styling from sponsor badges */
+.badge.bg-info {
+  color: #000 !important;
+  text-decoration: none !important;
+  cursor: default !important;
+}
+
+.badge.bg-info:hover {
+  color: #000 !important;
+  text-decoration: none !important;
 }
 </style>
 {% endblock content %}

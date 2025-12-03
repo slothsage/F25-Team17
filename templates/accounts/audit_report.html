@@ -1,86 +1,141 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-  <h2>{{ title }}</h2>
-
-  <form method="get" class="row gy-2 gx-2 align-items-end mb-3">
-    <div class="col-md-3">
-      <label class="form-label">Category</label>
-      <select name="category" class="form-select">
-        <option value="login_attempts" {% if category == "login_attempts" %}selected{% endif %}>Login attempts</option>
-        <option value="point_changes" {% if category == "point_changes" %}selected{% endif %}>Point changes</option>
-        <option value="password_changes" {% if category == "password_changes" %}selected{% endif %}>Password changes</option>
-        <option value="driver_applications" {% if category == "driver_applications" %}selected{% endif %}>Driver applications</option>
-        {% if is_admin %}
-        <option value="impersonations" {% if category == "impersonations" %}selected{% endif %}>Impersonations</option>
-        {% endif %}
-      </select>
+<div class="container-fluid mt-4 mb-5">
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+      <h5 class="mb-0 fw-bold">
+        <i class="fas fa-chart-line me-2 text-primary"></i>{{ title }}
+      </h5>
     </div>
+    <div class="card-body">
+      <form method="get" class="audit-filter-form">
+        <div class="row g-3">
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2">Category</label>
+            <select name="category" class="form-select">
+              <option value="login_attempts" {% if category == "login_attempts" %}selected{% endif %}>Login attempts</option>
+              <option value="point_changes" {% if category == "point_changes" %}selected{% endif %}>Point changes</option>
+              <option value="password_changes" {% if category == "password_changes" %}selected{% endif %}>Password changes</option>
+              <option value="driver_applications" {% if category == "driver_applications" %}selected{% endif %}>Driver applications</option>
+              {% if is_admin %}
+              <option value="impersonations" {% if category == "impersonations" %}selected{% endif %}>Impersonations</option>
+              {% endif %}
+            </select>
+          </div>
 
-    <div class="col-md-2">
-      <label class="form-label">Start</label>
-      <input type="date" name="start" class="form-control" value="{{ start }}">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label">End</label>
-      <input type="date" name="end" class="form-control" value="{{ end }}">
-    </div>
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2">Start Date</label>
+            <input type="date" name="start" class="form-control" value="{{ start }}">
+          </div>
 
-      <div class="col-md-2">
-        <label class="form-label">User ID</label>
-        <input type="number"
-           name="user_id"
-           class="form-control"
-           value="{{ user_id|default:'' }}"
-           placeholder="e.g. 12">
-      </div>
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2">End Date</label>
+            <input type="date" name="end" class="form-control" value="{{ end }}">
+          </div>
 
-    {% if is_admin %}
-    <div class="col-md-3">
-      <label class="form-label">Sponsor</label>
-      <select name="sponsor" class="form-select">
-        <option value="">All sponsors</option>
-        {% for s in sponsor_names %}
-          <option value="{{ s }}" {% if sponsor == s %}selected{% endif %}>{{ s }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    {% else %}
-    <div class="col-md-3">
-      <label class="form-label">Sponsor</label>
-      <input class="form-control" value="{{ sponsor }}" disabled>
-      <input type="hidden" name="sponsor" value="{{ sponsor }}">
-    </div>
-    {% endif %}
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2">User ID</label>
+            <input type="number" name="user_id" class="form-control" value="{{ user_id|default:'' }}" placeholder="e.g. 12">
+          </div>
 
-    <div class="col-md-2 d-flex gap-2">
-      <button class="btn btn-primary w-100" type="submit">Run</button>
-      <a class="btn btn-outline-secondary"
-         href="?category={{ category }}&start={{ start }}&end={{ end }}&sponsor={{ sponsor }}&user_id={{ user_id }}&format=csv">
-        CSV
-      </a>
-    </div>
-  </form>
+          {% if is_admin %}
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2">Sponsor</label>
+            <select name="sponsor" class="form-select">
+              <option value="">All sponsors</option>
+              {% for s in sponsor_names %}
+                <option value="{{ s }}" {% if sponsor == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% else %}
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2">Sponsor</label>
+            <input class="form-control" value="{{ sponsor }}" disabled>
+            <input type="hidden" name="sponsor" value="{{ sponsor }}">
+          </div>
+          {% endif %}
 
-  <div class="table-responsive">
-    <table class="table table-sm table-striped align-middle">
-      <thead>
-        <tr>
-          {% for col in columns %}<th>{{ col }}</th>{% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% if rows and rows|length %}
-          {% for r in rows %}
+          <div class="col-12 col-md-6 col-lg-4 col-xl-2">
+            <label class="form-label fw-semibold mb-2 d-block">&nbsp;</label>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary flex-fill" type="submit">
+                <i class="fas fa-play me-1"></i>Run
+              </button>
+              <a class="btn btn-primary flex-fill" href="?category={{ category }}&start={{ start }}&end={{ end }}&sponsor={{ sponsor }}&user_id={{ user_id }}&format=csv" style="text-decoration: none !important;">
+                <i class="fas fa-file-csv me-1"></i>CSV
+              </a>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <div class="scrollable-table-container">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
             <tr>
-              {% for cell in r %}<td>{{ cell }}</td>{% endfor %}
+              {% for col in columns %}<th>{{ col }}</th>{% endfor %}
             </tr>
-          {% endfor %}
-        {% else %}
-          <tr><td colspan="{{ columns|length }}" class="text-muted">No results.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
+          </thead>
+          <tbody>
+            {% if rows and rows|length %}
+              {% for r in rows %}
+                <tr>
+                  {% for cell in r %}<td>{{ cell }}</td>{% endfor %}
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="{{ columns|length }}" class="text-center text-muted py-5">
+                  <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                  No results found.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
+
+<style>
+
+.scrollable-table-container {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.scrollable-table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.scrollable-table-container thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+}
+</style>
 {% endblock %}
