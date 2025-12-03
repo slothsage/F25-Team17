@@ -133,8 +133,7 @@ urlpatterns = [
     path("admin/labels/", views.manage_labels, name="manage_labels"),
     path("admin/labels/assign/", views.assign_labels, name="assign_labels"),
     # Driver profile
-    path("", views.profile, name="profile"),
-    path("profile/", views.profile, name="profile_detail"),  # For convenience
+    path("profile/", views.profile, name="profile"),
     path("dashboard/", views.driver_dashboard, name="driver_dashboard"),
     path("dashboard/save-widget-order/", views.save_widget_order, name="save_widget_order"),
     path("profile/edit/", views.profile_edit, name="profile_edit"),
